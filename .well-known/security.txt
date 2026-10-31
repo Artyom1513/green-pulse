@@ -1,0 +1,4 @@
+# Как сообщить об уязвимости на сайте Листопульс (RFC 9116)
+Contact: mailto:your-email@example.com
+Expires: 2027-10-31T00:00:00.000Z
+Preferred-Languages: ru, en

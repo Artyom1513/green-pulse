@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+  <title>Энергия и калории без фанатизма — Листопульс</title>
+  <meta name="description" content="Из чего складывается расход энергии, калькулятор калорий по формуле Миффлина — Сан Жеора, ИМТ и игра «еда в минутах движения».">
+  <link rel="stylesheet" href="../../style.css">
+  <link rel="icon" href="../../img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+  <link rel="manifest" href="../../manifest.webmanifest">
+  <script src="../../theme.js"></script>
+  <script src="../../script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Перейти к содержанию</a>
+  <div class="read-progress" aria-hidden="true"></div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="../../index.html"><img class="brand-mark" src="../../img/logo.svg" alt="" width="28" height="28"><span class="brand-name">Листо<b>пульс</b></span></a>
+
+      <nav id="menu" class="navbar" aria-label="Главное меню">
+        <a href="../../index.html#nutrition" class="active">Питание</a>
+        <a href="../../index.html#workouts">Тренировки</a>
+        <a href="../../index.html#wellness">Здоровье</a>
+        <a href="../../index.html#tools">Инструменты</a>
+        <a href="../../index.html#fun">Игры</a>
+        <a href="../../index.html#blog">Блог</a>
+        <a href="../../index.html#contacts">Контакты</a>
+      </nav>
+
+      <div class="header-tools">
+        <button class="theme-toggle" type="button" aria-label="Сменить тему">
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="content" class="article narrow">
+    <nav class="breadcrumbs" aria-label="Вы находитесь здесь">
+      <a href="../../index.html">Главная</a><span aria-hidden="true">/</span><a href="../../index.html#nutrition">Питание</a>
+    </nav>
+
+    <h1>Энергия и калории без фанатизма</h1>
+    <p class="article-meta">Обновлено 31 октября 2026<span data-reading-time></span></p>
+    <p class="lead">Калория — просто единица энергии. Понимать, сколько энергии нужно телу, полезно, а превращать каждый приём пищи в бухгалтерию — нет. Разбираемся, из чего складывается расход, и считаем ориентиры для себя.</p>
+    <img class="article-cover illo" src="../../img/energy.svg" alt="" width="1200" height="800">
+
+    <nav class="toc" data-toc aria-label="Содержание" hidden></nav>
+
+    <h2 id="what">Что такое калория</h2>
+    <p>На упаковках пишут «ккал» — килокалории. Одна килокалория — это энергия, которая нужна, чтобы нагреть литр воды на один градус. Белки и углеводы дают около 4 ккал на грамм, жиры — 9, алкоголь — 7.</p>
+    <p>Если энергии с едой поступает больше, чем тратится, излишек запасается — в основном в виде жира. Если меньше — организм берёт недостающее из запасов. Это и называется энергетическим балансом.</p>
+
+    <h2 id="spend">На что тратится энергия</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Статья расхода</th><th>Доля</th><th>Что это</th></tr></thead>
+        <tbody>
+          <tr><td>Базовый обмен</td><td>≈ 60–70%</td><td>Работа сердца, мозга, дыхание, поддержание температуры — даже во сне</td></tr>
+          <tr><td>Переваривание еды</td><td>≈ 10%</td><td>Энергия на усвоение пищи; белок требует больше всего</td></tr>
+          <tr><td>Движение</td><td>≈ 20–30%</td><td>Тренировки и вся бытовая активность: ходьба, лестницы, уборка</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Самая изменчивая часть — бытовое движение. У человека, который весь день сидит, и у того, кто много ходит, разница может составлять сотни килокалорий в день — даже без спортзала.</p>
+
+    <h2 id="calc">Сколько энергии нужно вам</h2>
+    <p>Ниже — расчёт по формуле Миффлина — Сан Жеора. Это одна из самых точных простых формул для взрослых, но и она даёт лишь оценку: у реальных людей отклонение может достигать 10% и больше.</p>
+    <div class="tool" id="energy-calc" data-tool="energy">
+      <h3 class="tool-title">Суточная потребность в энергии</h3>
+      <div class="tool-fields">
+        <label class="field">Пол
+          <select name="sex">
+            <option value="f">Женский</option>
+            <option value="m">Мужской</option>
+          </select>
+        </label>
+        <label class="field">Возраст, лет
+          <input name="age" type="number" min="18" max="90" step="1" value="30" inputmode="numeric">
+        </label>
+        <label class="field">Рост, см
+          <input name="height" type="number" min="120" max="230" step="1" value="168" inputmode="numeric">
+        </label>
+        <label class="field">Вес, кг
+          <input name="weight" type="number" min="30" max="250" step="0.5" value="62" inputmode="decimal">
+        </label>
+        <label class="field">Активность
+          <select name="activity">
+            <option value="1.2">Почти без движения</option>
+            <option value="1.375" selected>Лёгкая: 1–3 тренировки в неделю</option>
+            <option value="1.55">Средняя: 3–5 тренировок</option>
+            <option value="1.725">Высокая: 6–7 тренировок</option>
+            <option value="1.9">Очень высокая: физическая работа и спорт</option>
+          </select>
+        </label>
+      </div>
+      <p class="tool-result" aria-live="polite"><strong>≈ 1 870 ккал в день</strong></p>
+      <p class="tool-note">Калькулятор для взрослых 18+. Подросткам, беременным, кормящим и людям с хроническими заболеваниями потребность определяет врач.</p>
+    </div>
+
+    <h2 id="bmi">Индекс массы тела</h2>
+    <p>ИМТ — это вес в килограммах, делённый на квадрат роста в метрах. ВОЗ использует его как простой скрининг для взрослых: 18,5–24,9 — норма, 25–29,9 — избыточная масса тела, 30 и выше — ожирение.</p>
+    <div class="tool" id="bmi-calc" data-tool="bmi">
+      <h3 class="tool-title">Калькулятор ИМТ</h3>
+      <div class="tool-fields">
+        <label class="field">Рост, см
+          <input name="height" type="number" min="120" max="230" step="1" value="168" inputmode="numeric">
+        </label>
+        <label class="field">Вес, кг
+          <input name="weight" type="number" min="30" max="250" step="0.5" value="62" inputmode="decimal">
+        </label>
+      </div>
+      <p class="tool-result" aria-live="polite"><strong>ИМТ ≈ 22</strong></p>
+      <p class="tool-note">ИМТ не различает мышцы и жир: у спортсменов он бывает завышен, у пожилых — занижен. Для детей и подростков до 18 лет ИМТ оценивают по возрастным таблицам — это делает педиатр.</p>
+    </div>
+
+    <h2 id="burn">Игра: еда в минутах движения</h2>
+    <p>Сколько нужно идти, чтобы потратить энергию одного пончика? Это не руководство к действию, а способ почувствовать масштаб. Еду не нужно «отрабатывать», а сладкое не делает вас «должником» перед тренажёром.</p>
+    <div class="tool" id="burn-game" data-tool="burn">
+      <h3 class="tool-title">Перевести в минуты</h3>
+      <div class="tool-fields">
+        <label class="field">Продукт
+          <select name="food">
+            <option value="90">Яблоко среднее</option>
+            <option value="105">Банан средний</option>
+            <option value="120">Капучино 300 мл</option>
+            <option value="140">Сладкая газировка, банка 330 мл</option>
+            <option value="250" selected>Пончик с глазурью</option>
+            <option value="250">Шоколадный батончик 50 г</option>
+            <option value="280">Кусок пиццы</option>
+            <option value="330">Картофель фри, средняя порция</option>
+          </select>
+        </label>
+        <label class="field">Ваш вес, кг
+          <input name="weight" type="number" min="30" max="250" step="0.5" value="70" inputmode="decimal">
+        </label>
+      </div>
+      <p class="tool-result" aria-live="polite"><strong>≈ 250 ккал</strong></p>
+      <ul class="sleep-times burn-list" aria-live="polite"></ul>
+      <p class="tool-note">Калорийность приблизительная и зависит от рецепта и размера порции. Расход рассчитан по таблицам метаболических эквивалентов (MET) и тоже примерный.</p>
+    </div>
+
+    <h2 id="tips">Как питаться без подсчёта калорий</h2>
+    <ul>
+      <li><b>Собирайте тарелку по методу тарелки:</b> половина — овощи, четверть — белок, четверть — цельные злаки. Подробнее — в <a href="../hiper3/h3.html#plate">руководстве по сбалансированному питанию</a>.</li>
+      <li><b>Пейте воду,</b> а не калории: сладкие напитки почти не насыщают.</li>
+      <li><b>Ешьте медленно</b> и останавливайтесь, когда сыты, но без тяжести.</li>
+      <li><b>Держите полезное на виду,</b> а сладости и снеки — подальше.</li>
+      <li><b>Двигайтесь каждый день:</b> даже <a href="../hiper11/h11.html">прогулка</a> заметно увеличивает расход.</li>
+    </ul>
+
+    <aside class="note"><p><b>Важно.</b> Если мысли о еде и весе вызывают тревогу, вы часто чувствуете вину после еды или чередуете жёсткие ограничения и переедание, — не считайте калории, а поговорите с врачом или психологом. Расстройства пищевого поведения лечатся, и чем раньше обратиться, тем лучше.</p></aside>
+
+    <h2 id="sources">Источники</h2>
+    <ul class="sources">
+      <li><a href="https://www.who.int/ru/news-room/fact-sheets/detail/healthy-diet" target="_blank" rel="noopener noreferrer">ВОЗ. Здоровое питание</a></li>
+      <li><a href="https://www.who.int/ru/news-room/fact-sheets/detail/obesity-and-overweight" target="_blank" rel="noopener noreferrer">ВОЗ. Ожирение и избыточный вес</a></li>
+      <li><a href="https://pubmed.ncbi.nlm.nih.gov/2305711/" target="_blank" rel="noopener noreferrer">Mifflin M. D., St Jeor S. T. et al. A new predictive equation for resting energy expenditure in healthy individuals (1990)</a></li>
+      <li><a href="https://pacompendium.com/" target="_blank" rel="noopener noreferrer">Compendium of Physical Activities — таблицы метаболических эквивалентов</a></li>
+    </ul>
+
+    <nav class="article-nav" aria-label="Другие статьи">
+      <a class="prev" href="../hiper11/h11.html"><span>← Предыдущая</span>Ходьба: самая недооценённая тренировка</a>
+      <a class="next" href="../hiper13/h13.html"><span>Следующая →</span>Миф или факт?</a>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>© 2025–2026 Листопульс <span class="age-mark">12+</span><button class="leaf-egg" type="button" aria-label="Секретный листик"><img src="../../img/logo.svg" alt="" width="16" height="16"></button></p>
+      <nav class="footer-nav" aria-label="Правовая информация">
+        <a href="../../legal.html">Правовая информация</a>
+        <a href="../../privacy.html">Персональные данные</a>
+      </nav>
+      <p class="disclaimer">Материалы сайта носят информационный характер и не заменяют консультацию врача.</p>
+    </div>
+  </footer>
+</body>
+</html>

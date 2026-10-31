@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; require-trusted-types-for 'script'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="color-scheme" content="light dark">
-  <title>Силовые тренировки для начинающих — Healthy Life</title>
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+  <title>Силовые тренировки для начинающих — Листопульс</title>
   <meta name="description" content="Зачем нужны силовые, базовые принципы, шесть основных движений и простая программа на всё тело для дома и зала.">
   <link rel="stylesheet" href="../../style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="icon" href="../../img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+  <link rel="manifest" href="../../manifest.webmanifest">
   <script src="../../theme.js"></script>
   <script src="../../script.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Перейти к содержанию</a>
   <div class="read-progress" aria-hidden="true"></div>
-
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="../../index.html">Healthy <b>Life</b></a>
+      <a class="brand" href="../../index.html"><img class="brand-mark" src="../../img/logo.svg" alt="" width="28" height="28"><span class="brand-name">Листо<b>пульс</b></span></a>
 
       <nav id="menu" class="navbar" aria-label="Главное меню">
         <a href="../../index.html#nutrition">Питание</a>
         <a href="../../index.html#workouts" class="active">Тренировки</a>
         <a href="../../index.html#wellness">Здоровье</a>
-        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#tools">Инструменты</a>
+        <a href="../../index.html#fun">Игры</a>
+        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#contacts">Контакты</a>
       </nav>
 
@@ -50,7 +54,7 @@
     <h1>Силовые тренировки для начинающих</h1>
     <p class="article-meta">Обновлено 31 октября 2026<span data-reading-time></span></p>
     <p class="lead">Силовые нужны не только ради рельефа. Они сохраняют мышцы и кости, помогают контролировать вес и делают повседневные дела — от переноски сумок до подъёма по лестнице — заметно легче.</p>
-    <img class="article-cover" src="../../img/strength.jpg" alt="Спортсмен держит гирю" width="1200" height="1799">
+    <img class="article-cover illo" src="../../img/strength.svg" alt="" width="1200" height="800">
 
     <nav class="toc" data-toc aria-label="Содержание" hidden></nav>
 
@@ -101,6 +105,26 @@
       </table>
     </div>
 
+    <h2 id="workout">Генератор тренировки</h2>
+    <p>Надоела одна и та же программа? Нажмите кнопку — и получите новый набор из пяти упражнений: ноги, грудь и руки, спина, корпус и кардио. Подходит для дома: из инвентаря понадобятся разве что устойчивый стул или эспандер.</p>
+    <div class="tool" data-tool="workout">
+      <h3 class="tool-title">Случайная тренировка</h3>
+      <div class="tool-fields">
+        <label class="field">Уровень
+          <select name="level">
+            <option value="easy" selected>Новичок</option>
+            <option value="mid">Уже тренируюсь</option>
+          </select>
+        </label>
+      </div>
+      <ol class="workout-list" aria-live="polite"></ol>
+      <p class="tool-result" data-rounds>Сделайте 2 круга, между кругами отдых 90 секунд.</p>
+      <div class="tool-actions">
+        <button class="btn primary" type="button" data-action="shuffle">Новый набор</button>
+      </div>
+      <p class="tool-note">Начните с разминки 5–7 минут. Если упражнение вызывает боль — замените его или пропустите.</p>
+    </div>
+
     <h2 id="progress">Как прогрессировать</h2>
     <p>Записывайте вес и повторения — в блокноте или приложении. Когда во всех подходах получается верхняя граница повторений (например, 3 × 12) с чистой техникой, увеличьте нагрузку: добавьте 1–2,5 кг или перейдите к более сложному варианту — от отжиманий от стола к отжиманиям от пола.</p>
     <p>Сила обычно заметно растёт уже через 4–6 недель. Видимые изменения в мышцах чаще всего появляются через 2–3 месяца регулярных занятий.</p>
@@ -138,7 +162,7 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <p>© 2025–2026 Healthy Life <span class="age-mark">12+</span></p>
+      <p>© 2025–2026 Листопульс <span class="age-mark">12+</span><button class="leaf-egg" type="button" aria-label="Секретный листик"><img src="../../img/logo.svg" alt="" width="16" height="16"></button></p>
       <nav class="footer-nav" aria-label="Правовая информация">
         <a href="../../legal.html">Правовая информация</a>
         <a href="../../privacy.html">Персональные данные</a>

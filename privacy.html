@@ -3,26 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; require-trusted-types-for 'script'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="color-scheme" content="light dark">
-  <title>Политика обработки персональных данных — Healthy Life</title>
-  <meta name="description" content="Какие персональные данные обрабатывает сайт Healthy Life, зачем, как долго хранит и как их защищает.">
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+  <title>Политика обработки персональных данных — Листопульс</title>
+  <meta name="description" content="Какие персональные данные обрабатывает сайт Листопульс, зачем, как долго хранит и как их защищает.">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
   <script src="theme.js"></script>
   <script src="script.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Перейти к содержанию</a>
-
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="index.html">Healthy <b>Life</b></a>
+      <a class="brand" href="index.html"><img class="brand-mark" src="img/logo.svg" alt="" width="28" height="28"><span class="brand-name">Листо<b>пульс</b></span></a>
+
+      <nav id="menu" class="navbar" aria-label="Главное меню">
+        <a href="index.html#nutrition">Питание</a>
+        <a href="index.html#workouts">Тренировки</a>
+        <a href="index.html#wellness">Здоровье</a>
+        <a href="index.html#tools">Инструменты</a>
+        <a href="index.html#fun">Игры</a>
+        <a href="index.html#blog">Блог</a>
+        <a href="index.html#contacts">Контакты</a>
+      </nav>
+
       <div class="header-tools">
         <button class="theme-toggle" type="button" aria-label="Сменить тему">
           <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
           <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
+          <span></span><span></span><span></span>
         </button>
       </div>
     </div>
@@ -39,15 +56,15 @@
     <nav class="toc" data-toc aria-label="Содержание" hidden></nav>
 
     <h2 id="general">1. Общие положения</h2>
-    <p>1.1. Политика определяет, как обрабатываются и защищаются персональные данные посетителей сайта Healthy Life (далее — сайт). Она разработана в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных».</p>
+    <p>1.1. Политика определяет, как обрабатываются и защищаются персональные данные посетителей сайта «Листопульс» (далее — сайт). Она разработана в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных».</p>
     <p>1.2. Оператор персональных данных — [ФИО владельца сайта] (далее — оператор). Адрес электронной почты для обращений: <a href="mailto:your-email@example.com">your-email@example.com</a>.</p>
     <p>1.3. Политика опубликована в свободном доступе и действует в отношении всех персональных данных, которые оператор получает через сайт.</p>
 
     <h2 id="data">2. Какие данные обрабатываются</h2>
     <p>2.1. Оператор обрабатывает только те данные, которые вы сами сообщаете, отправляя сообщение через форму обратной связи или по электронной почте: имя, адрес электронной почты и текст сообщения.</p>
     <p>2.2. Сайт не использует файлы cookie, системы веб-аналитики, рекламные и иные сторонние скрипты и не собирает сведения о ваших действиях на сайте.</p>
-    <p>2.3. Выбранная тема оформления и отметки в чек-листах сохраняются только в памяти вашего браузера (localStorage) и оператору не передаются. Удалить их можно, очистив данные сайта в настройках браузера.</p>
-    <p>2.4. Сервер хостинг-провайдера может автоматически записывать в технические журналы IP-адрес, сведения о браузере и время обращения к сайту. Эти данные используются только для обеспечения работы и безопасности сайта и хранятся в сроки, установленные хостинг-провайдером.</p>
+    <p>2.3. Выбранная тема оформления, отметки в чек-листах и трекере привычек, выпитые стаканы воды, выполненные вызовы дня и лучший результат теста сохраняются только в памяти вашего браузера (localStorage) и оператору не передаются. Удалить их можно, очистив данные сайта в настройках браузера.</p>
+    <p>2.4. Сайт размещён на хостинге GitHub Pages (GitHub, Inc., США). При открытии страниц ваш браузер обращается напрямую к серверам GitHub, которые могут автоматически записывать в технические журналы IP-адрес, сведения о браузере и время обращения — для работы и защиты хостинга, в соответствии с <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">политикой конфиденциальности GitHub</a>. Оператор доступа к этим журналам не имеет и такие данные не обрабатывает.</p>
 
     <h2 id="purposes">3. Цели и правовые основания</h2>
     <p>3.1. Данные из формы обратной связи обрабатываются с единственной целью — ответить на ваше обращение.</p>
@@ -73,7 +90,7 @@
     <h2 id="security">6. Защита данных</h2>
     <ul>
       <li>сайт работает по защищённому протоколу HTTPS;</li>
-      <li>на сайте нет сторонних скриптов, которые могли бы получить доступ к вводимым данным;</li>
+      <li>на сайте нет сторонних скриптов, которые могли бы получить доступ к вводимым данным, а браузеру запрещено выполнять внедрённый код (Content Security Policy);</li>
       <li>доступ к почтовому ящику, в который приходят обращения, есть только у оператора и защищён надёжным паролем и двухфакторной аутентификацией;</li>
       <li>обращения удаляются по истечении срока хранения.</li>
     </ul>
@@ -87,7 +104,7 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <p>© 2025–2026 Healthy Life <span class="age-mark">12+</span></p>
+      <p>© 2025–2026 Листопульс <span class="age-mark">12+</span><button class="leaf-egg" type="button" aria-label="Секретный листик"><img src="img/logo.svg" alt="" width="16" height="16"></button></p>
       <nav class="footer-nav" aria-label="Правовая информация">
         <a href="legal.html">Правовая информация</a>
         <a href="privacy.html">Персональные данные</a>

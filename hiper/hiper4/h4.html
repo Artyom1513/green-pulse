@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; require-trusted-types-for 'script'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="color-scheme" content="light dark">
-  <title>Кардио: как начать и тренироваться с пользой — Healthy Life</title>
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+  <title>Кардио: как начать и тренироваться с пользой — Листопульс</title>
   <meta name="description" content="Сколько кардио нужно по рекомендациям ВОЗ, как определить интенсивность, калькулятор пульсовых зон и план на 8 недель для новичка.">
   <link rel="stylesheet" href="../../style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="icon" href="../../img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+  <link rel="manifest" href="../../manifest.webmanifest">
   <script src="../../theme.js"></script>
   <script src="../../script.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Перейти к содержанию</a>
   <div class="read-progress" aria-hidden="true"></div>
-
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="../../index.html">Healthy <b>Life</b></a>
+      <a class="brand" href="../../index.html"><img class="brand-mark" src="../../img/logo.svg" alt="" width="28" height="28"><span class="brand-name">Листо<b>пульс</b></span></a>
 
       <nav id="menu" class="navbar" aria-label="Главное меню">
         <a href="../../index.html#nutrition">Питание</a>
         <a href="../../index.html#workouts" class="active">Тренировки</a>
         <a href="../../index.html#wellness">Здоровье</a>
-        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#tools">Инструменты</a>
+        <a href="../../index.html#fun">Игры</a>
+        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#contacts">Контакты</a>
       </nav>
 
@@ -50,7 +54,7 @@
     <h1>Кардио: как начать и тренироваться с пользой</h1>
     <p class="article-meta">Обновлено 31 октября 2026<span data-reading-time></span></p>
     <p class="lead">Аэробные нагрузки укрепляют сердце и сосуды, повышают выносливость и улучшают настроение. Разбираемся, сколько нужно двигаться, как подобрать интенсивность и с чего начать.</p>
-    <img class="article-cover" src="../../img/cardio.jpg" alt="Бегун на городской улице" width="1200" height="1800">
+    <img class="article-cover illo" src="../../img/cardio.svg" alt="" width="1200" height="800">
 
     <nav class="toc" data-toc aria-label="Содержание" hidden></nav>
 
@@ -167,7 +171,7 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <p>© 2025–2026 Healthy Life <span class="age-mark">12+</span></p>
+      <p>© 2025–2026 Листопульс <span class="age-mark">12+</span><button class="leaf-egg" type="button" aria-label="Секретный листик"><img src="../../img/logo.svg" alt="" width="16" height="16"></button></p>
       <nav class="footer-nav" aria-label="Правовая информация">
         <a href="../../legal.html">Правовая информация</a>
         <a href="../../privacy.html">Персональные данные</a>

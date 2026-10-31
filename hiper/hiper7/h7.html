@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; require-trusted-types-for 'script'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="color-scheme" content="light dark">
-  <title>Здоровые мысли и сон — Healthy Life</title>
+  <meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
+  <title>Здоровые мысли и сон — Листопульс</title>
   <meta name="description" content="Сколько нужно спать, циклы сна и калькулятор времени отбоя, 10 правил гигиены сна и практики против стресса.">
   <link rel="stylesheet" href="../../style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+  <link rel="icon" href="../../img/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+  <link rel="manifest" href="../../manifest.webmanifest">
   <script src="../../theme.js"></script>
   <script src="../../script.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Перейти к содержанию</a>
   <div class="read-progress" aria-hidden="true"></div>
-
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="../../index.html">Healthy <b>Life</b></a>
+      <a class="brand" href="../../index.html"><img class="brand-mark" src="../../img/logo.svg" alt="" width="28" height="28"><span class="brand-name">Листо<b>пульс</b></span></a>
 
       <nav id="menu" class="navbar" aria-label="Главное меню">
         <a href="../../index.html#nutrition">Питание</a>
         <a href="../../index.html#workouts">Тренировки</a>
         <a href="../../index.html#wellness" class="active">Здоровье</a>
-        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#tools">Инструменты</a>
+        <a href="../../index.html#fun">Игры</a>
+        <a href="../../index.html#blog">Блог</a>
         <a href="../../index.html#contacts">Контакты</a>
       </nav>
 
@@ -50,7 +54,7 @@
     <h1>Здоровые мысли и сон</h1>
     <p class="article-meta">Обновлено 31 октября 2026<span data-reading-time></span></p>
     <p class="lead">Сон и психическое здоровье тесно связаны: плохой сон усиливает тревогу, а тревога мешает спать. Разорвать этот круг помогают простые ежедневные привычки.</p>
-    <img class="article-cover" src="../../img/friends.jpg" alt="Три девушки смеются, сидя на полу спортивного зала" width="1200" height="800">
+    <img class="article-cover illo" src="../../img/mind.svg" alt="" width="1200" height="800">
 
     <nav class="toc" data-toc aria-label="Содержание" hidden></nav>
 
@@ -114,7 +118,7 @@
     <h2 id="help">Когда обратиться к специалисту</h2>
     <p>Если подавленное настроение, тревога или бессонница длятся больше двух недель и мешают работать, общаться или радоваться жизни, обратитесь к врачу — терапевту, психотерапевту или психиатру — или к психологу. Это такие же проблемы со здоровьем, как и любые другие, и они хорошо поддаются лечению. Например, хроническую бессонницу эффективно лечат методами когнитивно-поведенческой терапии, без снотворного.</p>
 
-    <aside class="note"><p><b>Если вам очень тяжело</b> или появляются мысли причинить себе вред, не оставайтесь с этим в одиночку. Позвоните на единый номер экстренных служб <b>112</b> или прямо сейчас свяжитесь с близким человеком.</p></aside>
+    <aside class="note"><p><b>Если вам очень тяжело</b> или появляются мысли причинить себе вред, не оставайтесь с этим в одиночку. Позвоните на единый номер экстренных служб <b>112</b> или прямо сейчас свяжитесь с близким человеком. Подросткам и их родителям бесплатно и анонимно помогут по детскому телефону доверия <b>8-800-2000-122</b>.</p></aside>
 
     <h2 id="sources">Источники</h2>
     <ul class="sources">
@@ -135,7 +139,7 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <p>© 2025–2026 Healthy Life <span class="age-mark">12+</span></p>
+      <p>© 2025–2026 Листопульс <span class="age-mark">12+</span><button class="leaf-egg" type="button" aria-label="Секретный листик"><img src="../../img/logo.svg" alt="" width="16" height="16"></button></p>
       <nav class="footer-nav" aria-label="Правовая информация">
         <a href="../../legal.html">Правовая информация</a>
         <a href="../../privacy.html">Персональные данные</a>
