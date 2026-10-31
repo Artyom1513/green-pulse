@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self' mailto:; object-src 'none'; require-trusted-types-for 'script'" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Healthy Life — питание, тренировки, здоровье</title>
+  <meta name="description" content="Понятные советы о питании, тренировках, сне и ментальном здоровье: статьи на основе рекомендаций ВОЗ, калькуляторы и практики." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>" />
+  <script src="theme.js"></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Перейти к содержанию</a>
+
+  <!-- Шапка -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="#top">Healthy <b>Life</b></a>
+
+      <nav id="menu" class="navbar" aria-label="Главное меню">
+        <a href="#nutrition">Питание</a>
+        <a href="#workouts">Тренировки</a>
+        <a href="#wellness">Здоровье</a>
+        <a href="#blog">Блог</a>
+        <a href="#tools">Инструменты</a>
+        <a href="#contacts">Контакты</a>
+      </nav>
+
+      <div class="header-tools">
+        <button class="theme-toggle" type="button" aria-label="Сменить тему">
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <button class="burger" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="content">
+    <!-- HERO -->
+    <section id="top" class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Спорт и здоровье</p>
+          <h1>Быстрее. Выше. <span>Сильнее.</span></h1>
+          <p class="lead">
+            Понятные советы о питании, тренировках и сне — на основе рекомендаций ВОЗ
+            и научных данных. Плюс калькуляторы и практики, которые работают прямо в браузере.
+          </p>
+          <div class="cta-row">
+            <a href="#nutrition" class="btn primary">Начать с питания</a>
+            <a href="#tools" class="btn ghost">Инструменты</a>
+          </div>
+        </div>
+        <div class="hero-media">
+          <img src="img/climber.jpg" alt="Скалолаз тянется к выступу скалы" width="1200" height="1500" fetchpriority="high" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ЦИФРЫ -->
+    <section id="facts" class="section" aria-labelledby="facts-title">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Главное в цифрах</p>
+          <h2 id="facts-title">Четыре ориентира на каждый день</h2>
+          <p class="lead">Рекомендации Всемирной организации здравоохранения для взрослых: запомнить легко, выполнять — ещё проще.</p>
+        </div>
+
+        <ul class="facts stagger">
+          <li class="fact reveal">
+            <span class="fact-num"><span data-count="150">150</span><small>мин</small></span>
+            <span class="fact-text">умеренной активности в неделю — минимум для взрослых</span>
+          </li>
+          <li class="fact reveal">
+            <span class="fact-num"><span data-count="400">400</span><small>г</small></span>
+            <span class="fact-text">овощей и фруктов в день, не считая картофеля</span>
+          </li>
+          <li class="fact reveal">
+            <span class="fact-num"><span data-count="25">25</span><small>г</small></span>
+            <span class="fact-text">клетчатки в день — из цельных злаков, бобовых, овощей</span>
+          </li>
+          <li class="fact reveal">
+            <span class="fact-num"><span data-count="5">5</span><small>г</small></span>
+            <span class="fact-text">соли в день — это потолок, а не цель</span>
+          </li>
+        </ul>
+
+        <div class="tip reveal">
+          <p class="eyebrow">Совет дня</p>
+          <p class="tip-text" data-tip aria-live="polite">Поставьте бутылку воды на рабочий стол — пить станете чаще без всяких напоминаний.</p>
+          <button class="btn ghost btn-sm" type="button" data-tip-next>Другой совет</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ПИТАНИЕ -->
+    <section id="nutrition" class="section">
+      <div class="container split">
+        <div class="reveal">
+          <p class="eyebrow">Питание</p>
+          <h2>Чистое питание для результатов</h2>
+          <p class="lead">Сбалансированная тарелка, вода и белок. Простая система — стабильный прогресс.</p>
+          <ul class="key-points">
+            <li><b>½ тарелки</b> — овощи и фрукты</li>
+            <li><b>30–35 мл</b> воды на 1 кг веса в день</li>
+            <li><b>Белок</b> в каждом приёме пищи</li>
+          </ul>
+          <ul class="link-list">
+            <li><a href="hiper/hiper1/h1.html">Основы правильного питания</a></li>
+            <li><a href="hiper/hiper2/h2.html">Здоровое питание: рекомендации ВОЗ</a></li>
+            <li><a href="hiper/hiper3/h3.html">Сбалансированное питание: руководство</a></li>
+          </ul>
+        </div>
+        <figure class="plate media reveal">
+          <svg viewBox="0 0 240 240" role="img" aria-label="Тарелка: половина — овощи и фрукты, четверть — белок, четверть — цельные злаки">
+            <circle class="plate-rim" cx="120" cy="120" r="116"/>
+            <path class="plate-veg" d="M120 20 A100 100 0 0 0 120 220 Z"/>
+            <path class="plate-protein" d="M120 120 L120 20 A100 100 0 0 1 220 120 Z"/>
+            <path class="plate-grain" d="M120 120 L220 120 A100 100 0 0 1 120 220 Z"/>
+            <text x="72" y="116" text-anchor="middle">Овощи<tspan x="72" dy="16">и фрукты</tspan></text>
+            <text x="164" y="82" text-anchor="middle">Белок</text>
+            <text x="164" y="160" text-anchor="middle">Цельные<tspan x="164" dy="16">злаки</tspan></text>
+          </svg>
+          <figcaption>Метод тарелки: ½ — овощи и фрукты, ¼ — белок, ¼ — цельные злаки.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ТРЕНИРОВКИ -->
+    <section id="workouts" class="section">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Тренировки</p>
+          <h2>Движение каждый день</h2>
+          <p class="lead">Три опоры физической формы: выносливость, сила и подвижность.</p>
+        </div>
+
+        <div class="cards stagger">
+          <a class="card reveal" href="hiper/hiper4/h4.html">
+            <img src="img/cardio.jpg" alt="Бегун на городской улице" width="1200" height="1800" loading="lazy" />
+            <div class="card-body">
+              <h3>Кардио</h3>
+              <p>Сколько нужно, как подобрать пульс и план на 8 недель для новичка.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+          <a class="card reveal" href="hiper/hiper5/h5.html">
+            <img src="img/strength.jpg" alt="Спортсмен держит гирю" width="1200" height="1799" loading="lazy" />
+            <div class="card-body">
+              <h3>Силовые</h3>
+              <p>Шесть базовых движений и простая программа на всё тело.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+          <a class="card reveal" href="hiper/hiper6/h6.html">
+            <img class="focus-low" src="img/mobility.jpg" alt="Девушка выполняет упражнение на растяжку на коврике" width="1200" height="1802" loading="lazy" />
+            <div class="card-body">
+              <h3>Мобильность</h3>
+              <p>Растяжка и йога: комплекс на 10 минут с таймером.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ЗДОРОВЬЕ -->
+    <section id="wellness" class="section">
+      <div class="container split">
+        <div class="reveal">
+          <p class="eyebrow">Здоровье</p>
+          <h2>Мысли, сон и стресс</h2>
+          <p class="lead">Сколько нужно спать, 10 правил гигиены сна и практики, которые помогают справляться со стрессом.</p>
+          <a class="btn ghost" href="hiper/hiper7/h7.html">Здоровые мысли и сон →</a>
+        </div>
+        <div class="media reveal">
+          <img src="img/friends.jpg" alt="Три девушки смеются, сидя на полу спортивного зала" width="1200" height="800" loading="lazy" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ИНСТРУМЕНТЫ -->
+    <section id="tools" class="section">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Инструменты</p>
+          <h2>Посчитать и попробовать</h2>
+          <p class="lead">Калькуляторы и практики внутри статей. Работают прямо в браузере и ничего никуда не отправляют.</p>
+        </div>
+
+        <ul class="tools-grid stagger">
+          <li class="reveal"><a class="tool-link" href="hiper/hiper1/h1.html#protein-calc">
+            <span class="tool-icon" aria-hidden="true">🥚</span>
+            <span><b>Калькулятор белка</b><span class="muted">Сколько белка нужно именно вам</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper3/h3.html#water-calc">
+            <span class="tool-icon" aria-hidden="true">💧</span>
+            <span><b>Норма воды</b><span class="muted">Ориентир по жидкости на день</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper4/h4.html#zones">
+            <span class="tool-icon" aria-hidden="true">❤️</span>
+            <span><b>Пульсовые зоны</b><span class="muted">Тренируйтесь с нужной интенсивностью</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper6/h6.html#routine">
+            <span class="tool-icon" aria-hidden="true">🧘</span>
+            <span><b>Таймер растяжки</b><span class="muted">10 минут мобильности с подсказками</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper7/h7.html#sleep-calc">
+            <span class="tool-icon" aria-hidden="true">🌙</span>
+            <span><b>Калькулятор сна</b><span class="muted">Когда лечь, чтобы легче встать</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper8/h8.html#checklist">
+            <span class="tool-icon" aria-hidden="true">☀️</span>
+            <span><b>Утренний чек-лист</b><span class="muted">Шесть шагов к бодрому утру</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper9/h9.html#shopping">
+            <span class="tool-icon" aria-hidden="true">🛒</span>
+            <span><b>Список покупок</b><span class="muted">Полезная корзина на неделю</span></span>
+          </a></li>
+          <li class="reveal"><a class="tool-link" href="hiper/hiper10/h10.html#breathing">
+            <span class="tool-icon" aria-hidden="true">🌬️</span>
+            <span><b>Дыхание 4–7–8</b><span class="muted">Минута, чтобы успокоиться</span></span>
+          </a></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- БЛОГ -->
+    <section id="blog" class="section">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Блог</p>
+          <h2>Советы на каждый день</h2>
+        </div>
+
+        <div class="cards stagger">
+          <a class="card reveal" href="hiper/hiper8/h8.html">
+            <img src="img/mat-workout.jpg" alt="Девушки делают упражнения на ковриках в светлом зале" width="1200" height="800" loading="lazy" />
+            <div class="card-body">
+              <h3>Как правильно начать день</h3>
+              <p>Утренний ритуал на 20 минут, идеи завтраков и чек-лист.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+          <a class="card reveal" href="hiper/hiper9/h9.html">
+            <img src="img/bowl.jpg" alt="Тарелка с яйцом, авокадо, киноа, кукурузой и томатами" width="1200" height="1187" loading="lazy" />
+            <div class="card-body">
+              <h3>10 продуктов для здорового рациона</h3>
+              <p>Почему «суперфудов» не бывает и что купить вместо них.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+          <a class="card reveal" href="hiper/hiper10/h10.html">
+            <img src="img/rest.jpg" alt="Мужчина отдыхает на кровати с закрытыми глазами" width="1200" height="814" loading="lazy" />
+            <div class="card-body">
+              <h3>Вечерняя разгрузка</h3>
+              <p>Как плавно «выключить» мозг перед сном. С дыхательной практикой.</p>
+              <p class="more">Читать →</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ЧАСТЫЕ ВОПРОСЫ -->
+    <section id="faq" class="section">
+      <div class="narrow">
+        <p class="eyebrow">Вопросы</p>
+        <h2>Частые вопросы</h2>
+        <div class="faq">
+          <details>
+            <summary>С чего начать после долгого перерыва в спорте?</summary>
+            <div class="faq-body">
+              <p>С ходьбы: 10–15 минут в день в комфортном темпе, каждую неделю прибавляйте по 5 минут. Через 3–4 недели добавьте две короткие силовые тренировки с весом собственного тела. На старте регулярность важнее интенсивности.</p>
+              <p>Если у вас есть хронические заболевания или вы беременны — сначала посоветуйтесь с врачом.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Сколько воды нужно пить?</summary>
+            <div class="faq-body">
+              <p>Единой нормы нет. Удобный ориентир — 30–35 мл на килограмм веса в сутки с учётом чая, супов и других напитков; в жару и в дни тренировок — больше. Признак, что воды хватает: нет жажды, а моча светло-жёлтая. Свою норму можно посчитать в <a href="hiper/hiper3/h3.html#water-calc">калькуляторе</a>. При болезнях сердца и почек питьевой режим определяет врач.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Можно ли есть после 18:00?</summary>
+            <div class="faq-body">
+              <p>Можно. На вес влияет общее количество еды за день, а не время на часах. Но плотный ужин прямо перед сном мешает засыпанию, поэтому последний большой приём пищи лучше устроить за 2–3 часа до сна.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Нужны ли витамины и БАДы?</summary>
+            <div class="faq-body">
+              <p>При разнообразном питании большинству людей добавки не нужны. Они имеют смысл при подтверждённом дефиците — например, витамина D или железа. Дефицит определяют по анализам, а дозу назначает врач: избыток некоторых витаминов тоже вреден.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Сколько нужно спать?</summary>
+            <div class="faq-body">
+              <p>Взрослым — 7–9 часов, подросткам 14–17 лет — 8–10 часов, людям старше 65 — 7–8 часов. Не менее важна регулярность: ложитесь и вставайте примерно в одно время, даже в выходные.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Что лучше для похудения — кардио или силовые?</summary>
+            <div class="faq-body">
+              <p>Вес снижается, когда калорий расходуется больше, чем поступает, а тренировки помогают этого добиться. Лучший результат даёт сочетание: кардио тренирует сердце и выносливость, а силовые сохраняют мышцы, которые иначе уходят вместе с весом.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Как не бросить через неделю?</summary>
+            <div class="faq-body">
+              <p>Ставьте маленькие конкретные цели («три прогулки на этой неделе»), вносите тренировки в календарь и отмечайте выполненное. Пропуск — не провал: просто вернитесь к плану на следующий день.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- КОНТАКТЫ -->
+    <section id="contacts" class="section">
+      <div class="narrow">
+        <p class="eyebrow">Контакты</p>
+        <h2>Свяжитесь с нами</h2>
+        <p class="lead">Вопрос, идея для статьи или замечание? Напишите — ответим.</p>
+
+        <!-- Адрес почты для формы указывается в action (mailto:...) -->
+        <form class="contact-form" action="mailto:your-email@example.com" method="post" enctype="text/plain">
+          <div class="field">
+            <label for="name">Имя</label>
+            <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required />
+          </div>
+          <div class="field">
+            <label for="email">E-mail для ответа</label>
+            <input id="email" name="email" type="email" autocomplete="email" maxlength="120" required />
+          </div>
+          <div class="field">
+            <label for="message">Сообщение</label>
+            <textarea id="message" name="message" rows="5" maxlength="1000" required></textarea>
+          </div>
+          <label class="check consent">
+            <input type="checkbox" name="consent" required />
+            <span>Я даю <a href="consent.html" target="_blank" rel="noopener">согласие на обработку персональных данных</a></span>
+          </label>
+          <p class="form-note">Как мы обращаемся с данными — в <a href="privacy.html" target="_blank" rel="noopener">политике обработки персональных данных</a>. Письмо отправится из вашего почтового приложения.</p>
+          <button type="submit" class="btn primary">Отправить</button>
+          <p class="form-status" role="status" hidden></p>
+        </form>
+        <p class="muted">Или напишите напрямую: <a href="mailto:your-email@example.com">your-email@example.com</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>© 2025–2026 Healthy Life <span class="age-mark">12+</span></p>
+      <nav class="footer-nav" aria-label="Правовая информация">
+        <a href="legal.html">Правовая информация</a>
+        <a href="privacy.html">Персональные данные</a>
+      </nav>
+      <p class="disclaimer">Материалы сайта носят информационный характер и не заменяют консультацию врача.</p>
+    </div>
+  </footer>
+</body>
+</html>
