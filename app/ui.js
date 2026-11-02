@@ -79,7 +79,12 @@ const ICONS = {
   drop: ["M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"],
   heart: ["M20.8 5.6a5 5 0 0 0-7.6 0L12 6.9l-1.2-1.3a5 5 0 0 0-7.6 6.6L12 21l8.8-8.8a5 5 0 0 0 0-6.6z"],
   refresh: ["M3 12a9 9 0 0 1 15.5-6.2L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1-15.5 6.2L3 16", "M3 21v-5h5"],
-  alert: ["M12 3l10 18H2z", "M12 10v5", "M12 18h.01"]
+  alert: ["M12 3l10 18H2z", "M12 10v5", "M12 18h.01"],
+  plus: ["M12 5v14", "M5 12h14"],
+  minus: ["M5 12h14"],
+  aid: ["M4 7h16v13H4z", "M9 7V4h6v3", "M12 10.5v6", "M9 13.5h6"],
+  trophy: ["M8 21h8", "M12 17v4", "M7 4h10v5a5 5 0 0 1-10 0z", "M7 6H4a3 3 0 0 0 3 4", "M17 6h3a3 3 0 0 1-3 4"],
+  share: ["M12 3v12", "M7 8l5-5 5 5", "M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"]
 };
 
 export function icon(name, size = 22) {
@@ -104,6 +109,12 @@ export function toast(message) {
 
 // ----- Нижняя панель-«шторка» -----
 let openSheets = 0;
+// Переход по ссылке внутри окна (например, к статье справочника) закрывает открытые окна
+const openClosers = new Set();
+export function closeSheets() {
+  for (const close of [...openClosers]) close();
+}
+window.addEventListener("hashchange", closeSheets);
 export function sheet({ title, body, actions = [], onClose, wide = false }) {
   const previousFocus = document.activeElement;
   const titleId = `sheet-${Math.random().toString(36).slice(2, 8)}`;
@@ -125,6 +136,7 @@ export function sheet({ title, body, actions = [], onClose, wide = false }) {
   function close(result) {
     if (closed) return;
     closed = true;
+    openClosers.delete(close);
     document.removeEventListener("keydown", onKey);
     backdrop.classList.add("is-closing");
     openSheets = Math.max(0, openSheets - 1);
@@ -135,6 +147,7 @@ export function sheet({ title, body, actions = [], onClose, wide = false }) {
   }
   document.addEventListener("keydown", onKey);
   document.body.append(backdrop);
+  openClosers.add(close);
   openSheets += 1;
   document.documentElement.classList.add("no-scroll");
   requestAnimationFrame(() => {

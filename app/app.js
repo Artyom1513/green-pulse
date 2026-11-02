@@ -3,12 +3,14 @@
 import { h, s, icon, toast, sheet, confirmSheet, choice, toggle, ring, unlockAudio, beep, buzz, speak, keepAwake, confetti, download, mmss, fmtDate } from "./ui.js";
 import * as store from "./store.js";
 import {
-  REGIONS, HOTSPOTS, SEVERITY, CONDITIONS, AGE_GROUPS, GOALS, LEVELS, EQUIPMENT, GROUPS,
-  EXERCISES, EX, QUICK, BADGES, TIPS, RED_FLAGS, SCREENING
+  REGIONS, REGION_GROUPS, SIDES, HOTSPOTS, SEVERITY, SYMPTOMS, ONSET, TRIGGERS, CONDITIONS, AGE_GROUPS, GOALS, LEVELS,
+  EQUIPMENT, GROUPS, EXERCISES, EX, QUICK, PROGRAMS, RECORD_EX, BADGES, TIPS, RED_FLAGS, SCREENING
 } from "./data.js";
+import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
+import { webglSupported, createFigure } from "./body3d.js";
 import * as E from "./engine.js";
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -21,6 +23,60 @@ let started = false;
 let lastRoute = "";
 let installPrompt = null;
 let player = null;
+const postRender = []; // действия после вставки экрана в документ (например, размер 3D-сцены)
+
+// ===== 3D-модель =====
+// Один WebGL-контекст на всё приложение: сцена переносится между экранами, а не создаётся заново
+let figure = null;
+let figureFailed = false;
+let figureMode = "rotate";
+function getFigure() {
+  if (figure || figureFailed) return figure;
+  if (!webglSupported()) { figureFailed = true; return null; }
+  try {
+    figure = createFigure({
+      regions: REGIONS.map(r => r.id),
+      label: "3D-модель человека. Касание выбирает зону, режим «Обвести» выделяет область",
+      onTap: (id, side) => regionSheet(id, side),
+      onLasso: result => onLasso(result)
+    });
+  } catch (e) {
+    figureFailed = true;
+    figure = null;
+  }
+  return figure;
+}
+const isDark = () => {
+  const t = document.documentElement.dataset.theme;
+  return t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches);
+};
+const SEV_RGB = [null, [0.98, 0.76, 0.28], [0.98, 0.52, 0.22], [0.92, 0.25, 0.25]];
+const mixRGB = (a, b, w) => [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, a[2] + (b[2] - a[2]) * w];
+function paintFigure() {
+  if (!figure || !state) return;
+  const dark = isDark();
+  figure.setTheme({ rim: dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29], amb: dark ? 0.3 : 0.4 });
+  const base = dark ? [0.55, 0.62, 0.6] : [0.86, 0.91, 0.89];
+  const tint = {};
+  for (const reg of REGIONS) {
+    const sev = E.regionSeverity(state, reg.id, E.dayKey(), false);
+    if (sev) tint[reg.id] = { sev, sides: (state.body[reg.id] && state.body[reg.id].sides) || [] };
+  }
+  const marks = state.marks;
+  figure.setColorizer((id, side, p, n) => {
+    let col = base;
+    const t = tint[id];
+    if (t && (!t.sides.length || !side || t.sides.includes(side))) col = mixRGB(col, SEV_RGB[t.sev], 0.62);
+    for (const m of marks) {
+      const d = Math.hypot(p[0] - m.c[0], p[1] - m.c[1], p[2] - m.c[2]);
+      if (d < m.r && n[0] * m.n[0] + n[1] * m.n[1] + n[2] * m.n[2] > -0.25) {
+        col = mixRGB(col, SEV_RGB[Math.max(1, m.sev)], 0.5 + 0.45 * (1 - (d / m.r) ** 2));
+      }
+    }
+    return col;
+  });
+  figure.repaint();
+}
 
 // ===== Сохранение =====
 // Сохраняем только настоящие изменения: иначе вкладка со старыми данными при закрытии
@@ -125,6 +181,7 @@ function startApp() {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", () => { flush(); });
     window.addEventListener("storage", onStorage);
+    try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintFigure); } catch (e) { /* старый браузер */ }
   }
   render();
 }
@@ -219,11 +276,13 @@ function showLock(env) {
 }
 
 // ===== Маршруты =====
-const ROUTES = { today: viewToday, workout: viewWorkout, body: viewBody, journal: viewJournal, more: viewMore };
+const ROUTES = { today: viewToday, workout: viewWorkout, body: viewBody, journal: viewJournal, more: viewMore, guide: viewGuide, program: viewProgram };
+const TAB_OF = { guide: "body", program: "workout" };
 const TABS = [["today", "Сегодня", "today"], ["workout", "Тренировка", "workout"], ["body", "Тело", "body"], ["journal", "Дневник", "journal"], ["more", "Ещё", "more"]];
 
 function render() {
   if (!state) return;
+  postRender.length = 0;
   if (!state.profile.onboarded) return renderOnboarding();
   let hash = "";
   try { hash = decodeURIComponent(window.location.hash.replace(/^#\/?/, "")); } catch (e) { hash = ""; }
@@ -234,8 +293,13 @@ function render() {
   const keep = key === lastRoute;
   lastRoute = key;
   const main = h("main", { class: "view", id: "main" }, ROUTES[name](sub));
-  app.replaceChildren(h("div", { class: "shell" }, topbar(), main), tabbar(name));
+  app.replaceChildren(h("div", { class: "shell" }, topbar(), main), tabbar(TAB_OF[name] || name));
   window.scrollTo(0, keep ? y : 0);
+  runPostRender();
+}
+function runPostRender() {
+  const tasks = postRender.splice(0);
+  for (const task of tasks) task();
 }
 const refresh = () => render();
 
@@ -256,7 +320,7 @@ let planCache = { key: "", plan: null };
 const variant = () => (state.planVariant.d === E.dayKey() ? state.planVariant.n : 0);
 function currentPlan() {
   const d = E.dayKey();
-  const key = JSON.stringify([d, state.profile, state.body, state.checkins.find(c => c.d === d) || null, state.modeOverride, variant(), state.progress.factor]);
+  const key = JSON.stringify([d, state.profile, state.body, state.marks, state.checkins.find(c => c.d === d) || null, state.modeOverride, variant(), state.progress.factor]);
   if (planCache.key !== key) planCache = { key, plan: E.buildSession(state, { variant: variant() }) };
   return planCache.plan;
 }
@@ -337,7 +401,7 @@ function checkinCard() {
       h("div", { class: "scale-labels" }, h("span", { text: sc.lo }), h("span", { text: sc.hi })))),
     h("div", { class: "q" },
       h("b", { text: "Что-то болит сегодня?" }),
-      choice({ multiple: true, label: "Что болит сегодня", value: [], options: REGIONS.map(r => ({ value: r.id, label: r.name })), onChange: v => { draft.pain = v; } })),
+      painPicker(draft)),
     h("button", {
       class: "btn primary block", type: "button", text: "Сохранить",
       onClick: () => {
@@ -351,6 +415,22 @@ function checkinCard() {
         toast(nb.length ? badgeToast(nb) : `Режим на сегодня: ${E.MODES[currentPlan().mode].name.toLowerCase()}`);
       }
     }));
+}
+
+const BASE_PAIN = ["neck", "shoulder", "elbow", "wrist", "upperBack", "lowerBack", "hip", "knee", "ankle"];
+function painPicker(draft) {
+  const first = [...new Set([...trackedRegions(), ...BASE_PAIN])];
+  const order = [...first, ...REGIONS.map(r => r.id).filter(id => !first.includes(id))];
+  const group = choice({ multiple: true, label: "Что болит сегодня", value: draft.pain, options: order.map(id => ({ value: id, label: REGION[id].name })), onChange: v => { draft.pain = v; } });
+  const extra = [...group.children].slice(first.length);
+  if (!extra.length) return group;
+  extra.forEach(b => { b.hidden = true; });
+  const more = h("button", {
+    class: "chip more-chip", type: "button", text: `Ещё ${extra.length} ${E.plural(extra.length, "зона", "зоны", "зон")}`,
+    onClick: () => { extra.forEach(b => { b.hidden = false; }); more.remove(); }
+  });
+  group.append(more);
+  return group;
 }
 
 function readinessCard(ci) {
@@ -493,6 +573,12 @@ function viewWorkout() {
       h("span", { class: "fi" }, icon("bolt", 20)),
       h("span", { class: "row-text" }, h("b", { text: q.name }), h("span", { class: "muted small", text: q.desc })),
       icon("chevron", 18)))),
+    programsSection(),
+    h("h2", { class: "section-title", text: "Испытай себя" }),
+    h("a", { class: "quick-item glass", href: "#more/records" },
+      h("span", { class: "fi" }, icon("trophy", 20)),
+      h("span", { class: "row-text" }, h("b", { text: "Рекорды статики" }), h("span", { class: "muted small", text: "Сколько продержитесь в планке или «стульчике»?" })),
+      icon("chevron", 18)),
     h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#more/library", text: "Библиотека упражнений →" })));
   return out;
 }
@@ -543,6 +629,51 @@ function exerciseSheet(id) {
 }
 
 // ===== Тело =====
+const SIDE_WORD = { R: "справа", L: "слева" };
+const zoneName = (id, side) => (side ? `${REGION[id].name} (${SIDE_WORD[side]})` : REGION[id].name);
+const symptomName = id => (SYMPTOMS.find(x => x.id === id) || { name: id }).name;
+const emptyBody = () => ({ sev: 0, note: "", since: "", temp: null, sides: [], symptoms: [], onset: "", triggers: [] });
+const painTier = v => (v >= 7 ? 3 : v >= 4 ? 2 : v >= 1 ? 1 : 0);
+const painWord = v => (v === 0 ? "не болит" : v <= 3 ? "слабая" : v <= 6 ? "умеренная" : v <= 9 ? "сильная" : "нестерпимая");
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const STAGE_HINT = {
+  rotate: "Ведите пальцем по фигуре, чтобы повернуть её. Коснитесь зоны, чтобы отметить её.",
+  lasso: "Обведите пальцем место, которое беспокоит, — потом опишите, что там происходит."
+};
+const STAGE_VIEWS = [["front", "Спереди"], ["back", "Сзади"], ["side", "Сбоку"]];
+
+function bodyStage() {
+  const fig = getFigure();
+  if (!fig) {
+    return [bodyMap(), h("p", { class: "muted small center", text: "Объёмная модель не поддерживается этим браузером, поэтому показана простая карта. Все зоны есть в списке ниже." })];
+  }
+  fig.setMode(figureMode);
+  const hint = h("p", { class: "stage-hint", "aria-live": "polite", text: STAGE_HINT[figureMode] });
+  const mode = choice({
+    className: "seg stage-mode", label: "Режим работы с моделью", value: figureMode,
+    options: [{ value: "rotate", label: "Вращать" }, { value: "lasso", label: "✎ Обвести" }],
+    onChange: v => { figureMode = v; fig.setMode(v); hint.textContent = STAGE_HINT[v]; }
+  });
+  const tool = (ic, label, fn) => h("button", { class: "icon-btn", type: "button", "aria-label": label, title: label, onClick: fn }, icon(ic, 18));
+  postRender.push(() => { fig.resize(); paintFigure(); fig.intro(); });
+  return h("div", { class: "stage" },
+    mode,
+    h("div", { class: "stage-box" },
+      fig.el,
+      h("div", { class: "stage-tools" },
+        tool("plus", "Приблизить", () => fig.zoomBy(1.25)),
+        tool("minus", "Отдалить", () => fig.zoomBy(0.8)),
+        tool("refresh", "Исходный вид", () => fig.reset()))),
+    h("div", { class: "chips stage-views", role: "group", "aria-label": "Ракурс" },
+      STAGE_VIEWS.map(([id, label]) => h("button", { class: "chip", type: "button", onClick: () => fig.setView(id) }, label))),
+    hint,
+    h("div", { class: "legend" },
+      [1, 2, 3].map(v => h("span", { class: `pill sev-${v}`, text: SEVERITY[v].name })),
+      h("span", { class: "pill sel-pill", text: "выделение" })),
+    h("p", { class: "muted small center", text: "Модель стоит к вам лицом: её правая сторона — слева от вас." }));
+}
+
 function viewBody() {
   const r = E.restrictions(state);
   const caution = state.profile.conditions.includes("caution");
@@ -550,9 +681,12 @@ function viewBody() {
   const notes = [...new Set(r.notes)];
   return [
     h("h1", { class: "page-title", text: "Тело" }),
-    h("p", { class: "lead", text: "Отметьте травмы, боль и особенности здоровья — тренер уберёт опасные упражнения и подскажет, что делать. Данные остаются только на этом устройстве." }),
-    h("section", { class: "card glass" }, bodyMap(), h("div", { class: "legend" }, [1, 2, 3].map(v => h("span", { class: `pill sev-${v}`, text: SEVERITY[v].name })))),
-    h("section", { class: "card glass" }, h("h2", { text: "Зоны" }), h("div", { class: "list" }, REGIONS.map(reg => regionRow(reg, r)))),
+    h("p", { class: "lead", text: "Коснитесь зоны на модели или обведите место, которое болит, — тренер уберёт опасные упражнения и подскажет, что делать. Данные остаются на этом устройстве." }),
+    h("section", { class: "card glass stage-card" }, bodyStage()),
+    marksCard(),
+    painCard(),
+    regionsCard(r),
+    guideCard(),
     h("section", { class: "card glass" },
       h("h2", { text: "Особенности здоровья" }),
       h("p", { class: "muted small", text: "Выберите всё, что к вам относится, — уберём неподходящие типы нагрузки." }),
@@ -584,23 +718,263 @@ function viewBody() {
       h("h2", { text: "Как работает тренер" }),
       h("ul", { class: "bullets" },
         h("li", { text: "«Дискомфорт» убирает упражнения с заметной нагрузкой на зону, «ограничение» и «острая боль» — все упражнения, которые её нагружают." }),
+        h("li", { text: "Обведённая область работает так же: тренер учитывает каждую зону внутри обводки." }),
         h("li", { text: "Особенности здоровья исключают опасные типы нагрузки: прыжки, высокую интенсивность, положения вниз головой и другие." }),
         h("li", { text: "Кнопка «Больно» во время тренировки сразу заменяет упражнение и 7 дней бережёт эту зону." }),
         h("li", { text: "Это общие правила безопасности, а не диагноз. Если что-то болит долго или сильно — покажитесь врачу." })))
   ];
 }
 
+// ----- Обведённые области -----
+function markLabel(m) {
+  const names = m.regions.map(x => zoneName(x.id, x.side));
+  return names.length > 2 ? `${names.slice(0, 2).join(", ")} и ещё ${names.length - 2}` : names.join(", ");
+}
+function markSub(m) {
+  return [
+    m.d ? fmtDate(m.d) : "",
+    m.pain ? `боль ${m.pain} из 10` : "",
+    m.symptoms.length ? `${symptomName(m.symptoms[0]).toLowerCase()}${m.symptoms.length > 1 ? ` +${m.symptoms.length - 1}` : ""}` : "",
+    m.note
+  ].filter(Boolean).join(" · ");
+}
+function startLasso() {
+  figureMode = "lasso";
+  if (figure) figure.setMode("lasso");
+  render();
+  const card = document.querySelector(".stage-card");
+  if (card) card.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" });
+}
+function marksCard() {
+  if (!figure && !state.marks.length) return null;
+  const list = state.marks.slice().reverse();
+  return h("section", { class: "card glass" },
+    h("div", { class: "card-head" },
+      h("div", {},
+        h("p", { class: "eyebrow", text: "Обведено на модели" }),
+        h("h2", { text: list.length ? `${list.length} ${E.plural(list.length, "область", "области", "областей")}` : "Пока пусто" })),
+      figure ? h("button", { class: "btn small ghost", type: "button", onClick: startLasso, text: "✎ Обвести" }) : null),
+    list.length
+      ? h("div", { class: "list" }, list.map(m => h("button", { class: "row row-btn", type: "button", onClick: () => markSheet(null, m) },
+        h("span", { class: "row-text" }, h("b", { text: markLabel(m) }), h("span", { class: "muted small", text: markSub(m) })),
+        h("span", { class: `pill sev-${m.sev}`, text: SEVERITY[m.sev].name }),
+        icon("chevron", 18))))
+      : h("p", { class: "muted small", text: "Нажмите «Обвести» и проведите пальцем вокруг места, которое болит, — например, внутренней части колена или области под лопаткой. Областей может быть несколько." }));
+}
+
+// ----- Дневник боли -----
+function trackedRegions() {
+  const ids = new Set(E.painRegions(state, 30));
+  const today = E.dayKey();
+  for (const [id, b] of Object.entries(state.body)) if (b.sev || (b.temp && b.temp.until >= today)) ids.add(id);
+  for (const m of state.marks) for (const x of m.regions) ids.add(x.id);
+  return REGIONS.map(x => x.id).filter(id => ids.has(id));
+}
+function painSpark(points) {
+  const from = E.shiftDay(E.dayKey(), -29);
+  const t0 = new Date(`${from}T12:00:00`).getTime();
+  const pts = points.map(p => [4 + (Math.round((new Date(`${p.d}T12:00:00`).getTime() - t0) / 864e5) * 92) / 29, 26 - p.level * 2.2]);
+  const last = pts[pts.length - 1];
+  return s("svg", { class: "mini-spark", viewBox: "0 0 100 30", preserveAspectRatio: "none", "aria-hidden": "true" },
+    s("polyline", { points: pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ") }),
+    s("circle", { cx: last[0].toFixed(1), cy: last[1].toFixed(1), r: 2.6 }));
+}
+function trendText(t) {
+  if (!t) return { text: "записей пока нет", cls: "muted" };
+  if (t.points.length < 2) return { text: `${fmtDate(t.since)}: ${t.last} из 10`, cls: "muted" };
+  if (t.delta < 0) return { text: `↓ на ${-t.delta} с ${fmtDate(t.since)}`, cls: "good" };
+  if (t.delta > 0) return { text: `↑ на ${t.delta} с ${fmtDate(t.since)}`, cls: "bad" };
+  return { text: `без изменений с ${fmtDate(t.since)}`, cls: "muted" };
+}
+function painCard() {
+  const ids = trackedRegions();
+  if (!ids.length) return null;
+  const today = E.dayKey();
+  return h("section", { class: "card glass" },
+    h("p", { class: "eyebrow", text: "Дневник боли" }),
+    h("h2", { text: "Как меняется боль" }),
+    h("p", { class: "muted small", text: "Отмечайте силу боли от 0 до 10 раз в день — по линии видно, идёт ли восстановление. Нажмите на зону, чтобы записать." }),
+    h("div", { class: "list" }, ids.slice(0, 12).map(id => {
+      const t = E.painTrend(state, id, 30);
+      const tr = trendText(t);
+      const todayLevel = t && t.points[t.points.length - 1].d === today ? t.last : null;
+      return h("button", { class: "row row-btn", type: "button", onClick: () => painLogSheet(id) },
+        h("span", { class: "row-text" }, h("b", { text: REGION[id].name }), h("span", { class: `small ${tr.cls}`, text: tr.text })),
+        t && t.points.length > 1 ? painSpark(t.points) : null,
+        h("span", { class: `pain-level lvl-${todayLevel === null ? "none" : painTier(todayLevel)}`, "aria-hidden": "true", text: todayLevel === null ? "+" : String(todayLevel) }),
+        h("span", { class: "visually-hidden", text: todayLevel === null ? "Сегодня не записано" : `Сегодня ${todayLevel} из 10` }));
+    })),
+    ids.length > 12 ? h("p", { class: "muted small", text: `Показаны 12 зон из ${ids.length}.` }) : null);
+}
+
+function painRange(draft, onInput) {
+  const out = h("output", { class: "pain-out" });
+  const input = h("input", { class: "range", type: "range", min: 0, max: 10, step: 1, value: draft.pain, "aria-label": "Сила боли от 0 до 10" });
+  const paint = () => {
+    const v = Number(input.value);
+    out.textContent = `${v} из 10 — ${painWord(v)}`;
+    out.className = `pain-out lvl-${painTier(v)}`;
+    input.setAttribute("aria-valuetext", `${v} из 10, ${painWord(v)}`);
+  };
+  input.addEventListener("input", () => {
+    draft.pain = Number(input.value);
+    draft.painTouched = true;
+    paint();
+    if (onInput) onInput();
+  });
+  paint();
+  return h("div", { class: "pain-range" }, input, out,
+    h("div", { class: "scale-labels" }, h("span", { text: "0 — не болит" }), h("span", { text: "10 — сильнейшая" })));
+}
+
+function painLogSheet(id) {
+  const reg = REGION[id];
+  const t = E.painTrend(state, id, 30);
+  const draft = { pain: t ? t.last : 0, painTouched: false };
+  const recent = t ? t.points.slice(-6).reverse() : [];
+  const close = sheet({
+    title: reg.name,
+    body: [
+      h("p", { class: "muted small", text: "Насколько болит сейчас? Запись за сегодня можно исправить в любой момент." }),
+      painRange(draft),
+      recent.length ? [
+        h("h3", { class: "sub-title", text: "Последние записи" }),
+        h("div", { class: "list" }, recent.map(p => h("div", { class: "row" },
+          h("span", { class: "row-text" }, h("b", { text: fmtDate(p.d) })),
+          h("span", { class: `pain-level lvl-${painTier(p.level)}`, text: String(p.level) }))))
+      ] : null,
+      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Боль, которая нарастает, будит ночью или идёт вместе с отёком, онемением или температурой, — повод показаться врачу." })
+    ],
+    actions: [h("button", {
+      class: "btn primary", type: "button", text: "Записать",
+      onClick: () => {
+        E.logPain(state, id, draft.pain);
+        const nb = E.newBadges(state);
+        persist();
+        close();
+        refresh();
+        toast(nb.length ? badgeToast(nb) : `Записали: ${draft.pain} из 10`);
+        suggestSeverity(id, draft.pain);
+      }
+    })]
+  });
+}
+
+// Сильную боль предлагаем сразу учесть в тренировках
+async function suggestSeverity(id, pain) {
+  const want = pain >= 7 ? 3 : pain >= 4 ? 2 : 0;
+  if (!want || E.regionSeverity(state, id) >= want) return;
+  const zone = REGION[id].name.toLowerCase();
+  const ok = await confirmSheet({
+    title: want === 3 ? "Похоже на сильную боль" : "Боль заметная",
+    message: want === 3
+      ? `${pain} из 10. Отметить зону «${zone}» как острую боль? Тренер исключит любую нагрузку на неё. Сильная боль — повод обратиться к врачу.`
+      : `${pain} из 10. Отметить зону «${zone}» как ограничение? Тренер перестанет её нагружать.`,
+    ok: "Да, учесть", cancel: "Не нужно"
+  });
+  if (!ok || !state) return;
+  const b = state.body[id] || (state.body[id] = emptyBody());
+  b.sev = want;
+  persist();
+  refresh();
+  toast("Тренировки подстроены");
+}
+
+// ----- Описание проблемы: общие поля для зоны и обведённой области -----
+function problemFields(draft) {
+  const warn = h("div", { class: "note-box", role: "status", hidden: true });
+  const update = () => {
+    const msgs = [];
+    if (draft.pain >= 7) msgs.push("Боль 7 из 10 и сильнее — повод показаться врачу. Пока выберите «Острая боль»: тренер уберёт любую нагрузку на зону.");
+    const flags = draft.symptoms.map(id => SYMPTOMS.find(x => x.id === id)).filter(x => x && x.flag);
+    if (flags.length) msgs.push(`${flags.map(x => x.name).join(", ")} — с такими признаками лучше показаться врачу, особенно если они появились недавно или нарастают.`);
+    if (draft.onset === "days" && ["swelling", "bruise", "sprain"].some(x => draft.symptoms.includes(x))) {
+      msgs.push("Свежая травма: первые 1–3 дня берегите зону и держите её приподнятой, холод через ткань — до 15–20 минут. Потом — осторожное движение без сильной боли.");
+    }
+    warn.hidden = !msgs.length;
+    warn.replaceChildren(...msgs.map(m => h("p", { class: "small", text: m })));
+  };
+  const note = h("textarea", { class: "input", maxlength: 300, rows: 3, placeholder: "Например: болит внутри колена после бега, хуже на лестнице" });
+  note.value = draft.note;
+  note.addEventListener("input", () => { draft.note = note.value; });
+  update();
+  return [
+    h("div", { class: "q" }, h("b", { text: "Сила боли" }), painRange(draft, update)),
+    h("div", { class: "q" }, h("b", { text: "Что беспокоит" }),
+      choice({ multiple: true, label: "Что беспокоит", value: draft.symptoms, options: SYMPTOMS.map(x => ({ value: x.id, label: x.name })), onChange: v => { draft.symptoms = v; update(); } })),
+    h("div", { class: "q" }, h("b", { text: "Когда началось" }),
+      choice({ label: "Когда началось", value: draft.onset, options: [{ value: "", label: "Не указано" }, ...ONSET.map(x => ({ value: x.id, label: x.name }))], onChange: v => { draft.onset = v; update(); } })),
+    h("div", { class: "q" }, h("b", { text: "Когда усиливается" }),
+      choice({ multiple: true, label: "Когда усиливается", value: draft.triggers, options: TRIGGERS.map(x => ({ value: x.id, label: x.name })), onChange: v => { draft.triggers = v; } })),
+    h("label", { class: "field" }, h("span", { text: "Заметка — видна только вам" }), note),
+    warn
+  ];
+}
+
+// Статьи справочника для зон. beforeGo сохраняет черновик перед переходом
+function guideFor(regionIds) {
+  const seen = new Set();
+  for (const id of regionIds) for (const g of REGION[id].guides || []) if (own(GUIDE_BY_ID, g)) seen.add(g);
+  return [...seen].map(g => GUIDE_BY_ID[g]);
+}
+function guideRow(a, beforeGo) {
+  return h("a", { class: "row", href: `#guide/${a.id}`, onClick: () => { if (beforeGo) beforeGo(); } },
+    h("span", { class: "fi" }, icon("book", 18)),
+    h("span", { class: "row-text" }, h("b", { text: a.title }), h("span", { class: "muted small", text: a.short })),
+    state.guideRead.includes(a.id) ? h("span", { class: "pill muted-pill", text: "прочитано" }) : null,
+    icon("chevron", 18));
+}
+function guideLinks(regionIds, beforeGo) {
+  const list = guideFor(regionIds).slice(0, 4);
+  if (!list.length) return null;
+  return [h("h3", { class: "sub-title", text: "Что почитать" }), h("div", { class: "list" }, list.map(a => guideRow(a, beforeGo)))];
+}
+function guideCard() {
+  const mine = guideFor(trackedRegions());
+  return h("section", { class: "card glass" },
+    h("p", { class: "eyebrow", text: "Справочник" }),
+    h("h2", { text: "Травмы и боль: что делать" }),
+    h("p", { class: "muted small", text: `${GUIDE.length} ${E.plural(GUIDE.length, "статья", "статьи", "статей")}: первая помощь, когда идти к врачу и как вернуться к нагрузке. По открытым рекомендациям NHS, NICE и консенсусам спортивных врачей.` }),
+    mine.length ? h("div", { class: "list" }, mine.slice(0, 3).map(a => guideRow(a))) : null,
+    h("div", { class: "btn-row" }, h("a", { class: "btn primary", href: "#guide" }, icon("book", 18), "Открыть справочник")));
+}
+
+// ----- Список зон -----
+function regionsCard(r) {
+  return h("section", { class: "card glass" },
+    h("h2", { text: "Все зоны" }),
+    h("p", { class: "muted small", text: `${REGIONS.length} ${E.plural(REGIONS.length, "зона", "зоны", "зон")} — от головы до стопы. Откройте группу и выберите зону.` }),
+    REGION_GROUPS.map(g => {
+      const regs = REGIONS.filter(x => x.group === g.id);
+      const top = Math.max(0, ...regs.map(x => r.regionSev[x.id] || 0));
+      const marked = regs.filter(x => r.regionSev[x.id]).length;
+      return h("details", { class: "group", open: marked > 0 },
+        h("summary", {},
+          h("span", { text: g.name }),
+          marked ? h("span", { class: `pill sev-${top}`, text: `${marked} из ${regs.length}` }) : h("span", { class: "muted small", text: `${regs.length} ${E.plural(regs.length, "зона", "зоны", "зон")}` })),
+        h("div", { class: "list" }, regs.map(reg => regionRow(reg, r))));
+    }));
+}
+
 function regionRow(reg, r) {
   const sev = r.regionSev[reg.id];
   const b = state.body[reg.id];
-  const tempActive = b && b.temp && b.temp.until >= E.dayKey();
-  const sub = b && b.note ? b.note : tempActive ? `После сигнала боли бережём до ${fmtDate(b.temp.until)}` : "";
+  const today = E.dayKey();
+  const ci = state.checkins.find(c => c.d === today);
+  const bits = [];
+  if (b && b.sides.length === 1) bits.push(SIDE_WORD[b.sides[0]]);
+  if (b && b.symptoms.length) bits.push(`${symptomName(b.symptoms[0]).toLowerCase()}${b.symptoms.length > 1 ? ` +${b.symptoms.length - 1}` : ""}`);
+  if (b && b.note) bits.push(b.note);
+  if (b && b.temp && b.temp.until >= today) bits.push(`после сигнала боли бережём до ${fmtDate(b.temp.until)}`);
+  if (ci && ci.pain.includes(reg.id)) bits.push("болит сегодня");
+  if (E.markSeverity(state, reg.id) && !(b && b.sev)) bits.push("обведено на модели");
   return h("button", { class: "row row-btn", type: "button", onClick: () => regionSheet(reg.id) },
-    h("span", { class: "row-text" }, h("b", { text: reg.name }), sub ? h("span", { class: "muted small", text: sub }) : null),
+    h("span", { class: "row-text" }, h("b", { text: reg.name }), bits.length ? h("span", { class: "muted small", text: bits.join(" · ") }) : null),
     h("span", { class: `pill ${sev ? `sev-${sev}` : "muted-pill"}`, text: sev ? SEVERITY[sev].name : "в порядке" }),
     icon("chevron", 18));
 }
 
+// Простая карта — запасной вариант, если браузер не умеет WebGL
 function bodyMap() {
   const r = E.restrictions(state);
   const svg = s("svg", { viewBox: "0 0 200 420", role: "group", "aria-label": "Карта тела, вид сзади" },
@@ -631,35 +1005,70 @@ function bodyMap() {
   return h("div", { class: "bodymap" }, svg, h("p", { class: "bm-caption", text: "Вид сзади. Нажмите на точку, чтобы отметить зону" }));
 }
 
-function regionSheet(id) {
+// Сколько упражнений уйдёт из тренировок при выбранной тяжести
+function effectBox(box, regionIds, sev) {
+  const found = new Map();
+  for (const id of new Set(regionIds)) for (const ex of E.excludedByRegion(id, sev)) found.set(ex.id, ex);
+  const removed = [...found.values()];
+  box.className = `note-box${removed.length ? "" : " ok"}`;
+  box.replaceChildren(removed.length
+    ? h("span", {}, h("b", { text: `Исключим ${removed.length} ${E.plural(removed.length, "упражнение", "упражнения", "упражнений")}: ` }),
+      `${removed.slice(0, 5).map(e => e.name).join(", ")}${removed.length > 5 ? " и другие" : ""}.`)
+    : h("span", { text: "Все упражнения остаются доступны." }));
+}
+
+// ----- Карточка зоны -----
+function regionSheet(id, tappedSide = "") {
   const reg = REGION[id];
+  if (!reg || player) return;
   const today = E.dayKey();
-  const entry = state.body[id] || { sev: 0, note: "", since: "", temp: null };
+  const stored = state.body[id];
+  const entry = stored || emptyBody();
   const tempActive = !!(entry.temp && entry.temp.until >= today);
-  const draft = { sev: entry.sev, note: entry.note, since: entry.since, clearTemp: false };
+  const t = E.painTrend(state, id, 30);
+  const draft = {
+    sev: entry.sev, note: entry.note, since: entry.since || "", clearTemp: false,
+    sides: stored && entry.sides.length ? entry.sides.slice() : reg.sided && tappedSide ? [tappedSide] : [],
+    symptoms: entry.symptoms.slice(), onset: entry.onset, triggers: entry.triggers.slice(),
+    pain: t ? t.last : 0, painTouched: false
+  };
   const desc = h("p", { class: "muted small", style: { marginTop: "10px" } });
   const effect = h("div", { class: "note-box" });
   const updateInfo = () => {
     desc.textContent = SEVERITY[draft.sev].desc;
-    const preview = { ...state, body: { ...state.body, [id]: { sev: draft.sev, note: "", since: "", temp: null } } };
-    const rr = E.restrictions(preview);
-    const removed = EXERCISES.filter(ex => (ex.load[id] || 0) > rr.regionMax[id]);
-    effect.className = `note-box${removed.length ? "" : " ok"}`;
-    effect.replaceChildren(removed.length
-      ? h("span", {}, h("b", { text: `Исключим ${removed.length} ${E.plural(removed.length, "упражнение", "упражнения", "упражнений")}: ` }),
-        `${removed.slice(0, 5).map(e => e.name).join(", ")}${removed.length > 5 ? " и другие" : ""}.`)
-      : h("span", { text: "Все упражнения остаются доступны." }));
+    effectBox(effect, [id], draft.sev);
   };
-  const note = h("textarea", { class: "input", maxlength: 200, rows: 3, placeholder: "Например: старая травма, болит при приседаниях" });
-  note.value = draft.note;
-  note.addEventListener("input", () => { draft.note = note.value; });
   const since = h("input", { class: "input", type: "date", max: today, value: draft.since });
   since.addEventListener("change", () => { draft.since = since.value; });
+  const marksHere = state.marks.filter(m => m.regions.some(x => x.id === id));
+  const described = !!(entry.symptoms.length || entry.onset || entry.triggers.length || entry.note || t);
+
+  const commit = () => {
+    const temp = tempActive && !draft.clearTemp ? entry.temp : null;
+    const noteText = clean(draft.note, 300);
+    const sinceValue = /^\d{4}-\d{2}-\d{2}$/.test(draft.since) && draft.since <= today ? draft.since : "";
+    const keep = draft.sev || noteText || temp || draft.symptoms.length || draft.onset || draft.triggers.length;
+    if (!keep) delete state.body[id];
+    else {
+      state.body[id] = {
+        sev: draft.sev, note: noteText, since: sinceValue, temp, sides: reg.sided ? draft.sides.slice() : [],
+        symptoms: draft.symptoms.slice(), onset: draft.onset, triggers: draft.triggers.slice()
+      };
+    }
+    if (draft.painTouched) E.logPain(state, id, draft.pain);
+    const nb = E.newBadges(state);
+    persist();
+    return nb;
+  };
 
   const close = sheet({
     title: reg.name,
     body: [
-      choice({ label: "Состояние зоны", value: draft.sev, options: SEVERITY.map(x => ({ value: x.v, label: x.name })), onChange: v => { draft.sev = v; updateInfo(); } }),
+      reg.sided ? h("div", { class: "q" }, h("b", { text: "Сторона" }),
+        choice({ multiple: true, label: "Сторона", value: draft.sides, options: SIDES.map(x => ({ value: x.id, label: x.name })), onChange: v => { draft.sides = v; } }),
+        h("p", { class: "muted small", style: { marginTop: "6px" }, text: "Не выбрано ничего — значит, обе стороны." })) : null,
+      h("div", { class: "q" }, h("b", { text: "Состояние зоны" }),
+        choice({ label: "Состояние зоны", value: draft.sev, options: SEVERITY.map(x => ({ value: x.v, label: x.name })), onChange: v => { draft.sev = v; updateInfo(); } })),
       desc, effect,
       tempActive ? h("div", { class: "note-box" },
         h("p", { class: "small", text: `После сигнала боли на тренировке зона под защитой до ${fmtDate(entry.temp.until)}.` }),
@@ -667,27 +1076,146 @@ function regionSheet(id) {
           class: "btn small ghost", type: "button", text: "Уже не болит — снять защиту",
           onClick: e => { draft.clearTemp = true; e.currentTarget.disabled = true; e.currentTarget.textContent = "Снимем после сохранения"; }
         })) : null,
-      h("label", { class: "field", style: { marginTop: "14px" } }, h("span", { text: "Заметка — видна только вам" }), note),
+      marksHere.length ? h("p", { class: "small", style: { marginTop: "10px" }, text: `Эта зона есть в ${marksHere.length} ${E.plural(marksHere.length, "обведённой области", "обведённых областях", "обведённых областях")} — их тренер тоже учитывает.` }) : null,
+      h("details", { class: "more", open: described },
+        h("summary", { text: "Описать проблему подробнее" }),
+        problemFields(draft)),
       h("label", { class: "field" }, h("span", { text: "С какого времени (необязательно)" }), since),
+      guideLinks([id], commit),
       h("h3", { class: "sub-title", text: "Советы" }),
-      h("ul", { class: "bullets small" }, reg.tips.map(t => h("li", { text: t })))
+      h("ul", { class: "bullets small" }, reg.tips.map(x => h("li", { text: x })))
     ],
     actions: [h("button", {
       class: "btn primary", type: "button", text: "Сохранить",
       onClick: () => {
-        const temp = tempActive && !draft.clearTemp ? entry.temp : null;
-        const noteText = clean(draft.note, 200);
-        const sinceValue = /^\d{4}-\d{2}-\d{2}$/.test(draft.since) && draft.since <= today ? draft.since : "";
-        if (!draft.sev && !noteText && !temp) delete state.body[id];
-        else state.body[id] = { sev: draft.sev, note: noteText, since: sinceValue, temp };
-        persist();
+        const nb = commit();
         close();
         refresh();
-        toast(draft.sev ? `Сохранено. Тренировки подстроены под зону «${reg.name.toLowerCase()}»` : "Сохранено");
+        toast(nb.length ? badgeToast(nb) : draft.sev ? `Сохранено. Тренировки подстроены под зону «${reg.name.toLowerCase()}»` : "Сохранено");
       }
     })]
   });
   updateInfo();
+}
+
+// ----- Обводка на 3D-модели -----
+function onLasso(result) {
+  if (player) return;
+  if (!result || !result.regions.length) {
+    if (figure) figure.clearSelection();
+    toast("Обведите область прямо на фигуре");
+    return;
+  }
+  markSheet(result, null);
+}
+
+const zoneOptions = () => REGIONS.flatMap(reg => (reg.sided ? [{ id: reg.id, side: "R" }, { id: reg.id, side: "L" }] : [{ id: reg.id, side: "" }]));
+
+function markSheet(result, existing) {
+  const today = E.dayKey();
+  const src = existing || {
+    regions: result.regions.slice(0, 8).map(x => ({ id: x.region, side: REGION[x.region].sided ? x.side : "" })),
+    c: result.center, n: result.normal, r: result.radius,
+    sev: 2, pain: 0, symptoms: [], onset: "", triggers: [], note: ""
+  };
+  const draft = {
+    regions: src.regions.map(x => ({ id: x.id, side: x.side })), sev: Math.max(1, src.sev),
+    pain: src.pain, painTouched: false, symptoms: src.symptoms.slice(), onset: src.onset, triggers: src.triggers.slice(), note: src.note
+  };
+  const err = h("p", { class: "error", role: "alert" });
+  const zones = h("div", { class: "chips zone-chips", role: "group", "aria-label": "Зоны в обведённой области" });
+  const addSel = h("select", { class: "input", "aria-label": "Добавить зону" });
+  const desc = h("p", { class: "muted small", style: { marginTop: "10px" } });
+  const effect = h("div", { class: "note-box" });
+  const updateEffect = () => {
+    desc.textContent = SEVERITY[draft.sev].desc;
+    effectBox(effect, draft.regions.map(z => z.id), draft.sev);
+  };
+  const fillZones = () => {
+    zones.replaceChildren(...draft.regions.map((z, i) => h("button", {
+      class: "chip", type: "button", "aria-pressed": "true", "aria-label": `Убрать зону: ${zoneName(z.id, z.side)}`,
+      onClick: () => {
+        if (draft.regions.length === 1) { err.textContent = "Должна остаться хотя бы одна зона"; return; }
+        err.textContent = "";
+        draft.regions.splice(i, 1);
+        fillZones();
+        updateEffect();
+      }
+    }, zoneName(z.id, z.side), h("span", { class: "chip-x", "aria-hidden": "true", text: "×" }))));
+    addSel.replaceChildren(h("option", { value: "", text: "+ Добавить зону" }),
+      ...zoneOptions().filter(o => !draft.regions.some(z => z.id === o.id && z.side === o.side))
+        .map(o => h("option", { value: `${o.id}|${o.side}`, text: zoneName(o.id, o.side) })));
+    addSel.value = "";
+  };
+  addSel.addEventListener("change", () => {
+    const [id, side] = addSel.value.split("|");
+    if (!own(REGION, id)) return;
+    if (draft.regions.length >= 8) { err.textContent = "В одной области — не больше 8 зон"; addSel.value = ""; return; }
+    err.textContent = "";
+    draft.regions.push({ id, side: REGION[id].sided && SIDE_WORD[side] ? side : "" });
+    fillZones();
+    updateEffect();
+  });
+  fillZones();
+
+  const commit = () => {
+    if (!existing && state.marks.length >= 40) { err.textContent = "Можно сохранить до 40 областей — удалите старые"; return null; }
+    const mark = {
+      id: existing ? existing.id : newId(), d: existing ? existing.d || today : today,
+      regions: draft.regions.slice(0, 8), c: src.c, n: src.n, r: src.r,
+      sev: draft.sev, pain: draft.pain, symptoms: draft.symptoms.slice(), onset: draft.onset,
+      triggers: draft.triggers.slice(), note: clean(draft.note, 300)
+    };
+    state.marks = existing ? state.marks.map(m => (m.id === existing.id ? mark : m)) : state.marks.concat(mark);
+    if (draft.painTouched || (!existing && draft.pain > 0)) {
+      for (const id of new Set(mark.regions.map(z => z.id))) E.logPain(state, id, draft.pain);
+    }
+    const nb = E.newBadges(state);
+    persist();
+    return nb;
+  };
+
+  const actions = [];
+  if (existing) {
+    actions.push(h("button", {
+      class: "btn ghost", type: "button", text: "Удалить",
+      onClick: () => {
+        state.marks = state.marks.filter(m => m.id !== existing.id);
+        persist();
+        close();
+        refresh();
+        toast("Область удалена");
+      }
+    }));
+  }
+  actions.push(h("button", {
+    class: "btn primary", type: "button", text: "Сохранить",
+    onClick: () => {
+      const nb = commit();
+      if (!nb) return;
+      close();
+      refresh();
+      toast(nb.length ? badgeToast(nb) : "Сохранено — тренер учтёт эту область");
+    }
+  }));
+
+  const close = sheet({
+    title: existing ? "Обведённая область" : "Что беспокоит здесь?",
+    onClose: () => { if (figure) figure.clearSelection(); },
+    body: [
+      h("p", { class: "muted small", text: existing ? `Отмечено ${existing.d ? fmtDate(existing.d) : "раньше"}. Можно поменять описание или удалить область.` : "Мы нашли эти зоны внутри обводки. Лишнее уберите касанием, недостающее добавьте из списка." }),
+      zones, addSel,
+      h("div", { class: "q", style: { marginTop: "16px" } }, h("b", { text: "Насколько мешает" }),
+        choice({ label: "Насколько мешает", value: draft.sev, options: SEVERITY.filter(x => x.v).map(x => ({ value: x.v, label: x.name })), onChange: v => { draft.sev = v; updateEffect(); } })),
+      desc, effect,
+      problemFields(draft),
+      guideLinks([...new Set(draft.regions.map(z => z.id))], () => { if (commit()) toast("Область сохранена"); }),
+      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Описание остаётся на этом устройстве и нужно только для подбора упражнений. Это не диагноз." }),
+      err
+    ],
+    actions
+  });
+  updateEffect();
 }
 
 // ===== Дневник =====
@@ -739,8 +1267,45 @@ function sparkline(list) {
     pts.map(([x, y]) => s("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: 3.5 })));
 }
 
+// Итоги недели для «Поделиться»: только активность, без сведений о здоровье
+function weekStats() {
+  const from = E.shiftDay(E.dayKey(), -6);
+  const sess = state.sessions.filter(x => x.d >= from);
+  const cis = state.checkins.filter(c => c.d >= from);
+  return {
+    workouts: sess.filter(x => x.goal !== "activity").length,
+    mins: sess.reduce((a, x) => a + x.mins, 0),
+    avg: cis.length ? Math.round(cis.reduce((a, c) => a + c.score, 0) / cis.length) : null,
+    badges: Object.values(state.badges).filter(d => d >= from).length
+  };
+}
+function weekShareText() {
+  const w = weekStats();
+  const st = E.streak(state);
+  if (!w.mins) return "Начинаю тренироваться с Листопульсом — бесплатным тренером, который подстраивает упражнения под травмы и самочувствие 🌿";
+  return `Моя неделя в Листопульсе: ${w.workouts} ${E.plural(w.workouts, "тренировка", "тренировки", "тренировок")} и ${w.mins} ${E.plural(w.mins, "минута", "минуты", "минут")} активности` +
+    `${st ? `, серия ${st} ${E.plural(st, "день", "дня", "дней")} подряд` : ""}${w.badges ? `, новых наград: ${w.badges}` : ""} 🌿`;
+}
+async function shareText(textValue) {
+  try {
+    if (navigator.share) {
+      await navigator.share({ text: textValue });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+  }
+  try {
+    await navigator.clipboard.writeText(textValue);
+    toast("Текст скопирован — вставьте его в сообщение");
+  } catch (e) {
+    toast("Не удалось поделиться в этом браузере");
+  }
+}
+
 function viewJournal() {
   const days = E.minutesByDay(state, 7);
+  const w = weekStats();
   const max = Math.max(30, ...days.map(x => x.mins));
   const total = state.sessions.reduce((a, x) => a + x.mins, 0);
   const week = E.weekMinutes(state);
@@ -757,8 +1322,10 @@ function viewJournal() {
       stat(total, E.plural(total, "минута всего", "минуты всего", "минут всего")),
       stat(E.streak(state), E.plural(E.streak(state), "день подряд", "дня подряд", "дней подряд")))),
     h("section", { class: "card glass" },
-      h("h2", { text: "Последние 7 дней" }),
-      h("p", { class: "muted small", text: `${week} мин из 150 рекомендованных ВОЗ` }),
+      h("div", { class: "card-head" },
+        h("h2", { text: "Последние 7 дней" }),
+        h("button", { class: "btn small ghost", type: "button", onClick: () => shareText(weekShareText()) }, icon("share", 16), "Поделиться")),
+      h("p", { class: "muted small", text: `${week} мин из 150 рекомендованных ВОЗ · ${w.workouts} ${E.plural(w.workouts, "тренировка", "тренировки", "тренировок")}${w.avg !== null ? ` · средняя готовность ${w.avg}` : ""}` }),
       h("div", { class: "bars", role: "img", "aria-label": days.map(x => `${fmtDate(x.d, { weekday: "short" })}: ${x.mins} мин`).join(", ") },
         days.map(x => h("div", { class: `bar${x.mins ? "" : " zero"}` },
           x.mins ? h("small", { text: String(x.mins) }) : null,
@@ -768,6 +1335,7 @@ function viewJournal() {
       h("h2", { text: "Готовность за 2 недели" }),
       h("p", { class: "muted small", text: "По отметкам самочувствия: чем выше, тем лучше сон, энергия и восстановление." }),
       sparkline(recent)) : null,
+    painCard(),
     pains.length ? h("section", { class: "card glass" },
       h("h2", { text: "Сигналы боли" }),
       h("div", { class: "list" }, pains.map(p => h("div", { class: "row" },
@@ -792,7 +1360,9 @@ function viewJournal() {
 
 // ===== Ещё =====
 const MORE = [
+  ["guide", "aid", "Справочник травм", `${GUIDE.length} ${E.plural(GUIDE.length, "статья", "статьи", "статей")}: что делать при травмах`, "#guide"],
   ["library", "book", "Упражнения", `${EXERCISES.length} ${E.plural(EXERCISES.length, "упражнение", "упражнения", "упражнений")} с подсказками`],
+  ["records", "trophy", "Рекорды статики", "Планка, «стульчик», мостик"],
   ["timer", "timer", "Интервальный таймер", "Работа и отдых по кругу"],
   ["breath", "wind", "Дыхание", "Спокойствие за пару минут"],
   ["calendar", "calendar", "Напоминания", "Тренировки в календаре телефона"],
@@ -802,14 +1372,14 @@ const MORE = [
   ["install", "phone", "Установить", "Иконка на главном экране"],
   ["about", "doc", "О приложении", "Правила и безопасность"]
 ];
-const SUB = { library: subLibrary, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
+const SUB = { library: subLibrary, records: subRecords, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
 
 function viewMore(sub) {
   if (sub && own(SUB, sub)) return [h("a", { class: "back-link", href: "#more" }, icon("back", 18), "Ещё"), ...SUB[sub]()];
   return [
     h("h1", { class: "page-title", text: "Ещё" }),
     h("p", { class: "lead", text: "Инструменты, настройки и защита данных." }),
-    h("div", { class: "menu-grid" }, MORE.map(([id, ic, title, desc]) => h("a", { class: "menu-item glass", href: `#more/${id}` },
+    h("div", { class: "menu-grid" }, MORE.map(([id, ic, title, desc, href]) => h("a", { class: "menu-item glass", href: href || `#more/${id}` },
       h("span", { class: "fi" }, icon(ic, 22)), h("b", { text: title }), h("span", { text: desc })))),
     h("p", { class: "muted small center", style: { marginTop: "18px" } }, `Листопульс ${VERSION} · 12+ · `, h("a", { href: "../index.html", text: "сайт о здоровье" }))
   ];
@@ -851,7 +1421,14 @@ function subLibrary() {
 }
 
 const timerCfg = { work: 30, rest: 15, rounds: 8 };
+const TIMER_PRESETS = [
+  { name: "Изометрия", work: 30, rest: 30, rounds: 5 },
+  { name: "Связки", work: 45, rest: 45, rounds: 6 },
+  { name: "Спокойный круг", work: 40, rest: 20, rounds: 8 },
+  { name: "Табата", work: 20, rest: 10, rounds: 8, hi: true }
+];
 function subTimer() {
+  const banned = E.restrictions(state).banned;
   const stepper = (label, key, min, max, step, unit) => {
     const val = h("b", { class: "stepper-val", text: `${timerCfg[key]}${unit}` });
     const set = v => { timerCfg[key] = Math.min(max, Math.max(min, v)); val.textContent = `${timerCfg[key]}${unit}`; };
@@ -864,6 +1441,13 @@ function subTimer() {
   return [
     h("h1", { class: "page-title", text: "Интервальный таймер" }),
     h("p", { class: "lead", text: "Чередуйте работу и отдых в любых упражнениях. Сигнал прозвучит на каждой смене." }),
+    h("section", { class: "card glass" },
+      h("p", { class: "eyebrow", text: "Готовые режимы" }),
+      h("div", { class: "chips" }, TIMER_PRESETS.filter(pr => !(pr.hi && banned.has("hi"))).map(pr => h("button", {
+        class: "chip", type: "button", "aria-pressed": timerCfg.work === pr.work && timerCfg.rest === pr.rest && timerCfg.rounds === pr.rounds ? "true" : "false",
+        onClick: () => { timerCfg.work = pr.work; timerCfg.rest = pr.rest; timerCfg.rounds = pr.rounds; refresh(); }
+      }, `${pr.name} ${pr.rounds}×${pr.work}/${pr.rest}`))),
+      h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Изометрия и связки — длинные спокойные удержания: упражнения из раздела «Статика и связки» или любые позы, которые держите без боли." })),
     h("section", { class: "card glass" }, h("div", { class: "list" },
       stepper("Работа", "work", 10, 300, 5, " с"),
       stepper("Отдых", "rest", 0, 300, 5, " с"),
@@ -1172,6 +1756,326 @@ function subAbout() {
   ];
 }
 
+// ===== Справочник травм =====
+const guideFilter = { q: "", area: "all" };
+function viewGuide(sub) {
+  if (sub && own(GUIDE_BY_ID, sub)) return guideArticle(GUIDE_BY_ID[sub]);
+  const mine = guideFor(trackedRegions());
+  const list = h("div", { class: "guide-list" });
+  const fill = () => {
+    const q = guideFilter.q.trim().toLowerCase();
+    const items = GUIDE.filter(a => (guideFilter.area === "all" || a.area === guideFilter.area) &&
+      (!q || `${a.title} ${a.short}`.toLowerCase().includes(q) || a.regions.some(id => own(REGION, id) && REGION[id].name.toLowerCase().includes(q))));
+    list.replaceChildren(...(items.length
+      ? GUIDE_AREAS.filter(ar => items.some(a => a.area === ar.id)).map(ar => h("section", { class: "card glass" },
+        h("h2", { text: ar.name }),
+        h("div", { class: "list" }, items.filter(a => a.area === ar.id).map(a => guideRow(a)))))
+      : [h("section", { class: "card glass" }, h("p", { class: "muted", text: "Ничего не нашлось. Попробуйте другое слово, например «колено» или «спина»." }))]));
+  };
+  const search = h("input", { class: "input", type: "search", placeholder: "Поиск: колено, растяжение, спина…", "aria-label": "Поиск по справочнику", maxlength: 60 });
+  search.value = guideFilter.q;
+  search.addEventListener("input", () => { guideFilter.q = search.value; fill(); });
+  fill();
+  return [
+    h("a", { class: "back-link", href: "#body" }, icon("back", 18), "Тело"),
+    h("h1", { class: "page-title", text: "Справочник травм" }),
+    h("p", { class: "lead", text: "Что делать при частых травмах и боли: первая помощь, тревожные признаки, когда идти к врачу и как безопасно вернуться к нагрузке." }),
+    h("section", { class: "card glass warn" },
+      h("p", { class: "small" }, h("b", { text: "Это не замена врачу. " }),
+        "Статьи пересказывают открытые рекомендации медицинских организаций (NHS, NICE) и консенсусы спортивных врачей — источники указаны в каждой статье. Диагноз и лечение назначает только врач после осмотра.")),
+    mine.length ? h("section", { class: "card glass" },
+      h("p", { class: "eyebrow", text: "Для ваших зон" }),
+      h("div", { class: "list" }, mine.slice(0, 5).map(a => guideRow(a)))) : null,
+    h("section", { class: "card glass" },
+      search,
+      h("div", { style: { marginTop: "12px" } }, choice({
+        label: "Раздел", value: guideFilter.area,
+        options: [{ value: "all", label: "Все" }, ...GUIDE_AREAS.map(a => ({ value: a.id, label: a.name }))],
+        onChange: v => { guideFilter.area = v; fill(); }
+      })),
+      h("p", { class: "muted small", style: { marginTop: "10px" }, text: `Прочитано ${state.guideRead.length} из ${GUIDE.length}` })),
+    list
+  ];
+}
+
+function markGuideRead(id) {
+  if (!state || state.guideRead.includes(id)) return;
+  state.guideRead = state.guideRead.concat(id).slice(-100);
+  const nb = E.newBadges(state);
+  persist();
+  if (nb.length) toast(badgeToast(nb));
+}
+
+function guideArticle(a) {
+  const area = GUIDE_AREAS.find(x => x.id === a.area);
+  const r = E.restrictions(state);
+  const marked = a.regions.filter(id => r.regionSev[id]);
+  const exs = a.exercises.filter(id => own(EX, id)).map(id => EX[id]);
+  const prog = a.program ? PROGRAMS.find(p => p.id === a.program) : null;
+  postRender.push(() => markGuideRead(a.id));
+  return [
+    h("a", { class: "back-link", href: "#guide" }, icon("back", 18), "Справочник"),
+    h("p", { class: "eyebrow", text: area ? area.name : "Справочник" }),
+    h("h1", { class: "page-title", text: a.title }),
+    h("p", { class: "lead", text: a.short }),
+    marked.length ? h("div", { class: "note-box ok", style: { margin: "0 0 14px" } },
+      `Вы отметили: ${marked.map(id => REGION[id].name.toLowerCase()).join(", ")}. Тренер уже учитывает это в тренировках.`) : null,
+    a.sections.map(sec => h("section", { class: `card glass${sec.alert ? " alert" : ""}` },
+      h("h2", { text: sec.h }),
+      (sec.p || []).map(t => h("p", { text: t })),
+      sec.list ? h("ul", { class: "bullets" }, sec.list.map(t => h("li", { text: t }))) : null)),
+    exs.length ? guideExercises(a, exs, r) : null,
+    prog ? h("a", { class: "quick-item glass", href: `#program/${prog.id}`, style: { marginBottom: "14px" } },
+      h("span", { class: "fi emoji", "aria-hidden": "true", text: prog.icon }),
+      h("span", { class: "row-text" },
+        h("b", { text: `Программа «${prog.name}»` }),
+        h("span", { class: "muted small", text: `${prog.days} ${E.plural(prog.days, "день", "дня", "дней")} · ${prog.desc}` })),
+      icon("chevron", 18)) : null,
+    h("section", { class: "card glass" },
+      h("h2", { text: "Источники" }),
+      h("ul", { class: "bullets small sources" }, a.sources.map(([title, url]) => h("li", {}, h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: title })))),
+      h("p", { class: "muted small", text: "Тексты написаны своими словами по открытым материалам. Это общие сведения, а не консультация: при травме обратитесь к врачу." }))
+  ];
+}
+
+function guideExercises(a, exs, r) {
+  return h("section", { class: "card glass" },
+    h("h2", { text: "Упражнения для восстановления" }),
+    h("p", { class: "muted small", text: "Начинайте, когда острая боль прошла и врач не запретил нагрузку. Двигайтесь в пределах лёгкого дискомфорта, без резкой боли." }),
+    exs.map(ex => {
+      const ok = E.fits(ex, r, state.profile);
+      return h("div", { class: "ex-row" },
+        h("div", { class: "row-text" }, h("b", { text: ex.name }), h("span", { class: "muted small", text: E.doseText(E.makeItem(ex, 1)) })),
+        h("span", { class: `pill${ok ? "" : " muted-pill"}`, text: ok ? "подходит" : "не сейчас" }),
+        h("button", { class: "icon-btn", type: "button", "aria-label": `Подробнее: ${ex.name}`, onClick: () => exerciseSheet(ex.id) }, icon("info", 20)));
+    }),
+    h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Неподходящие сейчас упражнения тренер заменит безопасными или пропустит." }),
+    h("div", { class: "btn-row" },
+      h("button", {
+        class: "btn primary", type: "button",
+        onClick: () => startPlayer(E.buildCustom(state, { title: `Справочник: ${a.title}`, ids: exs.map(ex => ex.id), k: 0.9, kind: "guide", goal: "custom", rest: 10 }))
+      }, icon("play", 18), "Начать комплекс")));
+}
+
+// ===== Программы восстановления =====
+function programsSection() {
+  return [
+    h("h2", { class: "section-title", text: "Программы восстановления" }),
+    h("p", { class: "muted small", style: { margin: "-4px 0 12px" }, text: "Курсы на 7–14 дней: каждый день — короткое занятие, нагрузка растёт постепенно. Упражнения подстраиваются под ваши зоны." }),
+    h("div", { class: "quick" }, PROGRAMS.map(p => {
+      const pr = E.programProgress(state, p.id);
+      return h("a", { class: "quick-item glass", href: `#program/${p.id}` },
+        h("span", { class: "fi emoji", "aria-hidden": "true", text: p.icon }),
+        h("span", { class: "row-text" },
+          h("b", { text: p.name }),
+          h("span", { class: "muted small", text: pr.finished ? "Пройдена 🎉" : pr.started ? `День ${pr.next} из ${p.days}` : `${p.days} ${E.plural(p.days, "день", "дня", "дней")} · ${p.desc}` }),
+          pr.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((pr.done / p.days) * 100)}%` } })) : null),
+        icon("chevron", 18));
+    }))
+  ];
+}
+
+function viewProgram(id) {
+  const prog = PROGRAMS.find(p => p.id === id);
+  const back = h("a", { class: "back-link", href: "#workout" }, icon("back", 18), "Тренировка");
+  if (!prog) return [back, h("h1", { class: "page-title", text: "Программа не найдена" }), h("p", {}, h("a", { href: "#workout", text: "Вернуться к тренировкам" }))];
+  const pr = E.programProgress(state, id);
+  const done = new Set(pr.started ? state.programs[id].done : []);
+  const today = E.dayKey();
+  const doneToday = state.sessions.some(x => x.d === today && x.goal === "program" && x.title.startsWith(prog.name));
+  const session = pr.finished ? null : E.buildProgramDay(state, id);
+  const guide = prog.guide && own(GUIDE_BY_ID, prog.guide) ? GUIDE_BY_ID[prog.guide] : null;
+  let from = 1;
+  const stages = prog.phases.map((ph, i) => {
+    const days = from === ph.until ? `день ${from}` : `дни ${from}–${ph.until}`;
+    const load = ph.k < 1 ? ", облегчённая дозировка" : ph.k > 1 ? ", нагрузка выше" : "";
+    from = ph.until + 1;
+    return h("li", { text: `Этап ${i + 1}, ${days}: ${ph.items.length} ${E.plural(ph.items.length, "упражнение", "упражнения", "упражнений")}${load}` });
+  });
+  const reset = async () => {
+    const ok = await confirmSheet({ title: "Начать программу заново?", message: "Отметки о пройденных днях сбросятся. Тренировки в дневнике останутся.", ok: "Сбросить" });
+    if (!ok) return;
+    delete state.programs[id];
+    persist();
+    refresh();
+    toast("Прогресс программы сброшен");
+  };
+  const out = [
+    back,
+    h("p", { class: "eyebrow", text: "Программа восстановления" }),
+    h("h1", { class: "page-title", text: `${prog.icon} ${prog.name}` }),
+    h("p", { class: "lead", text: prog.desc }),
+    h("section", { class: "card glass" },
+      h("div", { class: "card-head" },
+        h("h2", { text: pr.finished ? "Программа пройдена! 🎉" : `День ${pr.next} из ${prog.days}` }),
+        h("span", { class: "pill", text: `${pr.done} из ${prog.days}` })),
+      h("div", { class: "day-dots", role: "img", "aria-label": `Пройдено ${pr.done} из ${prog.days} дней` },
+        Array.from({ length: prog.days }, (_, i) => h("i", { class: done.has(i + 1) ? "done" : !pr.finished && i + 1 === pr.next ? "next" : "", text: String(i + 1) }))),
+      h("ul", { class: "bullets small" }, stages))
+  ];
+  if (session && session.blocked) {
+    out.push(h("section", { class: "card glass warn" },
+      h("h2", { text: "Сейчас программа на паузе" }),
+      h("ul", { class: "adapt" }, session.notes.map(n => h("li", { class: "note", text: n })))));
+  } else if (session) {
+    const items = session.blocks.flatMap(b => b.items);
+    out.push(h("section", { class: "card glass" },
+      h("h2", { text: `Занятие дня ${pr.next}` }),
+      h("p", { class: "muted small", text: `≈ ${session.est} мин · ${items.length} ${E.plural(items.length, "упражнение", "упражнения", "упражнений")}` }),
+      items.map((it, i) => h("div", { class: "ex-row" },
+        h("span", { class: "ex-num", text: String(i + 1) }),
+        h("div", { class: "row-text" }, h("b", { text: EX[it.id].name }), h("span", { class: "muted small", text: E.doseText(it) })),
+        h("button", { class: "icon-btn", type: "button", "aria-label": `Подробнее: ${EX[it.id].name}`, onClick: () => exerciseSheet(it.id) }, icon("info", 20)))),
+      session.adaptations.length ? h("ul", { class: "adapt", style: { marginTop: "12px" } }, session.adaptations.map(x => h("li", { text: x }))) : null,
+      doneToday ? h("p", { class: "note-box", text: "Сегодня вы уже занимались по программе. Следующий день лучше сделать завтра: мышцам и связкам нужно время на восстановление." }) : null,
+      h("div", { class: "btn-row" },
+        h("button", { class: "btn primary", type: "button", disabled: !items.length, onClick: () => startPlayer(session) }, icon("play", 18), `Начать день ${pr.next}`))));
+  } else {
+    out.push(h("section", { class: "card glass" },
+      h("h2", { text: "Отличная работа!" }),
+      h("p", { text: "Все дни пройдены. Можно повторить программу или перейти к обычным тренировкам — тренер продолжит беречь отмеченные зоны." }),
+      h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", text: "Пройти заново", onClick: reset }))));
+  }
+  if (guide) out.push(h("section", { class: "card glass" }, h("p", { class: "eyebrow", text: "Почитать перед началом" }), h("div", { class: "list" }, guideRow(guide))));
+  out.push(h("section", { class: "card glass" },
+    h("ul", { class: "bullets small" },
+      h("li", { text: "Станет больно во время занятия — нажмите «Больно»: упражнение заменится, а зона будет под защитой." }),
+      h("li", { text: "Острая или нарастающая боль, отёк, онемение — повод остановиться и показаться врачу." }),
+      h("li", { text: "Программа не заменяет лечебную физкультуру, которую назначил врач." })),
+    pr.started && !pr.finished ? h("button", { class: "link-btn small", type: "button", text: "Сбросить прогресс", onClick: reset }) : null));
+  return out;
+}
+
+// ===== Рекорды статики =====
+const RECORD_BLOCK = ["hypertension", "heart", "pregnancy", "surgery", "caution"];
+let recordPick = "";
+function subRecords() {
+  const r = E.restrictions(state);
+  const head = [
+    h("h1", { class: "page-title", text: "Рекорды статики" }),
+    h("p", { class: "lead", text: "Сколько вы продержитесь? Засекайте время и смотрите, как растёт выносливость мышц, которые держат суставы и спину." })
+  ];
+  if (state.profile.conditions.some(c => RECORD_BLOCK.includes(c))) {
+    return [...head, h("section", { class: "card glass warn" },
+      h("h2", { text: "Испытания на максимум вам сейчас не подходят" }),
+      h("p", { text: "Долгое напряжение «до отказа» повышает давление и нагрузку на сердце. При ваших особенностях здоровья выбирайте обычные тренировки — в них статика дозирована и короткая." }))];
+  }
+  const fitting = RECORD_EX.filter(id => E.fits(EX[id], r, state.profile));
+  const unfit = RECORD_EX.filter(id => !fitting.includes(id));
+  if (!fitting.length) {
+    return [...head, h("section", { class: "card glass warn" },
+      h("p", { text: "Сейчас все упражнения на рекорд нагружают зоны, которые нужно беречь. Вернитесь, когда восстановитесь." }))];
+  }
+  if (!fitting.includes(recordPick)) recordPick = fitting[0];
+  const clock = h("div", { class: "big-timer record-clock", "aria-live": "off", text: "0:00" });
+  const status = h("p", { class: "player-dose", "aria-live": "polite" });
+  const btn = h("button", { class: "btn primary block", type: "button", text: "Старт" });
+  const showBest = () => {
+    const rec = state.records[recordPick];
+    status.textContent = rec ? `Рекорд: ${mmss(rec.best)} · ${fmtDate(rec.d)}` : "Рекорда пока нет — установите первый!";
+  };
+  let phase = "idle", t0 = 0, iv = null, count = 0;
+  const stopTimer = () => {
+    clearInterval(iv);
+    iv = null;
+    keepAwake(false);
+  };
+  const finish = () => {
+    const sec = Math.floor((performance.now() - t0) / 1000);
+    stopTimer();
+    phase = "idle";
+    btn.textContent = "Старт";
+    if (sec < 3) { clock.textContent = "0:00"; showBest(); toast("Слишком коротко — попробуйте ещё раз"); return; }
+    const prev = state.records[recordPick];
+    const best = !prev || sec > prev.best;
+    state.records[recordPick] = { best: best ? sec : prev.best, d: best ? E.dayKey() : prev.d, last: sec, tries: Math.min(100000, (prev ? prev.tries : 0) + 1) };
+    const nb = E.newBadges(state);
+    persist();
+    if (best) {
+      confetti();
+      if (state.settings.sound) beep(990, 0.35);
+    }
+    say(best ? "Новый рекорд!" : "Готово");
+    toast(nb.length ? badgeToast(nb) : best ? (prev ? `Новый рекорд: ${mmss(sec)}! Было ${mmss(prev.best)}` : `Первый результат: ${mmss(sec)}`) : `${mmss(sec)}. Рекорд — ${mmss(prev.best)}`);
+    refresh();
+  };
+  btn.addEventListener("click", () => {
+    if (phase === "run") { finish(); return; }
+    if (phase === "count") {
+      stopTimer();
+      phase = "idle";
+      btn.textContent = "Старт";
+      clock.textContent = "0:00";
+      showBest();
+      return;
+    }
+    unlockAudio();
+    phase = "count";
+    count = 3;
+    clock.textContent = String(count);
+    status.textContent = "Займите позицию";
+    btn.textContent = "Отмена";
+    keepAwake(true);
+    if (state.settings.sound) beep(520, 0.12);
+    say("Приготовьтесь");
+    iv = setInterval(() => {
+      if (!document.body.contains(clock)) { stopTimer(); phase = "idle"; return; }
+      if (phase === "count") {
+        count -= 1;
+        if (count > 0) {
+          clock.textContent = String(count);
+          if (state.settings.sound) beep(520, 0.12);
+          return;
+        }
+        phase = "run";
+        t0 = performance.now();
+        clock.textContent = "0:00";
+        status.textContent = "Держим! Нажмите «Стоп», когда техника начнёт ломаться";
+        btn.textContent = "Стоп";
+        if (state.settings.sound) beep(880, 0.3);
+        if (state.settings.vibrate) buzz(150);
+        say("Держим");
+        clearInterval(iv);
+        iv = setInterval(() => {
+          if (!document.body.contains(clock)) { stopTimer(); phase = "idle"; return; }
+          const sec = (performance.now() - t0) / 1000;
+          clock.textContent = mmss(Math.floor(sec));
+          if (sec >= 600) finish();
+        }, 250);
+      }
+    }, 1000);
+  });
+  showBest();
+  const done = RECORD_EX.filter(id => state.records[id]);
+  return [...head,
+    h("section", { class: "card glass record-card" },
+      choice({
+        label: "Упражнение", value: recordPick,
+        options: fitting.map(id => ({ value: id, label: EX[id].name })),
+        onChange: v => {
+          if (phase !== "idle") return;
+          recordPick = v;
+          clock.textContent = "0:00";
+          showBest();
+        }
+      }),
+      clock, status, btn,
+      unfit.length ? h("p", { class: "muted small", style: { marginTop: "10px" }, text: `Сейчас не подходят: ${unfit.map(id => EX[id].name.toLowerCase()).join(", ")}.` }) : null),
+    done.length ? h("section", { class: "card glass" },
+      h("h2", { text: "Ваши рекорды" }),
+      h("div", { class: "list" }, done.map(id => h("div", { class: "row" },
+        h("span", { class: "row-text" }, h("b", { text: EX[id].name }),
+          h("span", { class: "muted small", text: `${fmtDate(state.records[id].d)} · попыток: ${state.records[id].tries}` })),
+        h("b", { class: "record-best", text: mmss(state.records[id].best) }))))) : null,
+    h("section", { class: "card glass" },
+      h("h2", { text: "Правила честного рекорда" }),
+      h("ul", { class: "bullets" },
+        h("li", { text: "Техника важнее секунд: как только поза «поплыла» или появилась боль — стоп, это и есть результат." }),
+        h("li", { text: "Дышите ровно, не задерживайте дыхание." }),
+        h("li", { text: "Пробуйте одно упражнение не чаще раза в 2–3 дня — мышцам нужно восстановиться." })))
+  ];
+}
+
 // ===== Знакомство =====
 let onbStep = 0;
 let onb = null;
@@ -1187,6 +2091,7 @@ function renderOnboarding() {
   }
   const steps = [onbWelcome, onbSafety, onbGoal, onbSetup, onbBody];
   onbStep = Math.min(onbStep, steps.length - 1);
+  postRender.length = 0;
   const { body, check } = steps[onbStep]();
   const err = h("p", { class: "error", role: "alert" });
   const last = onbStep === steps.length - 1;
@@ -1206,6 +2111,7 @@ function renderOnboarding() {
       h("div", { class: "dots", role: "img", "aria-label": `Шаг ${onbStep + 1} из ${steps.length}` }, steps.map((_, i) => h("i", { class: i === onbStep ? "on" : "" })))),
     h("div", { class: "onb-body" }, body, err),
     h("div", { class: "onb-actions glass-clear" }, back, next)));
+  runPostRender();
 }
 
 function onbWelcome() {
@@ -1296,8 +2202,8 @@ function onbBody() {
   return {
     body: [
       h("h1", { class: "page-title", text: "Что беспокоит?" }),
-      h("p", { class: "lead", text: "Отметьте травмы и болезненные зоны — или пропустите этот шаг. Всё можно изменить позже в разделе «Тело»." }),
-      h("section", { class: "card glass" }, bodyMap()),
+      h("p", { class: "lead", text: "Коснитесь зоны на модели или обведите место, которое болит, — или пропустите этот шаг. Всё можно изменить позже в разделе «Тело»." }),
+      h("section", { class: "card glass stage-card" }, bodyStage()),
       h("section", { class: "card glass" },
         h("h2", { text: "Особенности здоровья" }),
         choice({ multiple: true, label: "Особенности здоровья", value: onb.conditions, options: CONDITIONS.filter(c => !c.hidden).map(c => ({ value: c.id, label: c.name })), onChange: v => { onb.conditions = v; } }))
@@ -1330,6 +2236,7 @@ function finishOnboarding() {
 
 // ===== Плеер тренировки =====
 const stepSeconds = st => (EX[st.item.id].side ? st.item.sec * 2 : st.item.sec);
+const isHold = st => st.type === "ex" && EX[st.item.id].type === "hold";
 
 function startPlayer(session, stepsOverride) {
   if (player) return;
@@ -1337,7 +2244,7 @@ function startPlayer(session, stepsOverride) {
   if (!steps.length) { toast("В этой тренировке нет подходящих упражнений"); return; }
   unlockAudio();
   player = {
-    session, steps, i: 0, timed: false, deadline: null, remaining: 0, paused: false, prep: false, half: false,
+    session, steps, i: 0, timed: false, deadline: null, remaining: 0, paused: false, prep: false, half: false, hold: null,
     startedAt: Date.now(), pausedAt: 0, pausedTotal: 0, done: 0, pains: [], lastWhole: null, mins: 0,
     timerEl: null, sideEl: null, timer: null,
     el: h("div", { class: "player", role: "dialog", "aria-modal": "true", "aria-label": "Тренировка" })
@@ -1363,6 +2270,7 @@ function enterStep(i) {
   P.i = i;
   P.half = false;
   P.prep = false;
+  P.hold = null;
   if (i >= P.steps.length) { finishPlayer(); return; }
   const st = P.steps[i];
   const prevRest = i > 0 && P.steps[i - 1].type === "rest";
@@ -1374,7 +2282,12 @@ function enterStep(i) {
     else { startCountdown(st.sec); say(`Работа. Раунд ${st.round}`); }
   } else {
     const ex = EX[st.item.id];
-    if (st.item.sec) {
+    if (ex.type === "hold") {
+      // Изометрия: удержание → расслабление → удержание… (после отдыха начинаем сразу)
+      P.hold = { rep: 1, side: 1, phase: prevRest ? "hold" : "prep" };
+      if (prevRest) { startCountdown(ex.hold); say(`${ex.name}. Держим ${ex.hold} секунд`); }
+      else { startCountdown(E.PREP_SEC); say(`Приготовьтесь: ${ex.name}. ${E.doseText(st.item)}`); }
+    } else if (st.item.sec) {
       if (!prevRest) { P.prep = true; startCountdown(5); say(`Приготовьтесь: ${ex.name}`); }
       else { startCountdown(stepSeconds(st)); say(`${ex.name}. ${E.doseText(st.item)}`); }
     } else {
@@ -1383,6 +2296,40 @@ function enterStep(i) {
       P.remaining = 0;
       say(`${ex.name}. ${E.doseText(st.item)}`);
     }
+  }
+  renderPlayer();
+}
+
+// Следующая фаза изометрического упражнения
+function holdNext() {
+  const P = player;
+  const st = P.steps[P.i];
+  const ex = EX[st.item.id];
+  const H = P.hold;
+  const sound = state.settings.sound;
+  if (H.phase !== "hold") {
+    H.phase = "hold";
+    startCountdown(ex.hold);
+    if (sound) beep(760, 0.25);
+    say("Держим");
+  } else if (H.rep < st.item.reps) {
+    H.rep += 1;
+    H.phase = "relax";
+    startCountdown(E.relaxOf(ex));
+    if (sound) beep(440, 0.25);
+    say("Расслабьтесь");
+  } else if (ex.side && H.side === 1) {
+    H.side = 2;
+    H.rep = 1;
+    H.phase = "relax";
+    startCountdown(Math.max(E.relaxOf(ex), 5));
+    if (sound) beep(700, 0.2);
+    say("Смена стороны");
+  } else {
+    if (sound) beep(880, 0.3);
+    P.done += 1;
+    enterStep(P.i + 1);
+    return;
   }
   renderPlayer();
 }
@@ -1397,10 +2344,11 @@ function tick() {
   const whole = Math.ceil(left);
   if (whole !== P.lastWhole) {
     P.lastWhole = whole;
-    if (whole <= 3 && whole > 0 && state.settings.sound) beep(520, 0.12);
+    const quiet = P.hold && P.hold.phase === "relax";
+    if (whole <= 3 && whole > 0 && state.settings.sound && !quiet) beep(520, 0.12);
     if (P.timerEl) P.timerEl.textContent = mmss(P.remaining);
   }
-  if (st.type === "ex" && !P.prep && st.item.sec && EX[st.item.id].side && !P.half && left <= st.item.sec) {
+  if (st.type === "ex" && !P.hold && !P.prep && st.item.sec && EX[st.item.id].side && !P.half && left <= st.item.sec) {
     P.half = true;
     if (state.settings.sound) beep(700, 0.2);
     if (state.settings.vibrate) buzz(120);
@@ -1408,6 +2356,11 @@ function tick() {
     if (P.sideEl) P.sideEl.textContent = "Вторая сторона";
   }
   if (left > 0) return;
+  if (P.hold) {
+    if (state.settings.vibrate) buzz(P.hold.phase === "hold" ? 200 : 120);
+    holdNext();
+    return;
+  }
   if (state.settings.sound) beep(880, 0.3);
   if (state.settings.vibrate) buzz(200);
   if (P.prep) {
@@ -1449,6 +2402,7 @@ function nextName(i) {
   return "";
 }
 
+const HOLD_PHASE = { prep: "Приготовьтесь", hold: "Держим", relax: "Расслабьтесь" };
 function renderPlayer() {
   const P = player;
   const st = P.steps[P.i];
@@ -1468,6 +2422,8 @@ function renderPlayer() {
   P.sideEl = null;
   const timerNode = () => (P.timerEl = h("div", { class: "big-timer", text: mmss(P.remaining) }));
   const pauseBtn = cls => h("button", { class: `btn ${cls}`, type: "button", "aria-label": P.paused ? "Продолжить" : "Пауза", onClick: togglePause }, icon(P.paused ? "play" : "pause", 18), cls === "primary" ? (P.paused ? "Продолжить" : "Пауза") : null);
+  const painBtn = () => h("button", { class: "btn pain", type: "button", onClick: painSheet, text: "Больно" });
+  const skipBtn = () => h("button", { class: "btn ghost", type: "button", "aria-label": "Пропустить упражнение", onClick: () => enterStep(P.i + 1) }, icon("next", 18));
   let card, controls;
 
   if (st.type === "rest") {
@@ -1490,22 +2446,35 @@ function renderPlayer() {
   } else {
     const ex = EX[st.item.id];
     const blockInfo = `${st.block}${st.rounds > 1 ? ` · круг ${st.round} из ${st.rounds}` : ""}`;
-    let main;
-    if (P.prep) main = [h("p", { class: "player-dose", text: `Приготовьтесь · ${E.doseText(st.item)}` }), timerNode()];
-    else if (st.item.sec) main = [timerNode(), ex.side ? (P.sideEl = h("p", { class: "player-dose", text: P.half ? "Вторая сторона" : "Первая сторона" })) : null];
-    else main = [h("div", { class: "big-reps", text: `×${st.item.reps}` }), h("p", { class: "player-dose", text: ex.side ? "на каждую сторону · нажмите «Готово», когда закончите" : "нажмите «Готово», когда закончите" })];
-    card = h("section", { class: `player-card glass${P.prep ? " is-prep" : ""}` },
-      h("p", { class: "player-block", text: blockInfo }),
-      h("h1", { class: "player-ex", text: ex.name }),
-      main,
-      h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c }))));
-    const primary = st.item.reps
-      ? h("button", { class: "btn primary", type: "button", onClick: () => { P.done += 1; if (state.settings.sound) beep(880, 0.2); enterStep(P.i + 1); } }, icon("check", 18), "Готово")
-      : pauseBtn("primary");
-    controls = h("div", { class: "player-controls" },
-      h("button", { class: "btn pain", type: "button", onClick: painSheet, text: "Больно" }),
-      primary,
-      h("button", { class: "btn ghost", type: "button", "aria-label": "Пропустить упражнение", onClick: () => enterStep(P.i + 1) }, icon("next", 18)));
+    if (isHold(st)) {
+      const H = P.hold || { rep: 1, side: 1, phase: "prep" };
+      const n = st.item.reps;
+      const sideText = ex.side ? ` · ${H.side === 1 ? "первая" : "вторая"} сторона` : "";
+      card = h("section", { class: `player-card glass hold-card is-${H.phase}` },
+        h("p", { class: "player-block", text: blockInfo }),
+        h("h1", { class: "player-ex", text: ex.name }),
+        h("p", { class: "hold-phase", text: HOLD_PHASE[H.phase] }),
+        timerNode(),
+        h("p", { class: "player-dose", text: `${H.phase === "relax" ? "Далее повтор" : "Повтор"} ${H.rep} из ${n}${sideText}` }),
+        h("div", { class: "hold-dots", "aria-hidden": "true" },
+          Array.from({ length: n }, (_, k) => h("i", { class: k < H.rep - 1 ? "done" : k === H.rep - 1 && H.phase === "hold" ? "now" : "" }))),
+        h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c }))));
+      controls = h("div", { class: "player-controls" }, painBtn(), pauseBtn("primary"), skipBtn());
+    } else {
+      let main;
+      if (P.prep) main = [h("p", { class: "player-dose", text: `Приготовьтесь · ${E.doseText(st.item)}` }), timerNode()];
+      else if (st.item.sec) main = [timerNode(), ex.side ? (P.sideEl = h("p", { class: "player-dose", text: P.half ? "Вторая сторона" : "Первая сторона" })) : null];
+      else main = [h("div", { class: "big-reps", text: `×${st.item.reps}` }), h("p", { class: "player-dose", text: ex.side ? "на каждую сторону · нажмите «Готово», когда закончите" : "нажмите «Готово», когда закончите" })];
+      card = h("section", { class: `player-card glass${P.prep ? " is-prep" : ""}` },
+        h("p", { class: "player-block", text: blockInfo }),
+        h("h1", { class: "player-ex", text: ex.name }),
+        main,
+        h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c }))));
+      const primary = st.item.reps
+        ? h("button", { class: "btn primary", type: "button", onClick: () => { P.done += 1; if (state.settings.sound) beep(880, 0.2); enterStep(P.i + 1); } }, icon("check", 18), "Готово")
+        : pauseBtn("primary");
+      controls = h("div", { class: "player-controls" }, painBtn(), primary, skipBtn());
+    }
   }
   const next = nextName(P.i);
   P.el.replaceChildren(top,
@@ -1604,7 +2573,8 @@ function easier() {
   for (let j = P.i; j < P.steps.length; j++) {
     const st = P.steps[j];
     if (st.type !== "ex" || st.item.id !== id) continue;
-    st.item = st.item.reps ? { id, reps: Math.max(3, Math.round(st.item.reps * 0.7)) } : { id, sec: Math.max(10, Math.round((st.item.sec * 0.7) / 5) * 5) };
+    if (EX[id].type === "hold") st.item = { id, reps: Math.max(2, Math.round(st.item.reps * 0.7)) };
+    else st.item = st.item.reps ? { id, reps: Math.max(3, Math.round(st.item.reps * 0.7)) } : { id, sec: Math.max(10, Math.round((st.item.sec * 0.7) / 5) * 5) };
   }
   toast("Сделали упражнение легче");
   setPaused(false);
@@ -1633,6 +2603,7 @@ function finishPlayer() {
         choice({ className: "rpe", label: "Тяжесть тренировки от 1 до 10", value: rpe, options: Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: String(i + 1) })), onChange: v => { rpe = v; } }),
         h("div", { class: "scale-labels" }, h("span", { text: "очень легко" }), h("span", { text: "на пределе" }))),
       zones.length ? h("p", { class: "small", style: { textAlign: "left" }, text: `Зоны «${zones.join("», «")}» будут под защитой 7 дней. Если боль не проходит — покажитесь врачу.` }) : null,
+      P.session.kind === "program" && P.done ? h("p", { class: "small", style: { textAlign: "left" }, text: `Сохраните — и день ${P.session.programDay} программы будет засчитан.` }) : null,
       h("p", { class: "muted small", style: { textAlign: "left" }, text: "По вашей оценке тренер подстроит нагрузку в следующий раз." }),
       h("div", { class: "btn-row" },
         h("button", { class: "btn ghost", type: "button", text: "Не сохранять", onClick: () => closePlayer() }),
@@ -1649,6 +2620,11 @@ function saveWorkout(rpe) {
   });
   if (state.sessions.length > 1000) state.sessions.splice(0, state.sessions.length - 1000);
   if (P.session.kind === "plan") E.applyFeedback(state, rpe, P.pains.length);
+  if (P.session.kind === "program" && P.done) {
+    const pid = P.session.program;
+    const pr = own(state.programs, pid) ? state.programs[pid] : (state.programs[pid] = { start: E.dayKey(start), done: [] });
+    if (!pr.done.includes(P.session.programDay)) pr.done = pr.done.concat(P.session.programDay).sort((a, b) => a - b);
+  }
   const nb = E.newBadges(state);
   planCache.key = "";
   persist();

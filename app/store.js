@@ -3,7 +3,8 @@
 // По желанию пользователя всё шифруется паролем: AES-GCM 256 бит, ключ — PBKDF2-SHA-256, 600 000 итераций.
 // Любые загруженные данные (из памяти браузера или из файла) проходят строгую проверку и пересобираются
 // по известной схеме: лишние поля отбрасываются, значения ограничиваются по типу и длине.
-import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES } from "./data.js";
+import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX } from "./data.js";
+import { GUIDE } from "./guide.js";
 
 const KEY = "lpapp-v1";
 const THEME_KEY = "lpapp-theme"; // тема хранится отдельно и без шифрования: нужна до ввода пароля
@@ -16,7 +17,12 @@ const AGE_IDS = AGE_GROUPS.map(a => a.id);
 const GOAL_IDS = GOALS.map(g => g.id);
 const EQUIP_IDS = EQUIPMENT.map(e => e.id);
 const EX_IDS = Object.keys(EX);
-const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity"];
+const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom"];
+const SYMPTOM_IDS = SYMPTOMS.map(x => x.id);
+const ONSET_IDS = ONSET.map(x => x.id);
+const TRIGGER_IDS = TRIGGERS.map(x => x.id);
+const GUIDE_IDS = GUIDE.map(x => x.id);
+const SIDE_IDS = ["L", "R"];
 const MODES = ["recovery", "light", "normal", "push"];
 const SCREEN_IDS = ["chest", "dizzy", "heart", "pressure", "joints", "pregnant", "surgery"];
 
@@ -34,6 +40,11 @@ export const defaultState = () => ({
   badges: {},
   modeOverride: null,
   planVariant: { d: "", n: 0 },
+  marks: [],
+  painLog: [],
+  programs: {},
+  guideRead: [],
+  records: {},
   settings: { sound: true, voice: false, vibrate: true, lessGlass: false }
 });
 
@@ -47,6 +58,12 @@ const day = v => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Num
 const ids = (v, list, max) => (Array.isArray(v) ? [...new Set(v.filter(x => list.includes(x)))].slice(0, max) : []);
 const isObj = v => v !== null && typeof v === "object" && !Array.isArray(v);
 const own = (o, k) => (isObj(o) && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : undefined);
+const num = (v, min, max) => (typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? Math.round(v * 10000) / 10000 : null);
+const vec3 = (v, min, max) => {
+  if (!Array.isArray(v) || v.length !== 3) return null;
+  const out = v.map(x => num(x, min, max));
+  return out.every(x => x !== null) ? out : null;
+};
 
 export function sanitize(raw) {
   if (!isObj(raw) || raw.v !== 1) throw new Error("Неподходящий формат данных");
@@ -76,8 +93,12 @@ export function sanitize(raw) {
     if (!isObj(b)) continue;
     const t = own(b, "temp");
     const temp = isObj(t) && day(t.until) ? { until: day(t.until), sev: int(t.sev, 1, 3, 1) } : null;
-    const entry = { sev: int(b.sev, 0, 3, 0), note: text(b.note, 200), since: day(b.since), temp };
-    if (entry.sev || entry.note || entry.temp) d.body[id] = entry;
+    const entry = {
+      sev: int(b.sev, 0, 3, 0), note: text(b.note, 300), since: day(b.since), temp,
+      sides: ids(b.sides, SIDE_IDS, 2), symptoms: ids(b.symptoms, SYMPTOM_IDS, 20),
+      onset: oneOf(b.onset, ONSET_IDS, ""), triggers: ids(b.triggers, TRIGGER_IDS, 20)
+    };
+    if (entry.sev || entry.note || entry.temp || entry.symptoms.length || entry.onset || entry.triggers.length) d.body[id] = entry;
   }
 
   const checkins = own(raw, "checkins");
@@ -85,7 +106,7 @@ export function sanitize(raw) {
     for (const c of checkins.slice(-400)) {
       if (!isObj(c) || !day(c.d)) continue;
       const v = k => int(c[k], 1, 5, 3);
-      d.checkins.push({ d: day(c.d), sleep: v("sleep"), energy: v("energy"), soreness: v("soreness"), stress: v("stress"), score: int(c.score, 0, 100, 50), pain: ids(c.pain, REGION_IDS, 9) });
+      d.checkins.push({ d: day(c.d), sleep: v("sleep"), energy: v("energy"), soreness: v("soreness"), stress: v("stress"), score: int(c.score, 0, 100, 50), pain: ids(c.pain, REGION_IDS, 24) });
     }
   }
 
@@ -123,6 +144,55 @@ export function sanitize(raw) {
 
   const pv = own(raw, "planVariant");
   if (isObj(pv) && day(pv.d)) d.planVariant = { d: day(pv.d), n: int(pv.n, 0, 1000, 0) };
+
+  // Отметки, обведённые на 3D-модели
+  const marks = own(raw, "marks");
+  if (Array.isArray(marks)) {
+    for (const m of marks.slice(-40)) {
+      if (!isObj(m)) continue;
+      const regions = Array.isArray(m.regions)
+        ? m.regions.filter(x => isObj(x) && REGION_IDS.includes(x.id)).slice(0, 8).map(x => ({ id: x.id, side: oneOf(x.side, SIDE_IDS, "") }))
+        : [];
+      const c = vec3(m.c, -1, 2.5), n = vec3(m.n, -1.01, 1.01), r = num(m.r, 0.01, 0.5);
+      if (!regions.length || !c || !n || r === null) continue;
+      d.marks.push({
+        id: str(m.id, 24) || Math.random().toString(36).slice(2, 12), d: day(m.d) || "",
+        regions, c, n, r, sev: int(m.sev, 0, 3, 1), pain: int(m.pain, 0, 10, 0),
+        symptoms: ids(m.symptoms, SYMPTOM_IDS, 20), onset: oneOf(m.onset, ONSET_IDS, ""),
+        triggers: ids(m.triggers, TRIGGER_IDS, 20), note: text(m.note, 300)
+      });
+    }
+  }
+
+  // Дневник боли
+  const painLog = own(raw, "painLog");
+  if (Array.isArray(painLog)) {
+    for (const x of painLog.slice(-2000)) {
+      if (!isObj(x) || !day(x.d) || !REGION_IDS.includes(x.region)) continue;
+      d.painLog.push({ d: day(x.d), region: x.region, level: int(x.level, 0, 10, 0) });
+    }
+  }
+
+  // Прогресс программ восстановления
+  const programs = own(raw, "programs");
+  for (const prog of PROGRAMS) {
+    const ps = own(programs, prog.id);
+    if (!isObj(ps) || !day(ps.start)) continue;
+    const done = Array.isArray(ps.done) ? [...new Set(ps.done.filter(x => Number.isInteger(x) && x >= 1 && x <= prog.days))].sort((a, b) => a - b) : [];
+    d.programs[prog.id] = { start: day(ps.start), done };
+  }
+
+  d.guideRead = ids(own(raw, "guideRead"), GUIDE_IDS, 100);
+
+  // Рекорды статики: лучшее время в секундах
+  const records = own(raw, "records");
+  for (const id of RECORD_EX) {
+    const rec = own(records, id);
+    if (!isObj(rec) || !day(rec.d)) continue;
+    const best = int(rec.best, 1, 3600, 0);
+    if (!best) continue;
+    d.records[id] = { best, d: day(rec.d), last: int(rec.last, 0, 3600, 0), tries: int(rec.tries, 1, 100000, 1) };
+  }
 
   const st = own(raw, "settings");
   if (isObj(st)) {

@@ -1,8 +1,9 @@
 // ===== Листопульс: логика подбора тренировок =====
 // Чистые функции без доступа к DOM и сети. Всё считается на устройстве пользователя.
-import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT } from "./data.js";
+import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS } from "./data.js";
 
 export const REGION_NAME = Object.fromEntries(REGIONS.map(r => [r.id, r.name]));
+const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const EQUIP_NAME = Object.fromEntries(EQUIPMENT.map(e => [e.id, e.name]));
 
 const TAG_REASON = {
@@ -23,11 +24,13 @@ export const MODES = {
 
 const LEVEL_K = { 1: 0.8, 2: 1, 3: 1.25 };
 const REST = { 1: 40, 2: 30, 3: 25 };
+const ALLOWED = [3, 1, 0, 0]; // допустимая нагрузка при тяжести зоны 0…3
 const RELATED = {
-  warm: ["warm", "mobility"], legs: ["legs", "balance"], push: ["push"], pull: ["pull", "mobility"],
-  core: ["core"], cardio: ["cardio"], balance: ["balance", "legs"], mobility: ["mobility", "cool", "warm"],
-  cool: ["cool", "mobility"]
+  warm: ["warm", "mobility"], legs: ["legs", "iso", "balance"], push: ["push", "iso"], pull: ["pull", "iso", "mobility"],
+  core: ["core", "iso"], cardio: ["cardio"], balance: ["balance", "iso", "legs"], iso: ["iso", "mobility"],
+  mobility: ["mobility", "cool", "warm"], cool: ["cool", "mobility"]
 };
+export const PREP_SEC = 5;
 
 // ----- Даты и мелкие помощники -----
 export const dayKey = (d = new Date()) => d.toLocaleDateString("sv-SE"); // ГГГГ-ММ-ДД по местному времени
@@ -66,30 +69,50 @@ function hashStr(s) {
   return h >>> 0;
 }
 
-// ----- Ограничения -----
-// Тяжесть зоны с учётом временных отметок (сигнал боли на тренировке) и отметки самочувствия за день
-export function regionSeverity(state, id, day = dayKey()) {
+// ----- Тяжесть зон -----
+// Складывается из ручной отметки зоны, обведённых на 3D-модели областей, сигнала боли
+// на тренировке (7 дней) и отметки самочувствия за день. Берётся максимум.
+export function markSeverity(state, id) {
+  let sev = 0;
+  for (const m of state.marks) {
+    if (m.regions.some(x => x.id === id)) sev = Math.max(sev, m.sev);
+  }
+  return sev;
+}
+export function regionSeverity(state, id, day = dayKey(), withMarks = true) {
   const b = state.body[id];
   let sev = b ? b.sev : 0;
   if (b && b.temp && b.temp.until >= day) sev = Math.max(sev, b.temp.sev);
   const ci = state.checkins.find(c => c.d === day);
   if (ci && ci.pain.includes(id)) sev = Math.max(sev, 2);
+  if (withMarks) sev = Math.max(sev, markSeverity(state, id));
   return sev;
 }
 
+// ----- Ограничения -----
 export function restrictions(state, day = dayKey()) {
   const p = state.profile;
   const r = {
-    regionMax: {}, regionSev: {}, banned: new Set(), banSource: {}, notes: [], reasons: [],
+    keyMax: Object.fromEntries(LOAD_KEYS.map(k => [k, 3])), keySource: {},
+    regionSev: {}, banned: new Set(), banSource: {}, notes: [], reasons: [],
     maxLevel: p.level, block: null, longWarmup: false, balance: false, acute: []
   };
   for (const reg of REGIONS) {
     const s = regionSeverity(state, reg.id, day);
     r.regionSev[reg.id] = s;
-    // Дискомфорт — без заметной нагрузки на зону, ограничение и острая боль — зону не нагружаем совсем
-    r.regionMax[reg.id] = [3, 1, 0, 0][s];
-    if (s > 0) r.reasons.push(reg.name);
+    if (!s) continue;
+    r.reasons.push(reg.name);
     if (s === 3) r.acute.push(reg.name);
+    for (const key of reg.keys) {
+      if (ALLOWED[s] < r.keyMax[key]) {
+        r.keyMax[key] = ALLOWED[s];
+        r.keySource[key] = reg.name;
+      }
+    }
+    for (const tag of (reg.bans && reg.bans[s]) || []) {
+      r.banned.add(tag);
+      if (!r.banSource[tag]) r.banSource[tag] = reg.name.toLowerCase();
+    }
   }
   const apply = src => {
     (src.ban || []).forEach(t => {
@@ -119,13 +142,13 @@ export function restrictions(state, day = dayKey()) {
 // Причины, по которым упражнение исключено именно ради безопасности
 export function safetyReasons(ex, r) {
   const out = [];
-  for (const [reg, load] of Object.entries(ex.load)) {
-    if (load > r.regionMax[reg]) out.push(`бережём зону «${REGION_NAME[reg]}»`);
+  for (const [key, load] of Object.entries(ex.load)) {
+    if (load > r.keyMax[key]) out.push(`бережём зону «${r.keySource[key]}»`);
   }
   for (const t of ex.tags) {
     if (r.banned.has(t)) out.push(`${TAG_REASON[t] || t} (${r.banSource[t]})`);
   }
-  return out;
+  return [...new Set(out)];
 }
 
 // Все причины, почему упражнение сейчас не подходит; пустой список — подходит
@@ -138,19 +161,33 @@ export function whyNot(ex, r, profile) {
 }
 export const fits = (ex, r, profile) => whyNot(ex, r, profile).length === 0;
 
+// Какие упражнения убирает одна зона при заданной тяжести (для подсказки в карточке зоны)
+export function excludedByRegion(regionId, sev) {
+  const reg = REGION_BY_ID[regionId];
+  if (!reg || !sev) return [];
+  const bans = (reg.bans && reg.bans[sev]) || [];
+  return EXERCISES.filter(ex => reg.keys.some(k => (ex.load[k] || 0) > ALLOWED[sev]) || ex.tags.some(t => bans.includes(t)));
+}
+
 // ----- Дозировка -----
+export const relaxOf = ex => ex.relax || 4;
 export function makeItem(ex, k = 1) {
   if (ex.type === "reps") return { id: ex.id, reps: clamp(Math.round(ex.base * k), 3, 30) };
+  if (ex.type === "hold") return { id: ex.id, reps: clamp(Math.round(ex.base * k), 2, 15) };
   return { id: ex.id, sec: clamp(Math.round((ex.base * k) / 5) * 5, 10, 180) };
 }
 export function itemSeconds(item) {
   const ex = EX[item.id];
-  const one = item.reps ? item.reps * 3 + 4 : item.sec;
+  let one;
+  if (ex.type === "hold") one = item.reps * (ex.hold + relaxOf(ex));
+  else one = item.reps ? item.reps * 3 + 4 : item.sec;
   return ex.side ? one * 2 : one;
 }
 export function doseText(item) {
   const ex = EX[item.id];
-  const base = item.reps ? `${item.reps} ${plural(item.reps, "повторение", "повторения", "повторений")}` : fmtSec(item.sec);
+  let base;
+  if (ex.type === "hold") base = `${item.reps} × ${ex.hold} сек удержания`;
+  else base = item.reps ? `${item.reps} ${plural(item.reps, "повторение", "повторения", "повторений")}` : fmtSec(item.sec);
   return ex.side ? `${base} на каждую сторону` : base;
 }
 
@@ -161,7 +198,7 @@ export function findReplacement(ex, r, profile, exclude = new Set()) {
   const pool = EXERCISES.filter(e => groups.includes(e.group) && e.id !== ex.id && !exclude.has(e.id) && fits(e, r, profile));
   if (!pool.length) return null;
   pool.sort((a, b) =>
-    (a.group !== ex.group) - (b.group !== ex.group) ||
+    groups.indexOf(a.group) - groups.indexOf(b.group) ||
     (a.type !== ex.type) - (b.type !== ex.type) ||
     Math.abs(a.level - ex.level) - Math.abs(b.level - ex.level) ||
     totalLoad(a) - totalLoad(b));
@@ -205,7 +242,8 @@ function finalize(s) {
   for (const b of s.blocks) {
     for (let round = 0; round < b.rounds; round++) {
       for (const it of b.items) {
-        total += itemSeconds(it) + (b.kind === "main" ? s.rest : 8);
+        const ex = EX[it.id];
+        total += itemSeconds(it) + (b.kind === "main" ? s.rest : 8) + (ex.type === "hold" ? PREP_SEC : 0);
         count += 1;
       }
     }
@@ -258,15 +296,15 @@ export function buildSession(state, { variant = 0 } = {}) {
   if (mode === "recovery") {
     s.title = "Восстановление";
     const items = [];
-    for (const g of ["warm", "mobility", "mobility", "cool", "cool"]) {
+    for (const g of ["warm", "mobility", "iso", "mobility", "cool", "cool"]) {
       const ex = choose(g, 1);
-      if (ex) items.push(makeItem(ex, 1));
+      if (ex) items.push(makeItem(ex, g === "iso" ? 0.8 : 1));
     }
     if (!used.has("bellyBreath") && fits(EX.bellyBreath, r, p)) items.push(makeItem(EX.bellyBreath, 1));
     s.blocks.push({ kind: "main", name: "Мягкая мобильность", rounds: 1, items });
     s.rest = 10;
-    s.notes.unshift("Самочувствие сегодня на нуле — делаем мягкую мобильность и дыхание. Если есть силы, добавьте спокойную прогулку.");
-    explain(s, r, ["warm", "mobility", "cool"]);
+    s.notes.unshift("Самочувствие сегодня на нуле — делаем мягкую мобильность, немного изометрии и дыхание. Если есть силы, добавьте спокойную прогулку.");
+    explain(s, r, ["warm", "mobility", "iso", "cool"]);
     return finalize(s);
   }
 
@@ -290,9 +328,10 @@ export function buildSession(state, { variant = 0 } = {}) {
     else skipped.add(g);
   }
   if (goal.id === "flexibility") s.rest = 15;
+  if (goal.id === "joints") s.rest = Math.min(s.rest, 25);
 
   const balance = [];
-  if (r.balance) {
+  if (r.balance && goal.id !== "joints") {
     for (let i = 0; i < 2; i++) {
       const ex = choose("balance");
       if (ex) balance.push(makeItem(ex, 1));
@@ -307,7 +346,7 @@ export function buildSession(state, { variant = 0 } = {}) {
   }
 
   const sec = items => items.reduce((a, it) => a + itemSeconds(it) + 8, 0);
-  const roundSec = main.reduce((a, it) => a + itemSeconds(it) + s.rest, 0);
+  const roundSec = main.reduce((a, it) => a + itemSeconds(it) + s.rest + (EX[it.id].type === "hold" ? PREP_SEC : 0), 0);
   const avail = minutes * 60 - sec(warm) - sec(cool) - sec(balance);
   const rounds = main.length ? clamp(Math.round(avail / roundSec) || 1, 1, 6) : 0;
 
@@ -323,33 +362,57 @@ export function buildSession(state, { variant = 0 } = {}) {
   return finalize(s);
 }
 
-export function buildQuick(state, id) {
-  const q = QUICK.find(x => x.id === id) || QUICK[0];
+// Тренировка из заданного списка упражнений: неподходящие заменяются безопасными
+export function buildCustom(state, { title, ids, k = 1, kind = "custom", goal = "custom", rest = 8 }) {
   const p = state.profile;
   const r = restrictions(state);
-  const s = { kind: "quick", quick: q.id, title: q.name, goal: q.id, mode: "normal", rest: 8, blocks: [], adaptations: [], notes: [...new Set(r.notes)], blocked: false };
+  const s = { kind, title, goal, mode: "normal", rest, blocks: [], adaptations: [], notes: [...new Set(r.notes)], blocked: false };
   if (r.block) return pausedSession(s, r);
   const used = new Set();
   const items = [];
-  for (const exId of q.items) {
+  for (const exId of ids) {
     const ex = EX[exId];
-    if (!used.has(ex.id) && fits(ex, r, p)) {
-      items.push(makeItem(ex, 1));
+    if (!ex || used.has(ex.id)) continue;
+    if (fits(ex, r, p)) {
+      items.push(makeItem(ex, k));
       used.add(ex.id);
       continue;
     }
-    const alt = findReplacement(ex, r, p, used);
+    const alt = findReplacement(ex, r, p, new Set([...used, ...ids]));
     const why = safetyReasons(ex, r)[0] || whyNot(ex, r, p)[0];
     if (alt) {
-      items.push(makeItem(alt, 1));
+      items.push(makeItem(alt, k));
       used.add(alt.id);
       s.adaptations.push(`${ex.name} → ${alt.name}${why ? ` (${why})` : ""}.`);
     } else {
       s.adaptations.push(`${ex.name} — пропущено: безопасной замены нет.`);
     }
   }
-  s.blocks.push({ kind: "main", name: q.name, rounds: 1, items });
+  s.blocks.push({ kind: "main", name: title, rounds: 1, items });
   return finalize(s);
+}
+
+export function buildQuick(state, id) {
+  const q = QUICK.find(x => x.id === id) || QUICK[0];
+  const s = buildCustom(state, { title: q.name, ids: q.items, kind: "quick", goal: q.id });
+  s.quick = q.id;
+  return s;
+}
+
+// ----- Программы восстановления -----
+export function programProgress(state, id) {
+  const prog = PROGRAMS.find(p => p.id === id);
+  const st = state.programs[id];
+  const done = st ? st.done.length : 0;
+  return { prog, started: !!st, done, next: Math.min(done + 1, prog.days), finished: done >= prog.days };
+}
+export function buildProgramDay(state, id) {
+  const { prog, next } = programProgress(state, id);
+  const phase = prog.phases.find(ph => next <= ph.until) || prog.phases[prog.phases.length - 1];
+  const s = buildCustom(state, { title: `${prog.name} · день ${next}`, ids: phase.items, k: phase.k, kind: "program", goal: "program", rest: 10 });
+  s.program = id;
+  s.programDay = next;
+  return s;
 }
 
 // Шаги тренировки для плеера: упражнения и отдых
@@ -372,9 +435,29 @@ export function flatten(session) {
 // Зона отмечается на 7 дней; повторный сигнал повышает осторожность (но не выше «ограничения»)
 export function reportPain(state, region) {
   const day = dayKey();
-  const b = state.body[region] || (state.body[region] = { sev: 0, note: "", since: "", temp: null });
+  const b = state.body[region] || (state.body[region] = { sev: 0, note: "", since: "", temp: null, sides: [], symptoms: [], onset: "", triggers: [] });
   const active = b.temp && b.temp.until >= day;
   b.temp = { until: shiftDay(day, 7), sev: active ? Math.min(2, b.temp.sev + 1) : 1 };
+}
+
+// ----- Дневник боли -----
+export function logPain(state, region, level, day = dayKey()) {
+  state.painLog = state.painLog.filter(x => !(x.d === day && x.region === region));
+  state.painLog.push({ d: day, region, level });
+  state.painLog.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  if (state.painLog.length > 2000) state.painLog.splice(0, state.painLog.length - 2000);
+}
+export function painTrend(state, region, days = 30) {
+  const from = shiftDay(dayKey(), -(days - 1));
+  const points = state.painLog.filter(x => x.region === region && x.d >= from);
+  if (!points.length) return null;
+  const first = points[0].level, last = points[points.length - 1].level;
+  const peak = Math.max(...points.map(x => x.level));
+  return { points, first, last, peak, delta: last - first, since: points[0].d };
+}
+export function painRegions(state, days = 30) {
+  const from = shiftDay(dayKey(), -(days - 1));
+  return [...new Set(state.painLog.filter(x => x.d >= from).map(x => x.region))];
 }
 
 // ----- Прогрессия -----
@@ -410,6 +493,7 @@ export function streak(state) {
   return n;
 }
 
+const JOINT_GOALS = ["joints", "knees", "ankles", "shoulders", "program"];
 export function newBadges(state) {
   const got = [];
   const check = (id, cond) => {
@@ -428,6 +512,15 @@ export function newBadges(state) {
   check("streak7", st >= 7);
   check("who150", weekMinutes(state) >= 150);
   check("listener", state.sessions.some(s => s.pains.length > 0));
+  check("mapper", state.marks.length > 0);
+  check("painDown", painRegions(state).some(reg => {
+    const t = painTrend(state, reg);
+    return t && t.points.length >= 2 && t.peak - t.last >= 3;
+  }));
+  check("program", PROGRAMS.some(p => state.programs[p.id] && state.programs[p.id].done.length >= p.days));
+  check("joints5", state.sessions.filter(s => JOINT_GOALS.includes(s.goal)).length >= 5);
+  check("reader", state.guideRead.length >= 5);
+  check("statics", Object.keys(state.records || {}).length >= 3);
   check("checkin7", state.checkins.length >= 7);
   check("water", state.water.d === dayKey() && state.water.n >= 8);
   check("early", state.sessions.some(s => s.hour < 8));

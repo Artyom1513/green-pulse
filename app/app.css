@@ -339,7 +339,7 @@ input.switch:checked::after { transform: translateX(20px); }
 .adapt li::before { content: ""; position: absolute; left: 4px; top: .55em; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .adapt li.note::before { background: var(--warn); }
 .quick { display: grid; gap: 10px; }
-.quick-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border-radius: 22px; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.quick-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border-radius: 22px; color: var(--text); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
 .quick-item .fi { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
 
 /* ----- Карта тела ----- */
@@ -496,6 +496,17 @@ input.switch:checked::after { transform: translateX(20px); }
 .next-up { margin: 0; color: var(--muted); font-size: .9rem; text-align: center; }
 .player-controls { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 10px; width: 100%; max-width: 600px; margin: 0 auto; }
 .player-controls .btn { padding: 0 10px; }
+/* Кнопки плеера всегда видны, даже если карточка не помещается по высоте */
+.player-controls { position: sticky; bottom: 0; z-index: 1; padding-top: 10px; }
+.player-controls::before { content: ""; position: absolute; inset: -18px -16px calc(-16px - env(safe-area-inset-bottom)); z-index: -1; background: linear-gradient(to bottom, transparent, var(--bg) 45%); pointer-events: none; }
+@media (max-height: 740px) {
+  .player-main { gap: 10px; padding: 10px 0; }
+  .player-card { padding: 18px 16px; border-radius: 28px; }
+  .player-ex { font-size: clamp(1.35rem, 5.6vw, 1.9rem); }
+  .big-timer { font-size: clamp(3.4rem, 19vw, 5.2rem); }
+  .hold-phase { font-size: 1.15rem; }
+  .cues { gap: 4px; margin-top: 10px; font-size: .92rem; }
+}
 .summary { width: 100%; max-width: 600px; margin: auto; }
 
 /* ----- Дыхание ----- */
@@ -532,6 +543,109 @@ input.switch:checked::after { transform: translateX(20px); }
 .error { color: var(--danger); font-weight: 600; }
 .frame-guard { max-width: 520px; margin: 15vh auto; padding: 24px 16px; text-align: center; }
 :root.is-framed body > :not(.frame-guard) { display: none !important; }
+
+/* ----- 3D-модель ----- */
+[hidden] { display: none !important; }
+.stage-card { scroll-margin-top: 76px; }
+.stage { display: grid; gap: 12px; }
+.stage-mode { width: min(320px, 100%); justify-self: center; }
+.stage-box { position: relative; }
+.stage3d {
+  position: relative;
+  height: min(60vh, 520px);
+  min-height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background:
+    radial-gradient(60% 45% at 50% 38%, var(--accent-soft), transparent 70%),
+    linear-gradient(180deg, transparent 70%, var(--line));
+}
+.stage3d canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.stage3d canvas.gl { touch-action: pan-y; cursor: grab; }
+.stage3d canvas.gl:active { cursor: grabbing; }
+.stage3d canvas.gl:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.stage3d .overlay { pointer-events: none; }
+.stage3d.is-lasso { border-color: rgba(14, 150, 190, .7); box-shadow: inset 0 0 0 1px rgba(14, 150, 190, .5); }
+.stage3d.is-lasso canvas.gl { touch-action: none; cursor: crosshair; }
+.stage-tools { position: absolute; top: 10px; right: 10px; display: grid; gap: 8px; }
+.stage-tools .icon-btn { width: 40px; height: 40px; border-color: var(--edge); box-shadow: 0 4px 14px rgba(0, 0, 0, .10); }
+.stage-views { justify-content: center; }
+.stage-views .chip { min-height: 36px; padding: 0 12px; font-size: .88rem; }
+.stage-hint { margin: 0; font-size: .92rem; text-align: center; }
+.stage .legend { margin-top: 0; }
+.pill.sel-pill { background: rgba(46, 184, 219, .18); color: #0e7490; }
+:root[data-theme="dark"] .pill.sel-pill { color: #67e8f9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.sel-pill { color: #67e8f9; } }
+
+/* Зоны: группы и описание */
+details.group { border-top: 1px solid var(--line); }
+details.group:first-of-type { margin-top: 6px; }
+details.group > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 6px 2px; font-weight: 700; list-style: none; cursor: pointer; }
+details.group > summary::-webkit-details-marker { display: none; }
+details.group > summary::after { content: ""; flex: none; width: 9px; height: 9px; margin-left: 4px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .2s; }
+details.group[open] > summary::after { transform: rotate(-135deg); }
+details.group > summary > span:first-child { flex: 1; }
+details.group .list { padding-bottom: 8px; }
+details.more { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; }
+details.more > summary { color: var(--accent); font-weight: 650; cursor: pointer; }
+details.more[open] > summary { margin-bottom: 14px; }
+.zone-chips { margin-bottom: 10px; }
+.zone-chips .chip { padding-right: 10px; }
+.chip-x { margin-left: 2px; font-size: 1.1rem; line-height: 1; opacity: .75; }
+.more-chip { border-style: dashed; color: var(--accent); }
+a.row { color: var(--text); text-decoration: none; }
+a.row:hover .row-text b { color: var(--accent); }
+.row .fi { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); }
+.fi.emoji { font-size: 1.35rem; }
+.sources a { overflow-wrap: anywhere; }
+
+/* Сила боли */
+.pain-range { display: grid; gap: 4px; }
+input.range { width: 100%; height: 34px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+input.range:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+input.range::-webkit-slider-runnable-track { height: 10px; border-radius: 99px; background: linear-gradient(90deg, #22c55e, #facc15 45%, #f97316 70%, #ef4444); }
+input.range::-moz-range-track { height: 10px; border-radius: 99px; background: linear-gradient(90deg, #22c55e, #facc15 45%, #f97316 70%, #ef4444); }
+input.range::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -9px; border: 3px solid #fff; border-radius: 50%; background: var(--text); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); -webkit-appearance: none; appearance: none; }
+input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #fff; border-radius: 50%; background: var(--text); box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
+.pain-out { font-weight: 750; }
+.pain-out.lvl-0 { color: var(--muted); }
+.pain-out.lvl-1 { color: var(--accent); }
+.pain-out.lvl-2, .pain-out.lvl-3 { color: var(--warn); }
+.pain-out.lvl-3 { color: var(--danger); }
+.pain-level { display: grid; place-items: center; flex: none; min-width: 36px; height: 36px; padding: 0 6px; border-radius: 18px; background: var(--figure); color: var(--muted); font-weight: 800; font-variant-numeric: tabular-nums; }
+.pain-level.lvl-0, .pain-level.lvl-1 { background: var(--accent-soft); color: var(--accent); }
+.pain-level.lvl-2 { background: var(--warn-soft); color: var(--warn); }
+.pain-level.lvl-3 { background: var(--danger-soft); color: var(--danger); }
+.mini-spark { flex: none; width: 78px; height: 30px; overflow: visible; }
+.mini-spark polyline { fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.mini-spark circle { fill: var(--warn); }
+.small.good { color: var(--accent); font-weight: 650; }
+.small.bad { color: var(--danger); font-weight: 650; }
+
+/* Программы */
+.progress.slim { display: block; width: 100%; height: 5px; margin-top: 8px; }
+.day-dots { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 4px 0 14px; }
+.day-dots i { display: grid; place-items: center; aspect-ratio: 1; max-width: 46px; width: 100%; justify-self: center; border-radius: 50%; background: var(--line); color: var(--muted); font-size: .8rem; font-style: normal; font-weight: 700; }
+.day-dots i.done { background: var(--accent); color: var(--accent-ink); }
+.day-dots i.next { box-shadow: inset 0 0 0 2px var(--accent); color: var(--text); }
+
+/* Изометрия в плеере */
+.hold-phase { margin: 8px 0 0; color: var(--accent); font-size: 1.35rem; font-weight: 800; letter-spacing: .01em; }
+.hold-card.is-prep .hold-phase, .hold-card.is-prep .big-timer { color: var(--warn); }
+.hold-card.is-relax .hold-phase, .hold-card.is-relax .big-timer { color: var(--water); }
+.hold-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin: 12px 0 0; }
+.hold-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.hold-dots i.done { background: var(--accent); }
+.hold-dots i.now { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); animation: hold-pulse 1s ease-in-out infinite alternate; }
+@keyframes hold-pulse { to { box-shadow: 0 0 0 7px var(--accent-soft); } }
+
+/* Рекорды */
+.record-card { text-align: center; }
+.record-card .chips { justify-content: center; }
+.record-clock { margin-top: 18px; }
+.record-card .player-dose { min-height: 1.5em; margin-bottom: 14px; }
+.record-best { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
 /* ----- Широкие экраны ----- */
 @media (min-width: 900px) {
