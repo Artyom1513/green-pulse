@@ -647,6 +647,22 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .record-card .player-dose { min-height: 1.5em; margin-bottom: 14px; }
 .record-best { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
+/* ----- Разделы тренировки, конструктор, веса ----- */
+.sub-tabs { margin: 0 0 16px; }
+.sub-tabs .chip { color: var(--muted); text-decoration: none; }
+.sub-tabs .chip[aria-current="page"] { background: var(--glass-strong); color: var(--text); box-shadow: 0 2px 8px rgba(0, 0, 0, .10); font-weight: 650; }
+.need { display: block; margin-top: 4px; color: var(--warn); font-size: .8rem; font-weight: 600; }
+.icon-btn.mini { width: 34px; height: 34px; }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+.row-tools { display: flex; flex: none; gap: 4px; }
+.builder-row { gap: 8px; }
+.builder-row .row-text { min-width: 0; }
+.mini-spark.up polyline { stroke: var(--accent); }
+.mini-spark.up circle { fill: var(--accent); }
+.weight-ctl { display: grid; justify-items: center; gap: 6px; margin: 14px auto 0; padding: 12px 14px; max-width: 340px; border-radius: 22px; background: var(--accent-soft); }
+.w-row { display: flex; align-items: center; gap: 14px; }
+.w-val { min-width: 104px; font-size: 1.6rem; font-variant-numeric: tabular-nums; text-align: center; }
+
 /* ----- Широкие экраны ----- */
 @media (min-width: 900px) {
   .page-title { font-size: 2.1rem; }

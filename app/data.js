@@ -16,18 +16,31 @@ export const REGION_GROUPS = [
 // keys — какие нагрузки ограничивает зона; bans — какие типы нагрузки убираются при данной тяжести;
 // sided — у зоны есть правая и левая сторона; guides — статьи справочника
 export const REGIONS = [
+  // ----- Голова и шея -----
   { id: "head", name: "Голова", group: "head", keys: [], bans: { 1: ["inversion"], 2: ["inversion", "hi", "impact"], 3: ["inversion", "hi", "impact", "iso"] }, guides: ["concussion"], tips: [
     "После удара по голове — никаких тренировок, пока не пройдут все симптомы и врач не разрешит нагрузку.",
     "При головной боли избегайте положений вниз головой и резких наклонов."] },
   { id: "neck", name: "Шея", group: "head", keys: ["neck"], guides: ["neck-pain"], tips: [
     "Избегайте резких движений головой и упражнений, где голову тянут руками.",
     "Экран — на уровне глаз, каждые 30–60 минут — короткая разминка."] },
+  { id: "trapezius", name: "Надплечье и трапеция", group: "head", sided: true, keys: ["neck", "shoulder"], guides: ["neck-pain"], tips: [
+    "Опустите и расслабьте плечи — особенно за компьютером и за рулём.",
+    "Тяжёлую сумку носите в рюкзаке на двух лямках или меняйте руку.",
+    "Помогают мягкая растяжка шеи и упражнения для лопаток."] },
+
+  // ----- Плечи и руки -----
   { id: "shoulder", name: "Плечевой сустав", group: "arms", sided: true, keys: ["shoulder"], guides: ["shoulder-pain"], tips: [
     "Пока плечо беспокоит — без жимов над головой и упоров на руки.",
     "Помогают изометрия и лёгкие упражнения для мышц лопаток."] },
-  { id: "upperArm", name: "Плечо: бицепс и трицепс", group: "arms", sided: true, keys: ["shoulder", "elbow"], guides: ["soft-tissue", "shoulder-pain"], tips: [
+  { id: "collarbone", name: "Ключица", group: "arms", sided: true, keys: ["shoulder", "chest"], guides: ["shoulder-pain", "fracture-surgery"], tips: [
+    "После падения на плечо с болью, отёком или «ступенькой» на ключице — в травмпункт.",
+    "Пока ключица болит — без отжиманий, жимов и висов."] },
+  { id: "upperArm", name: "Плечо спереди (бицепс)", group: "arms", sided: true, keys: ["shoulder", "elbow"], guides: ["soft-tissue", "shoulder-pain"], tips: [
     "При растяжении мышцы первые дни — без силовых на руки, затем постепенная нагрузка.",
     "Резкая боль с «хлопком» и изменением формы мышцы — повод сразу к врачу."] },
+  { id: "triceps", name: "Плечо сзади (трицепс)", group: "arms", sided: true, keys: ["elbow", "shoulder"], guides: ["soft-tissue", "tennis-elbow"], tips: [
+    "Пока разгибание руки болезненно — без отжиманий и жимов.",
+    "Возвращайтесь к нагрузке с лёгкой изометрии и эспандера."] },
   { id: "elbow", name: "Локоть", group: "arms", sided: true, keys: ["elbow"], guides: ["tennis-elbow"], tips: [
     "Снизьте нагрузку на хват и разгибание рук.",
     "Не выпрямляйте руки рывком «до щелчка»."] },
@@ -37,25 +50,44 @@ export const REGIONS = [
   { id: "wrist", name: "Запястье", group: "arms", sided: true, keys: ["wrist"], guides: ["wrist-hand"], tips: [
     "Упоры на ладони заменяем упорами на кулаки, предплечья или стену.",
     "Разминайте запястья перед тренировкой."] },
-  { id: "hand", name: "Кисть и пальцы", group: "arms", sided: true, keys: ["wrist"], guides: ["wrist-hand"], tips: [
+  { id: "hand", name: "Кисть и ладонь", group: "arms", sided: true, keys: ["wrist"], guides: ["wrist-hand"], tips: [
     "Не нагружайте хват, пока больно сжимать кулак.",
     "После падения на руку с болью и отёком сделайте рентген."] },
-  { id: "chest", name: "Грудь и рёбра", group: "trunk", keys: ["chest"], guides: ["chest-ribs"], tips: [
+  { id: "fingers", name: "Пальцы рук", group: "arms", sided: true, keys: ["wrist"], guides: ["wrist-hand"], tips: [
+    "Палец, который не разгибается сам, искривлён или сильно отёк после удара, — повод к врачу.",
+    "Пока пальцы болят — без висов и тяжёлого хвата."] },
+  { id: "thumb", name: "Большой палец", group: "arms", sided: true, keys: ["wrist"], guides: ["wrist-hand"], tips: [
+    "Боль у основания большого пальца после падения на руку — сделайте рентген: такие переломы легко пропустить.",
+    "Упоры на ладони заменяйте упорами на кулаки или предплечья."] },
+
+  // ----- Грудь, живот и спина -----
+  { id: "chest", name: "Грудь", group: "trunk", keys: ["chest"], guides: ["chest-ribs"], tips: [
     "Боль в груди без травмы, особенно с одышкой, — сразу звоните 112.",
-    "При ушибе рёбер делайте несколько глубоких вдохов каждый час."] },
+    "Пока грудные мышцы болят — без отжиманий и жимов, растяжка — мягкая."] },
+  { id: "ribs", name: "Рёбра сбоку", group: "trunk", sided: true, keys: ["chest", "abdomen"], bans: { 2: ["flexion"], 3: ["flexion"] }, guides: ["chest-ribs"], tips: [
+    "При ушибе рёбер делайте несколько глубоких вдохов и покашливаний каждый час — это профилактика пневмонии.",
+    "Сильная боль при дыхании, одышка или кровь в мокроте — срочно к врачу."] },
   { id: "abdomen", name: "Живот и пресс", group: "trunk", keys: ["abdomen"], bans: { 2: ["flexion"], 3: ["flexion", "iso"] }, guides: ["hernia-groin"], tips: [
     "При грыже или после операции на животе нагрузку на пресс определяет врач.",
     "Не задерживайте дыхание и не натуживайтесь при усилии."] },
+  { id: "obliques", name: "Бока (косые мышцы)", group: "trunk", sided: true, keys: ["abdomen", "lowerBack"], bans: { 2: ["flexion"], 3: ["flexion"] }, guides: ["soft-tissue", "back-pain"], tips: [
+    "Без скручиваний и наклонов в сторону с весом, пока бок болит.",
+    "Боль в боку с температурой или проблемами с мочеиспусканием — повод к врачу: причина может быть не в мышцах."] },
+  { id: "shoulderBlade", name: "Лопатка", group: "trunk", sided: true, keys: ["upperBack", "shoulder"], guides: ["shoulder-pain", "back-pain"], tips: [
+    "Помогают упражнения для мышц лопаток: «ангел у стены», тяги эспандера, «Y» и «T» лёжа.",
+    "Боль под лопаткой вместе с одышкой или болью в груди — срочно к врачу."] },
   { id: "upperBack", name: "Грудной отдел спины", group: "trunk", keys: ["upperBack"], guides: ["back-pain", "neck-pain"], tips: [
     "Следите за осанкой: плечи опущены, грудь раскрыта.",
     "Помогают мягкие повороты и упражнения для лопаток."] },
-  { id: "lowerBack", name: "Поясница", group: "trunk", keys: ["lowerBack"], bans: { 2: ["flexion"], 3: ["flexion"] }, guides: ["back-pain"], tips: [
+  { id: "lowerBack", name: "Поясница", group: "trunk", keys: ["lowerBack"], bans: { 2: ["flexion", "heavy"], 3: ["flexion", "heavy"] }, guides: ["back-pain"], tips: [
     "Без скручиваний и наклонов с весом, пока поясница беспокоит.",
     "Часто помогают ходьба, «птица-собака» и ягодичный мост — если не вызывают боли.",
     "Онемение в области промежности или проблемы с мочеиспусканием — срочно к врачу."] },
   { id: "pelvis", name: "Крестец и копчик", group: "trunk", keys: ["lowerBack", "hip"], guides: ["back-pain"], tips: [
     "Долго сидеть лучше на мягкой подушке, вставая каждые 30–40 минут.",
     "Упражнения на полу — на мягком коврике."] },
+
+  // ----- Таз и бёдра -----
   { id: "hip", name: "Тазобедренный сустав", group: "hips", sided: true, keys: ["hip"], guides: ["arthritis", "soft-tissue"], tips: [
     "Двигайтесь в комфортной амплитуде, без глубоких выпадов при боли.",
     "Сильные ягодичные мышцы разгружают тазобедренный сустав."] },
@@ -68,13 +100,24 @@ export const REGIONS = [
   { id: "thighFront", name: "Передняя поверхность бедра", group: "hips", sided: true, keys: ["knee"], guides: ["soft-tissue"], tips: [
     "При растяжении — без прыжков, глубоких приседаний и ударов по мячу.",
     "Возвращайте нагрузку постепенно, ориентируясь на боль."] },
+  { id: "thighInner", name: "Внутренняя поверхность бедра", group: "hips", sided: true, keys: ["groin"], guides: ["hernia-groin", "soft-tissue"], tips: [
+    "Растяжение приводящих мышц часто бывает в футболе и хоккее: без широких выпадов и резких рывков в сторону.",
+    "Сжатие подушки коленями — мягкая изометрия для возвращения силы."] },
+  { id: "thighOuter", name: "Наружная поверхность бедра", group: "hips", sided: true, keys: ["hip", "knee"], guides: ["knee-front", "soft-tissue"], tips: [
+    "Боль снаружи бедра и колена у бегунов часто связана с перегрузкой: временно сократите беговой объём.",
+    "Укрепляйте ягодичные мышцы: отведения ноги, шаги с эспандером."] },
   { id: "hamstring", name: "Задняя поверхность бедра", group: "hips", sided: true, keys: ["hamstring"], guides: ["hamstring"], tips: [
     "Не растягивайте больную мышцу через боль в первые дни.",
     "Изометрия и ягодичный мост помогают вернуть силу."] },
+
+  // ----- Колени, голени и стопы -----
   { id: "knee", name: "Колено", group: "legs", sided: true, keys: ["knee"], guides: ["knee-front", "knee-injury", "arthritis"], tips: [
     "Неглубокие приседания и никаких прыжков, пока колено беспокоит.",
     "Сильные мышцы бёдер и ягодиц разгружают колени.",
     "Отёк, «заклинивание» или нестабильность колена — повод показаться врачу."] },
+  { id: "kneeBack", name: "Под коленом", group: "legs", sided: true, keys: ["knee", "hamstring"], guides: ["knee-injury"], tips: [
+    "Припухлость и напряжение под коленом бывают при кисте Бейкера — покажитесь врачу.",
+    "Боль, отёк и покраснение под коленом и в икре без травмы — срочно к врачу: это может быть тромбоз."] },
   { id: "shin", name: "Голень спереди", group: "legs", sided: true, keys: ["ankle"], bans: { 1: ["impact"], 2: ["impact"], 3: ["impact"] }, guides: ["shin-splints"], tips: [
     "Временно замените бег и прыжки на велосипед или плавание.",
     "Боль в одной точке кости — повод исключить стрессовый перелом."] },
@@ -87,9 +130,15 @@ export const REGIONS = [
   { id: "ankle", name: "Голеностоп", group: "legs", sided: true, keys: ["ankle"], guides: ["ankle-sprain"], tips: [
     "Без прыжков и бега; упражнения на равновесие — только у опоры.",
     "Тренировка равновесия снижает риск повторного растяжения."] },
-  { id: "foot", name: "Стопа и пятка", group: "legs", sided: true, keys: ["ankle"], bans: { 2: ["impact"], 3: ["impact"] }, guides: ["heel-pain", "ankle-sprain"], tips: [
+  { id: "foot", name: "Стопа (подъём и свод)", group: "legs", sided: true, keys: ["ankle"], bans: { 2: ["impact"], 3: ["impact"] }, guides: ["heel-pain", "ankle-sprain"], tips: [
     "Обувь с хорошей амортизацией и поддержкой свода.",
-    "Утренняя боль в пятке на первых шагах — типичный признак подошвенного фасциита."] }
+    "Боль в одной точке на подъёме стопы после роста нагрузки — повод исключить стрессовый перелом."] },
+  { id: "heel", name: "Пятка и подошва", group: "legs", sided: true, keys: ["ankle"], bans: { 1: ["impact"], 2: ["impact"], 3: ["impact"] }, guides: ["heel-pain"], tips: [
+    "Утренняя боль в пятке на первых шагах — типичный признак подошвенного фасциита.",
+    "Помогают растяжка икр, мягкая обувь и пауза в беге и прыжках."] },
+  { id: "toes", name: "Пальцы стопы", group: "legs", sided: true, keys: ["ankle"], bans: { 2: ["impact"], 3: ["impact"] }, guides: ["fracture-surgery"], tips: [
+    "Резкая боль, покраснение и отёк большого пальца без травмы — повод к врачу (например, подагра).",
+    "Пока пальцы болят — без прыжков и выпадов с опорой на носок; обувь — с широким носком."] }
 ];
 
 export const SIDES = [{ id: "R", name: "Правая" }, { id: "L", name: "Левая" }];
@@ -148,13 +197,14 @@ export const TRIGGERS = [
 
 // Теги упражнений: impact — прыжки и удары о пол, hi — высокая интенсивность, iso — длительное статическое
 // напряжение, inversion — голова ниже сердца, overhead — руки с весом над головой, flexion — скручивание
-// позвоночника, floor — упражнение на полу, kneel — с опорой на колени, balance — на одной ноге.
+// позвоночника, floor — упражнение на полу, kneel — с опорой на колени, balance — на одной ноге,
+// heavy — тяжёлая штанга с нагрузкой на позвоночник.
 export const CONDITIONS = [
-  { id: "hypertension", name: "Повышенное давление", ban: ["inversion", "hi"], notes: [
+  { id: "hypertension", name: "Повышенное давление", ban: ["inversion", "hi", "heavy"], notes: [
     "Не задерживайте дыхание: выдох — на усилии.",
     "Без положений вниз головой и резких подъёмов с пола.",
     "Если давление выше обычного или болит голова — сегодня лучше спокойная прогулка."] },
-  { id: "heart", name: "Заболевание сердца", ban: ["hi", "impact", "iso"], maxLevel: 1, notes: [
+  { id: "heart", name: "Заболевание сердца", ban: ["hi", "impact", "iso", "heavy"], maxLevel: 1, notes: [
     "Нагрузку согласуйте с кардиологом. Приложение предлагает только лёгкие тренировки.",
     "Боль или давление в груди, перебои, сильная одышка — сразу остановитесь и звоните 112."] },
   { id: "asthma", name: "Астма", ban: ["hi"], longWarmup: true, notes: [
@@ -166,7 +216,7 @@ export const CONDITIONS = [
   { id: "weight", name: "Большой вес", ban: ["impact"], notes: [
     "Упражнения без прыжков бережут суставы и так же хорошо тренируют сердце.",
     "Наращивайте время постепенно — регулярность важнее интенсивности."] },
-  { id: "osteoporosis", name: "Остеопороз", ban: ["flexion", "impact"], notes: [
+  { id: "osteoporosis", name: "Остеопороз", ban: ["flexion", "impact", "heavy"], notes: [
     "Без скручиваний и наклонов вперёд с округлённой спиной.",
     "Силовые упражнения и тренировка равновесия укрепляют кости и снижают риск падений."] },
   { id: "varicose", name: "Варикоз", ban: ["iso"], notes: [
@@ -175,7 +225,7 @@ export const CONDITIONS = [
   { id: "hypermobility", name: "Гипермобильность суставов", ban: ["inversion"], notes: [
     "Не растягивайтесь «до упора»: суставам нужна сила и контроль, а не дополнительная гибкость.",
     "Изометрия и упражнения на равновесие особенно полезны."] },
-  { id: "caution", name: "Бережный режим", hidden: true, ban: ["hi", "impact"], maxLevel: 1, notes: [
+  { id: "caution", name: "Бережный режим", hidden: true, ban: ["hi", "impact", "heavy"], maxLevel: 1, notes: [
     "По ответам анкеты включён бережный режим: только умеренные нагрузки. Посоветуйтесь с врачом — когда он разрешит обычные тренировки, режим можно выключить в разделе «Тело»."] },
   { id: "pregnancy", name: "Беременность или недавние роды", block: true, notes: [
     "Во время беременности занимайтесь по плану, согласованному с врачом. Приложение не подбирает тренировки для беременных.",
@@ -186,15 +236,16 @@ export const CONDITIONS = [
 ];
 
 export const AGE_GROUPS = [
-  { id: "teen", name: "12–17 лет", maxLevel: 2, notes: ["Без тяжёлых весов. Лучше всего заниматься в секции под присмотром тренера."] },
+  { id: "teen", name: "12–17 лет", maxLevel: 2, ban: ["heavy"], notes: ["Без тяжёлых весов. Лучше всего заниматься в секции под присмотром тренера."] },
   { id: "adult", name: "18–39 лет" },
   { id: "mature", name: "40–64 года" },
-  { id: "senior", name: "65 лет и старше", ban: ["impact"], balance: true, notes: ["В каждую тренировку добавлены упражнения на равновесие — они снижают риск падений."] }
+  { id: "senior", name: "65 лет и старше", ban: ["impact", "heavy"], balance: true, notes: ["В каждую тренировку добавлены упражнения на равновесие — они снижают риск падений."] }
 ];
 
 export const GOALS = [
   { id: "health", name: "Здоровье и тонус", short: "Здоровье", main: ["legs", "push", "pull", "core", "cardio"] },
-  { id: "strength", name: "Сила", short: "Сила", main: ["legs", "push", "pull", "legs", "core"] },
+  { id: "strength", name: "Сила", short: "Сила", main: ["legs", "push", "pull", "legs", "core"], sets: true, weights: true },
+  { id: "muscle", name: "Мышцы и рельеф (с весами)", short: "Мышцы", main: ["legs", "push", "pull", "legs", "push", "pull"], sets: true, weights: true },
   { id: "endurance", name: "Выносливость", short: "Выносливость", main: ["cardio", "legs", "cardio", "core", "cardio"] },
   { id: "weight", name: "Снизить вес", short: "Вес", main: ["cardio", "legs", "push", "cardio", "core", "pull"] },
   { id: "back", name: "Здоровая спина", short: "Спина", main: ["core", "pull", "mobility", "legs", "core"] },
@@ -212,9 +263,14 @@ export const EQUIPMENT = [
   { id: "chair", name: "Устойчивый стул" },
   { id: "step", name: "Ступенька или низкая скамья" },
   { id: "dumbbell", name: "Гантели" },
+  { id: "kettlebell", name: "Гиря" },
+  { id: "barbell", name: "Штанга со стойками" },
+  { id: "bench", name: "Силовая скамья" },
   { id: "band", name: "Эспандер-лента" },
   { id: "bar", name: "Турник" }
 ];
+// Инвентарь со свободным весом: для таких упражнений приложение запоминает рабочий вес
+export const WEIGHT_EQUIP = ["dumbbell", "kettlebell", "barbell"];
 
 export const GROUPS = {
   warm: "Разминка", legs: "Ноги", push: "Грудь и руки", pull: "Спина", core: "Корпус",
@@ -227,7 +283,8 @@ export const GROUPS = {
 const E = (id, name, group, level, type, base, opts = {}) => ({
   id, name, group, level, type, base,
   side: !!opts.side, equip: opts.equip || [], load: opts.load || {}, tags: opts.tags || [], cues: opts.cues || [],
-  hold: opts.hold || 0, relax: opts.relax || 0
+  hold: opts.hold || 0, relax: opts.relax || 0,
+  weighted: (opts.equip || []).some(e => WEIGHT_EQUIP.includes(e))
 });
 
 export const EXERCISES = [
@@ -375,12 +432,81 @@ export const EXERCISES = [
   E("figure4", "Растяжка ягодиц лёжа («четвёрка»)", "cool", 1, "time", 30, { side: true, load: { hip: 1, knee: 1 }, tags: ["floor"], cues: ["Лодыжка одной ноги на колене другой", "Подтяните ноги к себе до натяжения в ягодице"] }),
   E("calfStretch", "Растяжка икр у стены", "cool", 1, "time", 30, { side: true, load: { ankle: 1 }, cues: ["Руки на стене, задняя нога прямая", "Пятка прижата к полу"] }),
   E("neckStretch", "Мягкая растяжка шеи", "cool", 1, "time", 30, { load: { neck: 1 }, cues: ["Ухо к плечу, плечи опущены", "Без давления рукой на голову"] }),
-  E("bellyBreath", "Дыхание животом", "cool", 1, "time", 60, { cues: ["Ладонь на животе, вдох носом — живот поднимается", "Выдох длиннее вдоха"] })
+  E("bellyBreath", "Дыхание животом", "cool", 1, "time", 60, { cues: ["Ладонь на животе, вдох носом — живот поднимается", "Выдох длиннее вдоха"] }),
+  // ----- С гантелями -----
+  E("dbLunge", "Выпады назад с гантелями", "legs", 2, "reps", 8, { side: true, equip: ["dumbbell"], load: { knee: 2, hip: 1, ankle: 1, groin: 1, wrist: 1 }, tags: ["balance"], cues: ["Гантели в опущенных руках, корпус прямой", "Шаг назад, оба колена сгибаются примерно под прямым углом", "Оттолкнитесь передней ногой и вернитесь"] }),
+  E("bulgarian", "Болгарские выпады с гантелями", "legs", 3, "reps", 8, { side: true, equip: ["dumbbell", "chair"], load: { knee: 3, hip: 2, ankle: 1, groin: 1 }, tags: ["balance"], cues: ["Носок задней ноги на сиденье стула", "Опускайтесь вертикально, переднее колено над стопой", "Первые подходы — без веса, чтобы поймать равновесие"] }),
+  E("dbStepUp", "Зашагивания с гантелями", "legs", 2, "reps", 8, { side: true, equip: ["dumbbell", "step"], load: { knee: 2, hip: 1, ankle: 1, hamstring: 1 }, tags: ["balance"], cues: ["Ступенька устойчивая, не выше колена", "Поднимайтесь за счёт передней ноги, корпус прямой"] }),
+  E("dbHipThrust", "Ягодичный мост с гантелью", "legs", 2, "reps", 12, { equip: ["dumbbell"], load: { hip: 2, lowerBack: 1, hamstring: 1 }, tags: ["floor"], cues: ["Гантель лежит на тазу, придерживайте её руками", "Поднимайте таз, сжимая ягодицы, без прогиба в пояснице", "Пауза 1 секунда наверху"] }),
+  E("dbCalfRaise", "Подъёмы на носки с гантелями", "legs", 1, "reps", 15, { equip: ["dumbbell"], load: { ankle: 2, wrist: 1 }, cues: ["Гантель в одной руке, другой держитесь за опору", "Вверх на 2 счёта, вниз на 3"] }),
+  E("dbSumo", "Присед сумо с гантелью", "legs", 2, "reps", 12, { equip: ["dumbbell"], load: { knee: 2, hip: 1, groin: 2, lowerBack: 1 }, cues: ["Широкая стойка, носки наружу, гантель между ног", "Колени смотрят туда же, куда носки", "Спина прямая, взгляд вперёд"] }),
+  E("dbDeadlift", "Становая тяга с гантелями", "legs", 2, "reps", 10, { equip: ["dumbbell"], load: { lowerBack: 2, hip: 2, hamstring: 1, knee: 1, wrist: 1 }, cues: ["Гантели по бокам от стоп, спина ровная", "Вставайте, толкая пол ногами; гантели близко к телу", "Опускайте с той же ровной спиной"] }),
+  E("singleRdl", "Румынская тяга на одной ноге", "legs", 3, "reps", 8, { side: true, equip: ["dumbbell"], load: { hamstring: 2, lowerBack: 1, hip: 1, ankle: 1 }, tags: ["balance"], cues: ["Гантель в руке напротив опорной ноги", "Наклон с прямой спиной, свободная нога уходит назад", "Можно держаться за опору свободной рукой"] }),
+  E("dbBench", "Жим гантелей лёжа на скамье", "push", 2, "reps", 10, { equip: ["dumbbell", "bench"], load: { shoulder: 2, elbow: 1, wrist: 1, chest: 2 }, cues: ["Лопатки сведены и прижаты к скамье, стопы на полу", "Опускайте гантели к груди, локти под углом 45° к корпусу", "Выдох — на жиме"] }),
+  E("dbIncline", "Жим гантелей на наклонной скамье", "push", 2, "reps", 10, { equip: ["dumbbell", "bench"], load: { shoulder: 2, elbow: 1, wrist: 1, chest: 2 }, cues: ["Спинка скамьи под углом около 30°", "Гантели опускаются к верху груди", "Без отбива и рывков"] }),
+  E("dbFly", "Разведение гантелей лёжа", "push", 2, "reps", 12, { equip: ["dumbbell"], load: { shoulder: 2, chest: 2, elbow: 1 }, tags: ["floor"], cues: ["Лёжа на полу или скамье, руки чуть согнуты", "Разводите до лёгкого натяжения в груди, не ниже уровня корпуса"] }),
+  E("standPress", "Жим гантелей стоя", "push", 2, "reps", 10, { equip: ["dumbbell"], load: { shoulder: 3, elbow: 1, lowerBack: 1, neck: 1 }, tags: ["overhead"], cues: ["Ягодицы и пресс напряжены, поясница не прогибается", "Жмите вверх, голова уходит чуть вперёд «в окно» между руками"] }),
+  E("arnoldPress", "Жим Арнольда сидя", "push", 3, "reps", 8, { equip: ["dumbbell", "chair"], load: { shoulder: 3, elbow: 1, neck: 1 }, tags: ["overhead"], cues: ["Гантели у лица, ладони к себе", "По пути вверх разворачивайте ладони вперёд", "Лёгкий вес: упражнение технически сложное"] }),
+  E("hammerCurl", "Молотковые сгибания", "push", 1, "reps", 12, { equip: ["dumbbell"], load: { elbow: 1, wrist: 1 }, cues: ["Ладони смотрят друг на друга", "Локти у корпуса, без раскачивания"] }),
+  E("ohTriceps", "Французский жим гантели сидя", "push", 2, "reps", 10, { equip: ["dumbbell", "chair"], load: { elbow: 2, shoulder: 2 }, tags: ["overhead"], cues: ["Гантель двумя руками за головой", "Локти смотрят вперёд-вверх, двигаются только предплечья"] }),
+  E("kickback", "Разгибание руки с гантелью в наклоне", "push", 1, "reps", 12, { side: true, equip: ["dumbbell", "chair"], load: { elbow: 1, shoulder: 1 }, cues: ["Свободная рука и колено на стуле, спина ровная", "Плечо неподвижно, разгибайте руку назад до конца"] }),
+  E("frontRaise", "Подъём гантелей перед собой", "push", 2, "reps", 10, { equip: ["dumbbell"], load: { shoulder: 2, neck: 1 }, cues: ["Руки чуть согнуты, поднимайте до уровня плеч", "Корпус не раскачивается"] }),
+  E("dbSkull", "Разгибание рук лёжа с гантелями", "push", 2, "reps", 10, { equip: ["dumbbell"], load: { elbow: 2, shoulder: 1 }, tags: ["floor"], cues: ["Лёжа, руки вверх, ладони друг к другу", "Сгибайте только в локтях, гантели опускаются к ушам"] }),
+  E("bentRow", "Тяга гантелей в наклоне", "pull", 2, "reps", 10, { equip: ["dumbbell"], load: { shoulder: 1, elbow: 1, lowerBack: 2, hamstring: 1 }, cues: ["Наклон с прямой спиной, колени согнуты", "Тяните гантели к поясу, сводя лопатки"] }),
+  E("chestRow", "Тяга гантелей лёжа грудью на скамье", "pull", 2, "reps", 10, { equip: ["dumbbell", "bench"], load: { shoulder: 1, elbow: 1, upperBack: 1 }, cues: ["Лягте грудью на наклонную скамью", "Тяните локти назад — поясница при этом не нагружается"] }),
+  E("reverseFly", "Разведение гантелей в наклоне", "pull", 2, "reps", 12, { equip: ["dumbbell"], load: { shoulder: 1, upperBack: 1, lowerBack: 1 }, cues: ["Наклон с прямой спиной или сидя, грудь на бёдрах", "Разводите руки в стороны, сводя лопатки; вес — лёгкий"] }),
+  E("dbShrug", "Шраги с гантелями", "pull", 1, "reps", 12, { equip: ["dumbbell"], load: { neck: 1, shoulder: 1, wrist: 1 }, cues: ["Поднимайте плечи прямо вверх к ушам", "Без вращения плечами, пауза наверху"] }),
+  E("dbPullover", "Пуловер с гантелью лёжа", "pull", 2, "reps", 10, { equip: ["dumbbell"], load: { shoulder: 2, elbow: 1, chest: 1 }, tags: ["floor", "overhead"], cues: ["Лёжа, гантель двумя руками над грудью", "Опускайте за голову до лёгкого натяжения, руки чуть согнуты"] }),
+  E("renegadeRow", "Тяга гантели в планке", "pull", 3, "reps", 6, { side: true, equip: ["dumbbell"], load: { wrist: 2, shoulder: 2, abdomen: 2, lowerBack: 1 }, tags: ["floor"], cues: ["Упор на гантели, стопы шире плеч", "Тяните гантель к поясу, таз не разворачивается"] }),
+  E("woodchop", "«Дровосек» с гантелью", "core", 2, "reps", 10, { side: true, equip: ["dumbbell"], load: { shoulder: 1, lowerBack: 1, abdomen: 1, hip: 1 }, tags: ["flexion"], cues: ["Гантель двумя руками, движение по диагонали от бедра вверх", "Поворот идёт от корпуса и бёдер, руки почти прямые"] }),
+  E("russianTwist", "Повороты корпуса сидя с гантелью", "core", 2, "reps", 12, { equip: ["dumbbell"], load: { abdomen: 2, lowerBack: 2 }, tags: ["floor", "flexion"], cues: ["Сидя, корпус чуть отклонён назад, стопы на полу", "Поворачивайте грудь, а не только руки"] }),
+  E("suitcaseCarry", "Прогулка с гантелью в одной руке", "core", 2, "time", 30, { side: true, equip: ["dumbbell"], load: { wrist: 2, shoulder: 1, lowerBack: 1, abdomen: 1 }, cues: ["Гантель в одной руке, корпус не наклоняется", "Идите медленно, плечи на одном уровне"] }),
+  E("dbDeadBug", "«Мёртвый жук» с гантелью", "core", 2, "reps", 8, { side: true, equip: ["dumbbell"], load: { abdomen: 2, shoulder: 1 }, tags: ["floor"], cues: ["Гантель в вытянутых вверх руках", "Опускайте ноги поочерёдно, поясница прижата к полу"] }),
+  E("thruster", "Присед с жимом гантелей", "cardio", 3, "reps", 10, { equip: ["dumbbell"], load: { knee: 2, hip: 1, shoulder: 2, lowerBack: 1 }, tags: ["overhead", "hi"], cues: ["Гантели у плеч, присед с ровной спиной", "Вставая, выжимайте гантели вверх одним движением"] }),
+  E("dbSwing", "Махи гантелью", "cardio", 2, "reps", 15, { equip: ["dumbbell"], load: { hip: 2, lowerBack: 2, hamstring: 1, wrist: 1 }, tags: ["hi"], cues: ["Гантель двумя руками за верхний диск", "Движение от таза: резко выпрямите бёдра, руки только направляют"] }),
+
+  // ----- С гирей -----
+  E("kbSwing", "Махи гирей", "cardio", 2, "reps", 15, { equip: ["kettlebell"], load: { hip: 2, lowerBack: 2, hamstring: 2, wrist: 1, shoulder: 1 }, tags: ["hi"], cues: ["Гиря уходит назад между бёдер, спина прямая", "Резко выпрямите таз — гиря поднимается до уровня груди", "Это наклон, а не присед"] }),
+  E("kbGoblet", "Гоблет-присед с гирей", "legs", 2, "reps", 10, { equip: ["kettlebell"], load: { knee: 2, hip: 1, lowerBack: 1, wrist: 1, groin: 1 }, cues: ["Гиря у груди, держите её за «рога», локти вниз", "Опускайтесь между коленями, спина прямая"] }),
+  E("kbDeadlift", "Становая тяга гири", "legs", 1, "reps", 10, { equip: ["kettlebell"], load: { lowerBack: 2, hip: 1, hamstring: 1, knee: 1 }, cues: ["Гиря между стоп, таз назад, спина ровная", "Вставайте, толкая пол; гиря близко к телу"] }),
+  E("kbSumo", "Присед сумо с гирей", "legs", 1, "reps", 12, { equip: ["kettlebell"], load: { knee: 2, groin: 2, hip: 1, lowerBack: 1 }, cues: ["Широкая стойка, гиря в опущенных руках", "Колени по направлению носков, спина прямая"] }),
+  E("kbHalo", "«Гало» с гирей", "warm", 2, "reps", 6, { equip: ["kettlebell"], load: { shoulder: 2, neck: 1, upperBack: 1 }, tags: ["overhead"], cues: ["Гиря за «рога» дном вверх", "Медленные круги вокруг головы, пресс напряжён", "Вес — лёгкий"] }),
+  E("kbPress", "Жим гири одной рукой", "push", 2, "reps", 8, { side: true, equip: ["kettlebell"], load: { shoulder: 3, elbow: 1, wrist: 1, lowerBack: 1 }, tags: ["overhead"], cues: ["Гиря лежит на предплечье у плеча", "Жмите вверх, корпус не отклоняется в сторону"] }),
+  E("kbRow", "Тяга гири в наклоне", "pull", 2, "reps", 10, { side: true, equip: ["kettlebell", "chair"], load: { shoulder: 1, elbow: 1, lowerBack: 1 }, cues: ["Свободная рука на стуле, спина ровная", "Тяните гирю к поясу, локоть идёт вдоль корпуса"] }),
+  E("kbClean", "Взятие гири на грудь", "cardio", 3, "reps", 6, { side: true, equip: ["kettlebell"], load: { hip: 2, lowerBack: 2, wrist: 2, elbow: 1, shoulder: 1 }, tags: ["hi"], cues: ["Начните с маха, затем подведите гирю к плечу", "Гиря мягко «обкатывает» кисть, а не бьёт по предплечью", "Технику лучше ставить с тренером"] }),
+  E("kbCarry", "Прогулка с гирей у груди", "core", 1, "time", 40, { equip: ["kettlebell"], load: { abdomen: 1, wrist: 1, lowerBack: 1, shoulder: 1 }, cues: ["Гиря у груди двумя руками", "Идите медленно, корпус прямой, дыхание ровное"] }),
+  E("kbAround", "Передача гири вокруг корпуса", "core", 1, "reps", 8, { equip: ["kettlebell"], load: { wrist: 1, lowerBack: 1, abdomen: 1 }, cues: ["Передавайте гирю из руки в руку вокруг пояса", "Корпус неподвижен, ноги на ширине плеч", "Половину повторов — в другую сторону"] }),
+  E("kbGetUp", "Турецкий подъём до локтя", "core", 3, "reps", 3, { side: true, equip: ["kettlebell"], load: { shoulder: 3, wrist: 2, abdomen: 2, hip: 1 }, tags: ["floor", "overhead"], cues: ["Лёжа, гиря в прямой руке над плечом, взгляд на гирю", "Поднимитесь на локоть свободной руки и вернитесь", "Сначала освойте движение без веса"] }),
+
+  // ----- Со штангой (в зале или дома в силовой раме) -----
+  E("bbSquat", "Присед со штангой", "legs", 3, "reps", 8, { equip: ["barbell"], load: { knee: 3, hip: 2, lowerBack: 3, ankle: 1, shoulder: 1, groin: 1 }, tags: ["heavy"], cues: ["Только в раме со страховочными упорами", "Штанга на верхней части спины, взгляд вперёд", "Колени по направлению носков, спина прямая"] }),
+  E("bbDeadlift", "Становая тяга со штангой", "legs", 3, "reps", 6, { equip: ["barbell"], load: { lowerBack: 3, hip: 2, hamstring: 2, knee: 1, wrist: 2 }, tags: ["heavy"], cues: ["Гриф над серединой стопы, спина ровная", "Толкайте пол ногами, гриф скользит вдоль ног", "Технику ставьте с тренером"] }),
+  E("bbRdl", "Румынская тяга со штангой", "legs", 2, "reps", 8, { equip: ["barbell"], load: { lowerBack: 2, hamstring: 2, hip: 1, wrist: 1 }, tags: ["heavy"], cues: ["Колени чуть согнуты, таз уходит назад", "Гриф скользит по бёдрам до середины голени"] }),
+  E("bbBench", "Жим штанги лёжа", "push", 3, "reps", 8, { equip: ["barbell", "bench"], load: { shoulder: 3, chest: 3, elbow: 2, wrist: 2 }, tags: ["heavy"], cues: ["Только со страхующим или в раме с упорами", "Лопатки сведены, гриф опускается на низ груди", "Выдох — на жиме, не задерживайте дыхание"] }),
+  E("bbPress", "Жим штанги стоя", "push", 3, "reps", 8, { equip: ["barbell"], load: { shoulder: 3, elbow: 2, wrist: 2, lowerBack: 2, neck: 1 }, tags: ["heavy", "overhead"], cues: ["Ягодицы и пресс напряжены, поясница не прогибается", "Гриф идёт вертикально, голова уходит назад и возвращается"] }),
+  E("bbRow", "Тяга штанги в наклоне", "pull", 3, "reps", 8, { equip: ["barbell"], load: { lowerBack: 3, shoulder: 1, elbow: 1, upperBack: 1, hamstring: 1 }, tags: ["heavy"], cues: ["Наклон около 45° с прямой спиной", "Тяните гриф к низу живота, локти вдоль корпуса"] }),
+  E("bbHipThrust", "Ягодичный мост со штангой", "legs", 2, "reps", 10, { equip: ["barbell", "bench"], load: { hip: 2, lowerBack: 1, hamstring: 1 }, tags: ["floor"], cues: ["Лопатки на скамье, на грифе — мягкая накладка", "Поднимайте таз до прямой линии, подбородок к груди"] }),
+  E("bbCurl", "Сгибание рук со штангой", "push", 2, "reps", 10, { equip: ["barbell"], load: { elbow: 2, wrist: 2 }, cues: ["Хват на ширине плеч, локти у корпуса", "Без раскачивания корпусом"] }),
+
+  // ----- Ещё без тяжёлого инвентаря -----
+  E("pullUp", "Подтягивания", "pull", 3, "reps", 5, { equip: ["bar"], load: { shoulder: 2, elbow: 2, wrist: 1 }, cues: ["Из виса с опущенными плечами", "Тянитесь грудью к перекладине, опускайтесь подконтрольно"] }),
+  E("bandPullUp", "Подтягивания с резиной", "pull", 2, "reps", 6, { equip: ["bar", "band"], load: { shoulder: 2, elbow: 2, wrist: 1 }, cues: ["Петля резины под коленом или стопой", "Чем толще резина, тем легче"] }),
+  E("doorRow", "Тяга к дверному косяку", "pull", 1, "reps", 10, { load: { shoulder: 1, elbow: 1, wrist: 1 }, cues: ["Возьмитесь за косяк открытой двери и отклонитесь назад", "Подтягивайте грудь к двери, сводя лопатки", "Дверь надёжно открыта, стопы у порога"] }),
+  E("nordic", "Скандинавские опускания", "legs", 3, "reps", 4, { load: { hamstring: 3, knee: 1 }, tags: ["floor", "kneel"], cues: ["Стоя на коленях, пятки закреплены под диваном", "Медленно опускайтесь вперёд с прямым корпусом", "Ловите себя руками и возвращайтесь с их помощью"] }),
+  E("cossack", "Казачий присед", "legs", 3, "reps", 6, { side: true, load: { knee: 2, groin: 2, hip: 1, ankle: 1 }, cues: ["Широкая стойка, опускайтесь на одну ногу", "Вторая нога прямая, носок вверх", "Глубина — без боли"] }),
+  E("bearCrawl", "«Медвежья» ходьба", "cardio", 2, "time", 30, { load: { wrist: 2, shoulder: 2, knee: 1, abdomen: 1 }, tags: ["floor"], cues: ["Упор на ладони и носки, колени чуть над полом", "Двигайтесь маленькими шагами, спина ровная"] }),
+  E("inchworm", "«Гусеница»", "warm", 2, "reps", 6, { load: { wrist: 2, shoulder: 1, hamstring: 1, lowerBack: 1 }, tags: ["floor"], cues: ["Наклонитесь и поставьте ладони на пол", "Переступайте руками в планку и обратно", "Колени можно согнуть"] }),
+  E("copenhagen", "Копенгагенская планка с колена", "core", 3, "time", 15, { side: true, equip: ["chair"], load: { groin: 2, shoulder: 2, abdomen: 1 }, tags: ["floor", "iso"], cues: ["Боковая планка, верхнее колено на сиденье стула", "Таз поднят, тело — прямая линия", "Укрепляет приводящие мышцы и пах"] }),
+  E("hipHinge", "Наклон к стене: отработка тяги", "warm", 1, "reps", 8, { load: { hamstring: 1, lowerBack: 1 }, cues: ["Встаньте спиной к стене на полшага от неё", "Отводите таз назад, пока он не коснётся стены; спина прямая", "Так учатся становой и румынской тяге"] }),
+  E("bandDislocate", "Проводка эспандера за спину", "warm", 1, "reps", 8, { equip: ["band"], load: { shoulder: 1 }, tags: ["overhead"], cues: ["Широкий хват, прямые руки", "Проведите ленту над головой за спину и обратно — без боли"] }),
+  E("squatHold", "Удержание полуприседа", "iso", 2, "hold", 4, { hold: 20, relax: 20, load: { knee: 1, hip: 1 }, tags: ["iso"], cues: ["Присядьте на треть глубины, руки вперёд", "Колени над стопами, дыхание ровное"] }),
+  E("pressHold", "Изометрия жима ладонями", "iso", 1, "hold", 6, { hold: 10, relax: 10, load: { chest: 1, shoulder: 1 }, cues: ["Ладони вместе перед грудью, локти в стороны", "Давите ладонями друг в друга на 50–70% усилия"] })
 ];
 
 export const EX = Object.fromEntries(EXERCISES.map(e => [e.id, e]));
 
-// Готовые короткие тренировки: упражнения проходят тот же фильтр ограничений
+// Готовые тренировки: упражнения проходят тот же фильтр ограничений.
+// cat: home — короткие без веса, weights — с весами; rounds — круги, rest — отдых между упражнениями
 export const QUICK = [
   { id: "desk", name: "Перерыв в работе", desc: "4 минуты для шеи, плеч и спины прямо у стола", items: ["neckMob", "armCircles", "torsoTurns", "wallAngel", "chestStretch", "hamStretch"] },
   { id: "morning", name: "Бодрое утро", desc: "7 минут, чтобы проснуться", items: ["march", "armCircles", "hipCircles", "chairSquat", "wallPush", "highKnees", "chestStretch"] },
@@ -391,10 +517,21 @@ export const QUICK = [
   { id: "back", name: "Спина и осанка", desc: "10 минут для мышц спины и корпуса", items: ["catCow", "birdDog", "deadBug", "bridge", "wallAngel", "openBook", "childPose"] },
   { id: "seated", name: "Сидя, без нагрузки на ноги", desc: "Когда травмирована нога", items: ["armCircles", "armBike", "seatedMarch", "bandRow", "tricepsBand", "gripIso", "neckStretch", "bellyBreath"] },
   { id: "evening", name: "Перед сном", desc: "7 минут мягкой растяжки и дыхания", items: ["neckStretch", "openBook", "figure4", "childPose", "bellyBreath"] },
-  { id: "balance", name: "Равновесие", desc: "6 минут — особенно полезно после 60", items: ["singleLeg", "heelToe", "legSwingSide", "calfRaise", "standingKnee"] }
+  { id: "balance", name: "Равновесие", desc: "6 минут — особенно полезно после 60", items: ["singleLeg", "heelToe", "legSwingSide", "calfRaise", "standingKnee"] },
+  { id: "noEquip", name: "Всё тело без инвентаря", desc: "Силовая с весом своего тела, 2 круга", rounds: 2, rest: 20, items: ["squat", "kneePush", "doorRow", "reverseLunge", "plank", "bridge", "superman"] },
+  { id: "hiit", name: "Кардио-интервалы", desc: "Бодрые интервалы; прыжки уберутся, если вам их нельзя", rounds: 2, rest: 20, items: ["highKnees", "skater", "jacks", "mountain", "burpeeLow", "fastMarch"] },
+  { id: "warmW", name: "Разминка перед силовой", cat: "weights", desc: "8 минут: суставы, наклон, активация", items: ["march", "armCircles", "hipCircles", "catCow", "hipHinge", "inchworm", "legSwings", "bridge"] },
+  { id: "dbFull", name: "Гантели: всё тело", cat: "weights", equip: ["dumbbell"], desc: "3 круга по 7 упражнений", rounds: 3, rest: 30, items: ["gobletSquat", "floorPress", "bentRow", "rdl", "standPress", "dbHipThrust", "farmerCarry"] },
+  { id: "dbUpper", name: "Гантели: верх тела", cat: "weights", equip: ["dumbbell"], desc: "Грудь, спина, плечи и руки", rounds: 3, rest: 30, items: ["floorPress", "dbRow", "ohPress", "reverseFly", "bicepsCurl", "ohTriceps", "lateralRaise"] },
+  { id: "dbLegs", name: "Гантели: ноги и ягодицы", cat: "weights", equip: ["dumbbell"], desc: "Присед, тяга, выпады и мост", rounds: 3, rest: 30, items: ["gobletSquat", "rdl", "dbLunge", "dbHipThrust", "dbStepUp", "dbCalfRaise"] },
+  { id: "arms", name: "Руки с гантелями", cat: "weights", equip: ["dumbbell"], desc: "Бицепс, трицепс и плечи", rounds: 3, rest: 20, items: ["bicepsCurl", "ohTriceps", "hammerCurl", "kickback", "lateralRaise", "frontRaise"] },
+  { id: "coreW", name: "Корпус с весом", cat: "weights", equip: ["dumbbell"], desc: "Пресс и стабилизация с гантелью", rounds: 2, rest: 20, items: ["dbDeadBug", "woodchop", "suitcaseCarry", "russianTwist", "sidePlank", "plank"] },
+  { id: "kbBase", name: "Гиря: базовый комплекс", cat: "weights", equip: ["kettlebell"], desc: "Тяга, присед, жим, махи", rounds: 3, rest: 30, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbSwing", "kbPress", "kbRow", "kbCarry"] },
+  { id: "bbBase", name: "Штанга: силовая база", cat: "weights", equip: ["barbell"], desc: "Для зала: рама, упоры и страховка", rounds: 3, rest: 90, items: ["bbSquat", "bbBench", "bbRow", "bbRdl", "bbPress"] }
 ];
 
-// Программы восстановления: этапы по дням, k — множитель дозировки
+// Программы: kind — rehab (восстановление) или strength (сила); этапы по дням,
+// k — множитель дозировки, rounds и rest — круги и отдых в каждом занятии
 export const PROGRAMS = [
   { id: "knees", name: "Крепкие колени", icon: "🦵", days: 14, guide: "knee-front",
     desc: "Две недели укрепляем мышцы бедра и ягодиц — они разгружают колено. Без прыжков и глубоких приседаний.",
@@ -428,6 +565,27 @@ export const PROGRAMS = [
     desc: "Неделя статических упражнений: сухожилия и связки любят дозированное напряжение без резких движений.",
     phases: [
       { until: 7, k: 1, items: ["quadSet", "adductorSqueeze", "abductorPress", "calfHold", "shoulderER", "gripIso", "deadBugHold", "bridgeHold"] }
+    ] },
+  { id: "bodyweight", kind: "strength", name: "Сила без железа", icon: "🤸", days: 12, rounds: 3, rest: 30, guide: "weights-start",
+    desc: "4 недели по 3 занятия: приседания, отжимания, тяги и планки с весом своего тела. Занимайтесь через день.",
+    phases: [
+      { until: 4, k: 0.9, items: ["chairSquat", "wallPush", "doorRow", "bridge", "deadBug", "kneePlank"] },
+      { until: 8, k: 1, items: ["squat", "kneePush", "doorRow", "reverseLunge", "birdDog", "plank"] },
+      { until: 12, k: 1.1, items: ["splitSquat", "pushUp", "doorRow", "singleBridge", "sidePlank", "hollowHold"] }
+    ] },
+  { id: "dumbbells", kind: "strength", name: "Гантели с нуля", icon: "🏋️", days: 12, rounds: 3, rest: 45, equip: ["dumbbell"], guide: "weights-start",
+    desc: "4 недели по 3 занятия: учимся базовым движениям с гантелями и постепенно прибавляем вес. Занимайтесь через день.",
+    phases: [
+      { until: 4, k: 0.9, items: ["gobletSquat", "floorPress", "dbRow", "dbHipThrust", "dbDeadBug", "farmerCarry"] },
+      { until: 8, k: 1, items: ["gobletSquat", "rdl", "floorPress", "bentRow", "standPress", "dbLunge", "suitcaseCarry"] },
+      { until: 12, k: 1.1, items: ["bulgarian", "rdl", "dbBench", "bentRow", "standPress", "dbHipThrust", "renegadeRow"] }
+    ] },
+  { id: "kettlebell", kind: "strength", name: "Гиря: базовый курс", icon: "⚡", days: 10, rounds: 3, rest: 40, equip: ["kettlebell"], guide: "weights-start",
+    desc: "10 занятий: становая тяга, гоблет-присед, жим и махи гирей — сила и выносливость всего тела.",
+    phases: [
+      { until: 3, k: 0.9, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbRow", "kbCarry"] },
+      { until: 7, k: 1, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbPress", "kbRow", "kbSwing"] },
+      { until: 10, k: 1.1, items: ["kbSwing", "kbGoblet", "kbPress", "kbRow", "kbClean", "kbAround"] }
     ] }
 ];
 
@@ -449,7 +607,10 @@ export const BADGES = [
   { id: "water", name: "Водный баланс", desc: "8 стаканов воды за день", icon: "💧" },
   { id: "early", name: "Ранняя пташка", desc: "Тренировка до 8:00", icon: "🌅" },
   { id: "flex5", name: "Гибкий", desc: "5 тренировок на гибкость или спину", icon: "🧘" },
-  { id: "statics", name: "Железная статика", desc: "Рекорды в 3 упражнениях на статику", icon: "🧱" }
+  { id: "statics", name: "Железная статика", desc: "Рекорды в 3 упражнениях на статику", icon: "🧱" },
+  { id: "lifter", name: "Свой вес", desc: "Рабочий вес записан в 5 упражнениях", icon: "🏋️" },
+  { id: "stronger", name: "Сильнее, чем был", desc: "Рабочий вес вырос на 20% и больше", icon: "📈" },
+  { id: "builder", name: "Конструктор", desc: "Собрал(а) свою тренировку", icon: "🧩" }
 ];
 
 // Упражнения для «Рекордов статики»: удержание на время, без резких движений
@@ -468,7 +629,11 @@ export const TIPS = [
   "Связки и сухожилия крепнут медленнее мышц: прибавляйте нагрузку постепенно, неделя за неделей.",
   "Изометрия — удержание без движения — помогает тренироваться даже при болезненном суставе.",
   "Тренировка равновесия снижает риск повторного растяжения голеностопа.",
-  "Плохо спали и нет сил? Лёгкая тренировка или прогулка сегодня — тоже победа."
+  "Плохо спали и нет сил? Лёгкая тренировка или прогулка сегодня — тоже победа.",
+  "Вес подобран верно, если последние 2–3 повтора даются тяжело, но техника не ломается.",
+  "Прибавляйте вес понемногу — на 2,5–5%, когда легко делаете верхнюю границу повторов.",
+  "Перед подходами с весом сделайте 1–2 разминочных подхода с лёгким весом.",
+  "Мышцам нужно 48 часов на восстановление: силовые на одну группу — через день."
 ];
 
 // Анкета безопасности при первом запуске. Ответ «да» включает соответствующую особенность здоровья.

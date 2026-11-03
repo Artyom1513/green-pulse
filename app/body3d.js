@@ -35,76 +35,167 @@ const rotY = t => { const c = Math.cos(t), s = Math.sin(t); return new Float32Ar
 const trans = (x, y, z) => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
 
 // ----- Геометрия -----
-// Поверхность вращения вокруг оси a→d; profile — кольца { t, rx, rz } вдоль оси
-function revolve(mesh, { a, d, profile, segs = 20, power = 2, classify }) {
-  d = norm(d);
-  const ref = Math.abs(d[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
-  const e1 = norm(cross(d, ref));
-  const e2 = cross(e1, d);
-  const rings = profile.length;
+// Фигура собирается из гладких «трубок»: туловище и голова — из колец по высоте, руки, ноги, пальцы
+// и стопы — протяжкой сечения вдоль сплайна. Мышечный рельеф задаётся смещениями сечения.
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const bell = (x, c, w) => Math.exp(-(((x - c) / w) ** 2));
+const spow = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
+
+// Сплайн Катмулла — Рома по строкам чисел; t от 0 до rows.length - 1
+function catmull(rows, t) {
+  const n = rows.length - 1;
+  const i = Math.min(Math.max(Math.floor(t), 0), n - 1), f = t - i;
+  const p0 = rows[Math.max(i - 1, 0)], p1 = rows[i], p2 = rows[i + 1], p3 = rows[Math.min(i + 2, n)];
+  const f2 = f * f, f3 = f2 * f;
+  return p1.map((_, k) => 0.5 * (2 * p1[k] + (-p0[k] + p2[k]) * f + (2 * p0[k] - 5 * p1[k] + 4 * p2[k] - p3[k]) * f2 + (-p0[k] + 3 * p1[k] - 3 * p2[k] + p3[k]) * f3));
+}
+// Таблица значений на равномерной сетке от 0 до 1 — гладкая интерполяция
+const table = (rows, v) => catmull(rows, Math.min(1, Math.max(0, v)) * (rows.length - 1));
+
+// Трубка из rings колец по segs точек; point(i, j) → { p, c, u }; classify(p, dir, u) → [зона, сторона]
+function tube(mesh, rings, segs, point, classify) {
+  const row = segs + 1;
   const base = mesh.count;
-  const pts = [];
+  const P = new Array(rings * row), C = new Array(rings), U = new Array(rings);
   for (let i = 0; i < rings; i++) {
-    const { t, rx, rz } = profile[i];
-    for (let j = 0; j <= segs; j++) {
-      const ang = (j / segs) * Math.PI * 2;
-      const c = Math.cos(ang), s = Math.sin(ang);
-      const ce = Math.sign(c) * Math.pow(Math.abs(c), 2 / power);
-      const se = Math.sign(s) * Math.pow(Math.abs(s), 2 / power);
-      pts.push(add(add(add(a, scale(d, t)), scale(e1, rx * ce)), scale(e2, rz * se)));
+    for (let j = 0; j < segs; j++) {
+      const q = point(i, j);
+      P[i * row + j] = q.p;
+      if (j === 0) { C[i] = q.c; U[i] = q.u; }
     }
+    P[i * row + segs] = P[i * row];
   }
-  const L = profile[rings - 1].t - profile[0].t || 1;
   for (let i = 0; i < rings; i++) {
-    const axisPt = add(a, scale(d, profile[i].t));
+    const endDir = i < rings / 2 ? sub(C[0], C[Math.min(1, rings - 1)]) : sub(C[rings - 1], C[Math.max(rings - 2, 0)]);
     for (let j = 0; j <= segs; j++) {
-      const p = pts[i * (segs + 1) + j];
-      const jj = j % segs;
-      const pR = pts[i * (segs + 1) + ((jj + 1) % segs)], pL = pts[i * (segs + 1) + ((jj - 1 + segs) % segs)];
-      const pU = pts[Math.min(i + 1, rings - 1) * (segs + 1) + j], pD = pts[Math.max(i - 1, 0) * (segs + 1) + j];
+      const p = P[i * row + j], jj = j % segs;
+      const pR = P[i * row + (jj + 1) % segs], pL = P[i * row + (jj - 1 + segs) % segs];
+      const pU = P[Math.min(i + 1, rings - 1) * row + j], pD = P[Math.max(i - 1, 0) * row + j];
+      const radial = sub(p, C[i]);
+      const flat = len(radial) < 1e-5;
       let n = cross(sub(pR, pL), sub(pU, pD));
-      const radial = sub(p, axisPt);
-      if (profile[i].rx < 1e-4 || len(n) < 1e-10) n = i === 0 ? scale(d, -1) : i === rings - 1 ? d : radial;
+      if (flat || len(n) < 1e-12) n = flat ? endDir : radial;
       else if (dot(n, radial) < 0) n = scale(n, -1);
       n = norm(n);
-      const [region, side] = classify(p, n, (profile[i].t - profile[0].t) / L);
+      const [region, side] = classify(p, flat ? n : norm(radial), U[i]);
       mesh.push(p, n, region, side);
     }
   }
   for (let i = 0; i < rings - 1; i++) {
     for (let j = 0; j < segs; j++) {
-      const v = base + i * (segs + 1) + j, w = v + segs + 1;
+      const v = base + i * row + j, w = v + row;
       mesh.idx.push(v, w, v + 1, v + 1, w, w + 1);
     }
   }
 }
 
-function capsuleProfile(L, ra, rb, sx = 1, sz = 1, cap = 6, body = 14) {
-  const prof = [];
-  for (let k = 0; k <= cap; k++) {
-    const phi = -Math.PI / 2 + (k / cap) * (Math.PI / 2);
-    prof.push({ t: ra * Math.sin(phi), rx: ra * Math.cos(phi) * sx, rz: ra * Math.cos(phi) * sz });
+// «Лофт» по высоте: rows — [y, полуширина, глубина спереди, глубина сзади, сдвиг центра по z];
+// bump(x, y, z, dir) добавляет рельеф вдоль направления от оси
+function loft(mesh, { rows, step, segs, power, bump, classify }) {
+  const samples = [];
+  for (let i = 0; i < rows.length - 1; i++) {
+    const n = Math.max(1, Math.round((rows[i + 1][0] - rows[i][0]) / step));
+    for (let k = 0; k < n; k++) samples.push(catmull(rows, i + k / n));
   }
-  for (let k = 1; k < body; k++) {
-    const u = k / body, r = ra + (rb - ra) * u;
-    prof.push({ t: L * u, rx: r * sx, rz: r * sz });
-  }
-  for (let k = 0; k <= cap; k++) {
-    const phi = (k / cap) * (Math.PI / 2);
-    prof.push({ t: L + rb * Math.sin(phi), rx: rb * Math.cos(phi) * sx, rz: rb * Math.cos(phi) * sz });
-  }
-  return prof;
-}
-function ellipsoidProfile(rx, ry, rz, rings = 14) {
-  const prof = [];
-  for (let k = 0; k <= rings; k++) {
-    const phi = -Math.PI / 2 + (k / rings) * Math.PI;
-    prof.push({ t: ry * Math.sin(phi), rx: rx * Math.cos(phi), rz: rz * Math.cos(phi) });
-  }
-  return prof;
+  samples.push(rows[rows.length - 1]);
+  const y0 = rows[0][0], y1 = rows[rows.length - 1][0];
+  tube(mesh, samples.length, segs, (i, j) => {
+    const [y, W0, Df0, Db0, zc] = samples[i];
+    const W = Math.max(0, W0), Df = Math.max(0, Df0), Db = Math.max(0, Db0);
+    const th = (j / segs) * Math.PI * 2;
+    const ct = Math.cos(th), st = Math.sin(th);
+    const x = W * spow(st, 2 / power);
+    const z = (ct >= 0 ? Df : Db) * spow(ct, 2 / power);
+    const pole = Math.hypot(x, z) < 1e-6;
+    const dir = pole ? [0, 0, 1] : norm([x, 0, z]);
+    const extra = bump && !pole ? bump(x, y, z, dir) : 0;
+    return { p: [x + dir[0] * extra, y, zc + z + dir[2] * extra], c: [0, y, zc], u: (y - y0) / (y1 - y0) };
+  }, classify);
 }
 
-// Сборка фигуры. regionIndex(id) → номер зоны (1…), сторона: 0 — центр, 1 — правая, 2 — левая
+// Протяжка сечения вдоль сплайна через точки pts. shape(u, ct, st, K) → [вдоль e1, вдоль e2];
+// e1 — проекция ref на плоскость сечения (обычно «вперёд»), e2 = T × e1;
+// K — доли длины дуги в контрольных точках (где локоть, колено), u — доля длины от начала
+function sweep(mesh, { pts, rings, segs, ref = [0, 0, 1], shape, classify, capStart = true, capEnd = true, capRings = 6 }) {
+  const N = 240, samples = [];
+  let L = 0, prev = catmull(pts, 0);
+  samples.push({ s: 0, p: prev });
+  for (let k = 1; k <= N; k++) {
+    const p = catmull(pts, (k / N) * (pts.length - 1));
+    L += len(sub(p, prev));
+    samples.push({ s: L, p });
+    prev = p;
+  }
+  const K = pts.map((_, i) => samples[Math.round((i / (pts.length - 1)) * N)].s / L);
+  const at = u => {
+    const target = Math.min(1, Math.max(0, u)) * L;
+    let lo = 0, hi = N;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (samples[mid].s < target) lo = mid; else hi = mid; }
+    const a = samples[lo], b = samples[hi];
+    const f = b.s > a.s ? (target - a.s) / (b.s - a.s) : 0;
+    return add(a.p, scale(sub(b.p, a.p), f));
+  };
+  const frame = u => {
+    const c = at(u);
+    const T = norm(sub(at(u + 0.004), at(u - 0.004)));
+    const e1 = norm(sub(ref, scale(T, dot(ref, T))));
+    return { c, T, e1, e2: cross(T, e1) };
+  };
+  const avgR = u => {
+    let s = 0;
+    for (let k = 0; k < 8; k++) {
+      const th = (k / 8) * Math.PI * 2;
+      const q = shape(u, Math.cos(th), Math.sin(th), K);
+      s += Math.hypot(q[0], q[1]);
+    }
+    return s / 8;
+  };
+  const rowsDef = [];
+  if (capStart) {
+    const f = frame(0), r = avgR(0);
+    for (let k = 0; k < capRings; k++) {
+      const phi = (k / capRings) * Math.PI / 2;
+      rowsDef.push({ f, u: 0, k: Math.sin(phi), shift: -Math.cos(phi) * r });
+    }
+  }
+  for (let i = 0; i < rings; i++) rowsDef.push({ f: frame(i / (rings - 1)), u: i / (rings - 1), k: 1, shift: 0 });
+  if (capEnd) {
+    const f = frame(1), r = avgR(1);
+    for (let k = capRings - 1; k >= 0; k--) {
+      const phi = (k / capRings) * Math.PI / 2;
+      rowsDef.push({ f, u: 1, k: Math.sin(phi), shift: Math.cos(phi) * r });
+    }
+  }
+  tube(mesh, rowsDef.length, segs, (i, j) => {
+    const R = rowsDef[i], f = R.f;
+    const th = (j / segs) * Math.PI * 2;
+    const q = shape(R.u, Math.cos(th), Math.sin(th), K);
+    const c = add(f.c, scale(f.T, R.shift));
+    return { p: add(c, add(scale(f.e1, q[0] * R.k), scale(f.e2, q[1] * R.k))), c, u: R.u };
+  }, (p, d, u) => classify(p, d, u, K));
+}
+
+// Эллипсоид — для мелких деталей: надколенник, косточки лодыжки, уши, нос
+function ellipsoid(mesh, c, rx, ry, rz, classify, rings = 10, segs = 14) {
+  const rows = [];
+  for (let k = 0; k <= rings; k++) {
+    const phi = -Math.PI / 2 + (k / rings) * Math.PI;
+    rows.push([c[1] + ry * Math.sin(phi), rx * Math.cos(phi), rz * Math.cos(phi), rz * Math.cos(phi), c[2]]);
+  }
+  tube(mesh, rows.length, segs, (i, j) => {
+    const [y, W, D, , zc] = rows[i];
+    const th = (j / segs) * Math.PI * 2;
+    return { p: [c[0] + W * Math.sin(th), y, zc + D * Math.cos(th)], c: [c[0], y, zc], u: i / rings };
+  }, classify);
+}
+
+// Эллиптическое сечение с мышечным рельефом: a — полуось вперёд-назад, b — в стороны
+const ellipse = (a, b, ct, st, extra = 0) => {
+  const r = 1 / Math.sqrt((ct / a) ** 2 + (st / b) ** 2) + extra;
+  return [r * ct, r * st];
+};
+
+// Сборка фигуры. regionIndex(id) → номер зоны (1…), сторона: 0 — центр, 1 — правая (x < 0), 2 — левая
 function buildFigure(regionIndex) {
   const pos = [], nor = [], reg = [], sid = [], idx = [];
   const mesh = {
@@ -120,107 +211,205 @@ function buildFigure(regionIndex) {
   const sideOf = x => (x < -0.012 ? 1 : x > 0.012 ? 2 : 0);
   const R = (id, p) => [id, sideOf(p[0])];
   const C = id => [id, 0];
-  const up = [0, 1, 0];
 
-  // Голова, нос, уши
-  revolve(mesh, { a: [0, 1.655, 0.004], d: up, profile: ellipsoidProfile(0.085, 0.108, 0.097, 16), segs: 28, classify: () => C("head") });
-  revolve(mesh, { a: [0, 1.646, 0.096], d: up, profile: ellipsoidProfile(0.015, 0.024, 0.018, 8), segs: 14, classify: () => C("head") });
-  for (const s of [-1, 1]) revolve(mesh, { a: [s * 0.086, 1.652, 0], d: up, profile: ellipsoidProfile(0.012, 0.026, 0.018, 8), segs: 12, classify: () => C("head") });
-  // Шея
-  revolve(mesh, { a: [0, 1.465, -0.008], d: [0, 1, 0.04], profile: capsuleProfile(0.1, 0.058, 0.05), segs: 22, classify: () => C("neck") });
-
-  // Туловище: кольца по высоте
-  const torso = [
-    [0.840, 0.02, 0.02, 0], [0.855, 0.11, 0.08, 0], [0.88, 0.15, 0.10, 0], [0.93, 0.163, 0.105, 0],
-    [0.99, 0.157, 0.10, 0], [1.05, 0.143, 0.095, 0], [1.11, 0.137, 0.095, 0], [1.17, 0.145, 0.10, 0.005],
-    [1.24, 0.162, 0.108, 0.01], [1.31, 0.176, 0.112, 0.012], [1.37, 0.183, 0.108, 0.01], [1.415, 0.175, 0.098, 0.005],
-    [1.445, 0.145, 0.08, 0], [1.47, 0.085, 0.06, 0], [1.485, 0.02, 0.02, 0]
-  ];
-  // Кольца сглаживаются сплайном Катмулла — Рома: силуэт ровнее, а отмеченные пятна — круглее
-  const dense = [];
-  for (let i = 0; i < torso.length - 1; i++) {
-    const p0 = torso[Math.max(i - 1, 0)], p1 = torso[i], p2 = torso[i + 1], p3 = torso[Math.min(i + 2, torso.length - 1)];
-    for (let k = 0; k < 3; k++) {
-      const t = k / 3, t2 = t * t, t3 = t2 * t;
-      dense.push(p1.map((_, j) => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3)));
-    }
-  }
-  dense.push(torso[torso.length - 1]);
-  // Смещение по глубине для кольца задаём сдвигом его вершин после построения
-  const torsoProfile = dense.map(([y, rx, rz]) => ({ t: y - 0.84, rx: Math.max(rx, 0.001), rz: Math.max(rz, 0.001) }));
-  const torsoZ = dense.map(r => r[3]);
-  const before = mesh.count;
-  revolve(mesh, {
-    a: [0, 0.84, 0], d: up, profile: torsoProfile, segs: 36, power: 2.5,
-    classify: p => {
-      const ax = Math.abs(p[0]), y = p[1], z = p[2];
-      if (y > 1.36 && ax > 0.115) return R("shoulder", p);
-      if (y < 1.0 && ax > 0.148) return R("hip", p);
-      if (y >= 1.18) return C(z >= 0 ? "chest" : "upperBack");
-      if (y >= 1.0) return C(z >= 0 ? "abdomen" : "lowerBack");
-      if (z >= 0) return ax > 0.045 ? R("groin", p) : C("abdomen");
-      return ax < 0.05 ? C("pelvis") : R("glute", p);
+  // ----- Туловище -----
+  loft(mesh, {
+    step: 0.011, segs: 48, power: 2.4,
+    rows: [
+      [0.812, 0, 0, 0, -0.012], [0.818, 0.045, 0.034, 0.045, -0.012], [0.835, 0.075, 0.050, 0.065, -0.012],
+      [0.865, 0.112, 0.068, 0.085, -0.012], [0.905, 0.148, 0.082, 0.096, -0.010], [0.950, 0.160, 0.088, 0.097, -0.008],
+      [1.000, 0.155, 0.092, 0.090, -0.002], [1.050, 0.142, 0.094, 0.082, 0.002], [1.090, 0.137, 0.096, 0.080, 0.004], [1.130, 0.141, 0.098, 0.082, 0.006],
+      [1.182, 0.151, 0.104, 0.088, 0.008], [1.242, 0.163, 0.110, 0.093, 0.010], [1.302, 0.173, 0.112, 0.097, 0.010],
+      [1.356, 0.181, 0.106, 0.098, 0.008], [1.400, 0.186, 0.093, 0.093, 0.004], [1.432, 0.168, 0.075, 0.080, 0.000],
+      [1.458, 0.122, 0.061, 0.066, -0.004], [1.478, 0.074, 0.053, 0.056, -0.006], [1.492, 0.040, 0.040, 0.040, -0.006],
+      [1.500, 0, 0, 0, -0.006]
+    ],
+    bump: (x, y, z) => {
+      const ax = Math.abs(x);
+      let e = 0;
+      if (z > 0) {
+        // грудные мышцы и лёгкая линия пресса
+        e += 0.015 * smooth(1.19, 1.26, y) * (1 - smooth(1.33, 1.40, y)) * bell(ax, 0.078, 0.06);
+        e -= 0.0035 * bell(ax, 0, 0.009) * smooth(0.97, 1.02, y) * (1 - smooth(1.18, 1.24, y));
+      } else {
+        // лопатки, ложбинка позвоночника, ягодицы и их разделение
+        e += 0.011 * smooth(1.21, 1.27, y) * (1 - smooth(1.36, 1.41, y)) * bell(ax, 0.088, 0.045);
+        e -= 0.006 * bell(ax, 0, 0.011) * smooth(0.99, 1.04, y) * (1 - smooth(1.40, 1.44, y));
+        e += 0.026 * bell(y, 0.885, 0.048) * bell(ax, 0.072, 0.058);
+        e -= 0.006 * bell(ax, 0, 0.01) * (1 - smooth(0.9, 0.95, y));
+      }
+      return e;
+    },
+    classify: (p, d) => {
+      const ax = Math.abs(p[0]), y = p[1], fr = d[2];
+      if (y > 1.445) return ax > 0.115 ? R("shoulder", p) : R("trapezius", p);
+      if (y > 1.39) {
+        if (ax > 0.155) return R("shoulder", p);
+        if (fr > 0.2) return R("collarbone", p);
+        return fr < -0.2 ? R("trapezius", p) : R("shoulder", p);
+      }
+      if (fr < -0.3) {
+        if (y > 1.22) return ax < 0.045 ? C("upperBack") : R("shoulderBlade", p);
+        if (y > 1.12) return C("upperBack");
+        if (y > 0.99) return C("lowerBack");
+        return ax < 0.04 ? C("pelvis") : R("glute", p);
+      }
+      if (fr > 0.3) {
+        if (y > 1.17) return ax > 0.16 ? R("shoulder", p) : C("chest");
+        if (y > 0.925) return ax > 0.115 ? R("obliques", p) : C("abdomen");
+        return ax > 0.035 ? R("groin", p) : C("abdomen");
+      }
+      if (y > 1.12) return R("ribs", p);
+      if (y > 0.99) return R("obliques", p);
+      return R("hip", p);
     }
   });
-  // Сдвиг колец туловища вперёд на уровне груди
-  for (let v = before, ring = 0; v < mesh.count; v++) {
-    ring = Math.floor((v - before) / 37);
-    pos[v * 3 + 2] += torsoZ[ring];
-  }
+
+  // ----- Шея и голова -----
+  sweep(mesh, {
+    pts: [[0, 1.452, -0.012], [0, 1.53, -0.004], [0, 1.6, 0.008]], rings: 10, segs: 28, capStart: false, capEnd: false,
+    shape: (u, ct, st) => ellipse(0.058 - 0.004 * u, 0.062 - 0.006 * u, ct, st),
+    classify: () => C("neck")
+  });
+  loft(mesh, {
+    step: 0.006, segs: 40, power: 2.1,
+    rows: [
+      [1.545, 0, 0, 0, 0.055], [1.549, 0.02, 0.016, 0.014, 0.052], [1.556, 0.034, 0.028, 0.022, 0.050], [1.565, 0.048, 0.040, 0.040, 0.040],
+      [1.585, 0.060, 0.052, 0.062, 0.025], [1.610, 0.068, 0.062, 0.080, 0.014], [1.640, 0.074, 0.074, 0.090, 0.006],
+      [1.670, 0.078, 0.082, 0.096, 0.002], [1.700, 0.077, 0.080, 0.098, -0.002], [1.728, 0.069, 0.068, 0.090, -0.006],
+      [1.750, 0.052, 0.050, 0.070, -0.010], [1.764, 0.028, 0.026, 0.040, -0.012], [1.770, 0, 0, 0, -0.012]
+    ],
+    bump: (x, y, z) => {
+      if (z <= 0) return 0;
+      const ax = Math.abs(x);
+      return -0.005 * bell(ax, 0.031, 0.015) * bell(y, 1.668, 0.011) // глазницы
+        + 0.004 * bell(y, 1.689, 0.007) * (1 - smooth(0.05, 0.07, ax)) // надбровья
+        + 0.004 * bell(y, 1.645, 0.012) * bell(ax, 0.056, 0.014); // скулы
+    },
+    classify: () => C("head")
+  });
+  ellipsoid(mesh, [0, 1.647, 0.087], 0.012, 0.023, 0.018, () => C("head"), 8, 12);
+  for (const s of [-1, 1]) ellipsoid(mesh, [s * 0.078, 1.656, -0.006], 0.009, 0.029, 0.019, () => C("head"), 8, 12);
 
   for (const s of [-1, 1]) {
-    const X = x => x * s;
-    // Ягодицы
-    revolve(mesh, {
-      a: [X(0.07), 0.915, -0.045], d: up, profile: ellipsoidProfile(0.082, 0.09, 0.058, 12), segs: 20,
-      classify: p => (Math.abs(p[0]) > 0.142 ? R("hip", p) : R("glute", p))
-    });
-    // Дельты
-    revolve(mesh, { a: [X(0.188), 1.392, 0], d: up, profile: ellipsoidProfile(0.062, 0.07, 0.064, 12), segs: 20, classify: p => R("shoulder", p) });
-    // Плечо, предплечье, кисть
-    const ua = [X(0.2), 1.36, 0], ub = [X(0.232), 1.11, 0];
-    revolve(mesh, {
-      a: ua, d: sub(ub, ua), profile: capsuleProfile(len(sub(ub, ua)), 0.051, 0.042), segs: 20,
-      classify: (p, n, u) => R(u < 0.14 ? "shoulder" : u > 0.86 ? "elbow" : "upperArm", p)
-    });
-    const fa = [X(0.234), 1.1, 0.004], fb = [X(0.256), 0.872, 0.022];
-    revolve(mesh, {
-      a: fa, d: sub(fb, fa), profile: capsuleProfile(len(sub(fb, fa)), 0.042, 0.03), segs: 20,
-      classify: (p, n, u) => R(u < 0.13 ? "elbow" : u > 0.9 ? "wrist" : "forearm", p)
-    });
-    revolve(mesh, {
-      a: [X(0.262), 0.8, 0.03], d: up, profile: ellipsoidProfile(0.022, 0.068, 0.04, 12), segs: 16,
-      classify: p => R(p[1] > 0.852 ? "wrist" : "hand", p)
-    });
-    // Бедро
-    const ta = [X(0.09), 0.93, 0], tb = [X(0.098), 0.53, 0.012];
-    revolve(mesh, {
-      a: ta, d: sub(tb, ta), profile: capsuleProfile(len(sub(tb, ta)), 0.088, 0.058), segs: 24,
-      classify: (p, n, u) => {
-        if (u < 0.13) return p[2] < -0.02 ? R("glute", p) : Math.abs(p[0]) < 0.07 ? R("groin", p) : R("hip", p);
-        if (u < 0.26 && Math.abs(p[0]) < 0.062 && p[2] > -0.03) return R("groin", p);
-        if (u > 0.9) return R("knee", p);
-        return R(p[2] >= 0.005 ? "thighFront" : "hamstring", p);
+    // ----- Рука: плечо → локоть → запястье -----
+    const armPts = [[s * 0.176, 1.4, -0.006], [s * 0.205, 1.30, -0.012], [s * 0.226, 1.17, -0.016], [s * 0.233, 1.105, -0.012], [s * 0.242, 0.99, 0.01], [s * 0.252, 0.872, 0.03]];
+    const upper = [[0.054, 0.058], [0.051, 0.054], [0.046, 0.046], [0.041, 0.042], [0.036, 0.041]];
+    const lower = [[0.036, 0.041], [0.042, 0.046], [0.037, 0.039], [0.033, 0.030], [0.030, 0.021]];
+    sweep(mesh, {
+      pts: armPts, rings: 46, segs: 28,
+      shape: (u, ct, st, K) => {
+        const ue = K[3], out = -s * st;
+        if (u <= ue) {
+          const v = u / ue, [a, b] = table(upper, v);
+          const extra = 0.009 * bell(v, 0.56, 0.2) * Math.max(0, ct) ** 2 + 0.007 * bell(v, 0.45, 0.22) * Math.max(0, -ct) ** 2
+            + 0.009 * bell(v, 0.12, 0.12) * Math.max(0, out) ** 1.5;
+          return ellipse(a, b, ct, st, extra);
+        }
+        const v = (u - ue) / (1 - ue), [a, b] = table(lower, v);
+        const extra = 0.006 * bell(v, 0.22, 0.18) * Math.max(0, 0.6 * ct + 0.8 * out) ** 2;
+        return ellipse(a, b, ct, st, extra);
+      },
+      classify: (p, d, u, K) => {
+        const ue = K[3];
+        if (u <= ue) {
+          const v = u / ue;
+          if (v < 0.24) return R("shoulder", p);
+          if (v < 0.86) return d[2] >= -0.15 ? R("upperArm", p) : R("triceps", p);
+          return R("elbow", p);
+        }
+        const v = (u - ue) / (1 - ue);
+        if (v < 0.14) return R("elbow", p);
+        return v < 0.88 ? R("forearm", p) : R("wrist", p);
       }
     });
-    // Надколенник
-    revolve(mesh, { a: [X(0.1), 0.505, 0.05], d: up, profile: ellipsoidProfile(0.038, 0.044, 0.028, 10), segs: 16, classify: p => R("knee", p) });
-    // Голень, икра, лодыжка, стопа
-    const sa = [X(0.099), 0.5, 0.008], sb = [X(0.1), 0.1, -0.004];
-    revolve(mesh, {
-      a: sa, d: sub(sb, sa), profile: capsuleProfile(len(sub(sb, sa)), 0.054, 0.034), segs: 22,
-      classify: (p, n, u) => {
-        if (u < 0.1) return R("knee", p);
-        if (u > 0.92) return R(p[2] < -0.01 ? "achilles" : "ankle", p);
-        return R(p[2] >= -0.012 ? "shin" : "calf", p);
+
+    // ----- Кисть: ладонь, четыре пальца и большой палец -----
+    sweep(mesh, {
+      pts: [[s * 0.253, 0.868, 0.031], [s * 0.257, 0.818, 0.036], [s * 0.26, 0.776, 0.04]], rings: 12, segs: 24, capStart: false, capRings: 4,
+      shape: (u, ct, st) => {
+        const [a, b] = table([[0.030, 0.017], [0.040, 0.0155], [0.042, 0.013]], u);
+        const inn = s * st;
+        const pad = 0.006 * bell(u, 0.4, 0.22) * Math.max(0, 0.6 * ct + 0.8 * inn) ** 2;
+        return [a * spow(ct, 2 / 2.8) + pad * ct, b * spow(st, 2 / 2.8) + pad * st];
+      },
+      classify: (p, d, u) => (u < 0.18 ? R("wrist", p) : R("hand", p))
+    });
+    const fingers = [[0.027, 0.072, 0.0095], [0.009, 0.080, 0.0102], [-0.009, 0.075, 0.0096], [-0.026, 0.060, 0.0086]];
+    for (const [dz, Lf, rf] of fingers) {
+      const x0 = s * 0.258, z0 = 0.04 + dz, y0 = 0.786;
+      sweep(mesh, {
+        pts: [[x0, y0, z0], [x0 - s * 0.003, y0 - Lf * 0.5, z0 + dz * 0.05], [x0 - s * 0.011, y0 - Lf, z0 + dz * 0.1]],
+        rings: 9, segs: 12, capRings: 4,
+        shape: (u, ct, st) => ellipse(rf * (1 - 0.22 * u), rf * (1 - 0.18 * u), ct, st),
+        classify: p => R("fingers", p)
+      });
+    }
+    sweep(mesh, {
+      pts: [[s * 0.254, 0.846, 0.058], [s * 0.249, 0.814, 0.07], [s * 0.245, 0.789, 0.073]], rings: 9, segs: 12, capRings: 4,
+      shape: (u, ct, st) => ellipse(0.0118 * (1 - 0.2 * u), 0.0112 * (1 - 0.18 * u), ct, st),
+      classify: p => R("thumb", p)
+    });
+
+    // ----- Нога: тазобедренный сустав → колено → лодыжка -----
+    const thigh = [[0.064, 0.066], [0.088, 0.090], [0.078, 0.076], [0.067, 0.063], [0.056, 0.054], [0.050, 0.051]];
+    const shank = [[0.050, 0.051], [0.048, 0.049], [0.050, 0.047], [0.043, 0.042], [0.035, 0.034], [0.031, 0.031], [0.030, 0.033]];
+    sweep(mesh, {
+      pts: [[s * 0.086, 0.965, -0.01], [s * 0.094, 0.8, 0.006], [s * 0.097, 0.62, 0.012], [s * 0.099, 0.5, 0.012], [s * 0.1, 0.3, -0.006], [s * 0.1, 0.095, -0.01]],
+      rings: 72, segs: 32,
+      shape: (u, ct, st, K) => {
+        const uk = K[3], out = -s * st, inn = -out;
+        if (u <= uk) {
+          const v = u / uk, [a, b] = table(thigh, v);
+          const extra = 0.010 * bell(v, 0.38, 0.25) * Math.max(0, ct) ** 2
+            + 0.011 * bell(v, 0.83, 0.08) * Math.max(0, 0.6 * ct + 0.8 * inn) ** 2
+            + 0.008 * bell(v, 0.42, 0.25) * Math.max(0, -ct) ** 2
+            + 0.012 * bell(v, 0.97, 0.05) * Math.max(0, ct) ** 3
+            - 0.004 * bell(v, 0.5, 0.3) * Math.max(0, out) ** 4;
+          return ellipse(a, b, ct, st, extra);
+        }
+        const v = (u - uk) / (1 - uk), [a, b] = table(shank, v);
+        const extra = 0.024 * bell(v, 0.3, 0.16) * Math.max(0, -ct) ** 1.6 * (1 + 0.25 * inn)
+          - 0.006 * bell(v, 0.86, 0.08) * Math.max(0, -ct) ** 2
+          + 0.010 * bell(v, 0.02, 0.05) * Math.max(0, ct) ** 3
+          + 0.008 * bell(v, 0.95, 0.045) * Math.max(0, inn) ** 4 + 0.008 * bell(v, 0.985, 0.045) * Math.max(0, out) ** 4;
+        return ellipse(a, b, ct, st, extra);
+      },
+      classify: (p, d, u, K) => {
+        const uk = K[3], fr = d[2], out = d[0] * s;
+        if (u <= uk) {
+          const v = u / uk;
+          if (v < 0.16) return fr < -0.3 ? R("glute", p) : out < -0.3 ? R("groin", p) : R("hip", p);
+          if (v < 0.8) {
+            if (fr > 0.35) return R("thighFront", p);
+            if (fr < -0.35) return R("hamstring", p);
+            return out > 0 ? R("thighOuter", p) : R("thighInner", p);
+          }
+          return fr < -0.3 ? R("kneeBack", p) : R("knee", p);
+        }
+        const v = (u - uk) / (1 - uk);
+        if (v < 0.16) return fr < -0.3 ? R("kneeBack", p) : R("knee", p);
+        if (v < 0.8) return fr < -0.15 ? R("calf", p) : R("shin", p);
+        return fr < -0.3 ? R("achilles", p) : R("ankle", p);
       }
     });
-    revolve(mesh, {
-      a: [X(0.1), 0.36, -0.028], d: up, profile: ellipsoidProfile(0.047, 0.09, 0.043, 12), segs: 18,
-      classify: p => R(p[1] < 0.29 && p[2] < -0.03 ? "achilles" : "calf", p)
+
+    // ----- Стопа: пятка → свод → пальцы -----
+    sweep(mesh, {
+      pts: [[s * 0.1, 0.04, -0.062], [s * 0.1, 0.05, -0.02], [s * 0.102, 0.042, 0.04], [s * 0.104, 0.028, 0.11], [s * 0.106, 0.018, 0.16]],
+      rings: 24, segs: 28, ref: [0, 1, 0], capRings: 5,
+      shape: (u, ct, st) => {
+        const [top, bottom, w] = table([[0.030, 0.030, 0.030], [0.040, 0.032, 0.033], [0.044, 0.030, 0.038], [0.030, 0.022, 0.044], [0.020, 0.016, 0.044], [0.014, 0.012, 0.038]], u);
+        const inn = s * st;
+        const toe = 0.004 * bell(u, 0.9, 0.08) * Math.max(0, inn) * Math.max(0, ct);
+        return [(ct >= 0 ? top : bottom) * spow(ct, 2 / (ct >= 0 ? 2.4 : 3)) + toe, w * spow(st, 2 / 2.4)];
+      },
+      classify: (p, d, u) => {
+        if (u < 0.24) return R("heel", p);
+        if (u > 0.74) return R("toes", p);
+        return d[1] < -0.6 ? R("heel", p) : R("foot", p);
+      }
     });
-    revolve(mesh, { a: [X(0.1), 0.085, 0], d: up, profile: ellipsoidProfile(0.038, 0.038, 0.038, 10), segs: 16, classify: p => R(p[2] < -0.018 ? "achilles" : "ankle", p) });
-    revolve(mesh, { a: [X(0.1), 0.04, 0.05], d: up, profile: ellipsoidProfile(0.042, 0.037, 0.108, 12), segs: 20, classify: p => R("foot", p) });
   }
 
   return {
@@ -260,7 +449,7 @@ void main() { vId = aId; gl_Position = uMVP * vec4(aPos, 1.0); }`;
 const PFS = `
 precision mediump float;
 varying vec2 vId;
-void main() { gl_FragColor = vec4(vId / 255.0, 0.0, 1.0); }`;
+void main() { gl_FragColor = vec4(floor(vId + 0.5) / 255.0, 0.0, 1.0); }`;
 
 function compile(gl, vs, fs) {
   const make = (type, src) => {
@@ -305,10 +494,20 @@ export function createFigure({ regions, onTap, onLasso, label }) {
   const geo = buildFigure(regionIndex);
   const vertexCount = geo.pos.length / 3;
   const colors = new Float32Array(vertexCount * 3);
-  const ids = new Float32Array(vertexCount * 2);
-  for (let v = 0; v < vertexCount; v++) {
-    ids[v * 2] = geo.reg[v];
-    ids[v * 2 + 1] = geo.sid[v];
+  // Для выбора зоны каждый треугольник получает один код: иначе на границе двух зон
+  // интерполяция дала бы «чужие» номера посередине
+  const triCount = geo.idx.length / 3;
+  const pickPos = new Float32Array(triCount * 9);
+  const pickIds = new Float32Array(triCount * 6);
+  for (let t = 0; t < triCount; t++) {
+    const a = geo.idx[t * 3], b = geo.idx[t * 3 + 1], c = geo.idx[t * 3 + 2];
+    const ra = geo.reg[a], rb = geo.reg[b], rc = geo.reg[c];
+    const main = ra === rb || ra === rc ? a : rb === rc ? b : a;
+    [a, b, c].forEach((v, k) => {
+      pickPos.set(geo.pos.subarray(v * 3, v * 3 + 3), t * 9 + k * 3);
+      pickIds[t * 6 + k * 2] = geo.reg[main];
+      pickIds[t * 6 + k * 2 + 1] = geo.sid[main];
+    });
   }
 
   const el = document.createElement("div");
@@ -346,7 +545,8 @@ export function createFigure({ regions, onTap, onLasso, label }) {
     };
     glState = {
       prog, pick,
-      pos: buffer(geo.pos), nor: buffer(geo.nor), col: buffer(colors, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW), ids: buffer(ids),
+      pos: buffer(geo.pos), nor: buffer(geo.nor), col: buffer(colors, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW),
+      pickPos: buffer(pickPos), pickIds: buffer(pickIds),
       idx: buffer(geo.idx, gl.ELEMENT_ARRAY_BUFFER),
       loc: {
         aPos: gl.getAttribLocation(prog, "aPos"), aNor: gl.getAttribLocation(prog, "aNor"), aCol: gl.getAttribLocation(prog, "aCol"),
@@ -434,11 +634,10 @@ export function createFigure({ regions, onTap, onLasso, label }) {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(glState.pick);
-    bindAttr(glState.pos, L.pPos, 3);
-    bindAttr(glState.ids, L.pId, 2);
+    bindAttr(glState.pickPos, L.pPos, 3);
+    bindAttr(glState.pickIds, L.pId, 2);
     gl.uniformMatrix4fv(L.pMVP, false, mvp);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glState.idx);
-    gl.drawElements(gl.TRIANGLES, geo.idx.length, gl.UNSIGNED_SHORT, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, triCount * 3);
     for (const loc of [L.pPos, L.pId]) if (loc >= 0) gl.disableVertexAttribArray(loc);
     return { w, h };
   }
@@ -451,6 +650,22 @@ export function createFigure({ regions, onTap, onLasso, label }) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     if (!px[0]) return null;
     return { region: regions[px[0] - 1], side: px[1] === 1 ? "R" : px[1] === 2 ? "L" : "" };
+  }
+
+  // Какие зоны сейчас видны и сколько пикселей занимают (для проверки модели)
+  function visibleRegions() {
+    if (!gl || lost) return [];
+    const { w, h } = renderPick();
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const counts = new Map();
+    for (let o = 0; o < buf.length; o += 4) {
+      if (!buf[o]) continue;
+      const key = `${regions[buf[o] - 1]}${buf[o + 1] === 1 ? ":R" : buf[o + 1] === 2 ? ":L" : ""}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return [...counts.entries()].map(([key, px]) => ({ key, px }));
   }
 
   // Обводка: какие зоны видны внутри контура и где центр выделенной области
@@ -752,6 +967,7 @@ export function createFigure({ regions, onTap, onLasso, label }) {
     get mode() { return mode; },
     pickAt,
     analyzeLasso,
+    visibleRegions,
     vertexCount
   };
 }

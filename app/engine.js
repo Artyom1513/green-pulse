@@ -1,6 +1,6 @@
 // ===== Листопульс: логика подбора тренировок =====
 // Чистые функции без доступа к DOM и сети. Всё считается на устройстве пользователя.
-import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS } from "./data.js";
+import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP } from "./data.js";
 
 export const REGION_NAME = Object.fromEntries(REGIONS.map(r => [r.id, r.name]));
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
@@ -12,7 +12,8 @@ const TAG_REASON = {
   iso: "без долгой статики",
   inversion: "без положений головой вниз",
   overhead: "без нагрузки над головой",
-  flexion: "без скручиваний позвоночника"
+  flexion: "без скручиваний позвоночника",
+  heavy: "без тяжёлой штанги"
 };
 
 export const MODES = {
@@ -24,6 +25,7 @@ export const MODES = {
 
 const LEVEL_K = { 1: 0.8, 2: 1, 3: 1.25 };
 const REST = { 1: 40, 2: 30, 3: 25 };
+const REST_SETS = { 1: 60, 2: 75, 3: 90 }; // отдых между силовыми подходами
 const ALLOWED = [3, 1, 0, 0]; // допустимая нагрузка при тяжести зоны 0…3
 const RELATED = {
   warm: ["warm", "mobility"], legs: ["legs", "iso", "balance"], push: ["push", "iso"], pull: ["pull", "iso", "mobility"],
@@ -172,6 +174,7 @@ export function excludedByRegion(regionId, sev) {
 // ----- Дозировка -----
 export const relaxOf = ex => ex.relax || 4;
 export function makeItem(ex, k = 1) {
+  if (ex.type === "reps" && ex.weighted) return { id: ex.id, reps: clamp(Math.round(ex.base * (1 + (k - 1) * 0.5)), 4, 15) };
   if (ex.type === "reps") return { id: ex.id, reps: clamp(Math.round(ex.base * k), 3, 30) };
   if (ex.type === "hold") return { id: ex.id, reps: clamp(Math.round(ex.base * k), 2, 15) };
   return { id: ex.id, sec: clamp(Math.round((ex.base * k) / 5) * 5, 10, 180) };
@@ -193,12 +196,17 @@ export function doseText(item) {
 
 // ----- Замена упражнения -----
 const totalLoad = e => Object.values(e.load).reduce((a, b) => a + b, 0);
+// Насколько похожи упражнения по нагрузке на суставы и мышцы — так замена ближе по движению
+const similarity = (a, b) => Object.keys(a.load).reduce((sum, k) => sum + Math.min(a.load[k], b.load[k] || 0), 0);
 export function findReplacement(ex, r, profile, exclude = new Set()) {
   const groups = RELATED[ex.group] || [ex.group];
   const pool = EXERCISES.filter(e => groups.includes(e.group) && e.id !== ex.id && !exclude.has(e.id) && fits(e, r, profile));
   if (!pool.length) return null;
   pool.sort((a, b) =>
     groups.indexOf(a.group) - groups.indexOf(b.group) ||
+    Math.max(0, a.level - ex.level) - Math.max(0, b.level - ex.level) ||
+    similarity(ex, b) - similarity(ex, a) ||
+    (b.weighted === ex.weighted) - (a.weighted === ex.weighted) ||
     (a.type !== ex.type) - (b.type !== ex.type) ||
     Math.abs(a.level - ex.level) - Math.abs(b.level - ex.level) ||
     totalLoad(a) - totalLoad(b));
@@ -240,11 +248,12 @@ function explain(session, r, groups) {
 function finalize(s) {
   let total = 0, count = 0;
   for (const b of s.blocks) {
+    const sets = b.sets || 1;
     for (let round = 0; round < b.rounds; round++) {
       for (const it of b.items) {
         const ex = EX[it.id];
-        total += itemSeconds(it) + (b.kind === "main" ? s.rest : 8) + (ex.type === "hold" ? PREP_SEC : 0);
-        count += 1;
+        total += (itemSeconds(it) + (b.kind === "main" || b.kind === "sets" ? s.rest : 8) + (ex.type === "hold" ? PREP_SEC : 0)) * sets;
+        count += sets;
       }
     }
   }
@@ -273,9 +282,14 @@ export function buildSession(state, { variant = 0 } = {}) {
   const level = Math.min(p.level, r.maxLevel);
   const rand = mulberry32(hashStr(JSON.stringify([day, p.goal, p.minutes, p.level, p.equipment, p.conditions, p.ageGroup, r.regionSev, mode, variant])));
   const used = new Set();
-  const choose = (group, maxLevel = 3) => {
-    const pool = EXERCISES.filter(e => e.group === group && !used.has(e.id) && e.level <= maxLevel && fits(e, r, p));
+  const choose = (group, maxLevel = 3, preferWeights = false, compound = false) => {
+    let pool = EXERCISES.filter(e => e.group === group && !used.has(e.id) && e.level <= maxLevel && fits(e, r, p));
     if (!pool.length) return null;
+    const weighted = pool.filter(e => e.weighted);
+    if (preferWeights && weighted.length && rand() < 0.85) pool = weighted;
+    // Многосуставные упражнения (нагрузка на 3 и больше зон) — основа силовой тренировки
+    const big = pool.filter(e => Object.keys(e.load).length >= 3);
+    if (compound && big.length && rand() < 0.85) pool = big;
     const near = pool.filter(e => e.level === Math.min(level, maxLevel));
     const src = near.length && rand() < 0.75 ? near : pool;
     const ex = src[Math.floor(rand() * src.length)];
@@ -317,16 +331,26 @@ export function buildSession(state, { variant = 0 } = {}) {
   }
 
   let groups = goal.main.slice();
-  if (minutes <= 10) groups = groups.slice(0, 4);
+  const setsMode = !!goal.sets;
+  if (setsMode) {
+    // Силовые подходы: упражнений меньше, зато по 2–4 подхода с отдыхом
+    const n = minutes <= 10 ? 2 : minutes <= 20 ? 3 : minutes <= 30 ? 4 : 6;
+    groups = groups.slice(0, n);
+  } else if (minutes <= 10) groups = groups.slice(0, 4);
   else if (minutes >= 45) groups = groups.concat(goal.main.slice(0, 2));
   else if (minutes >= 30) groups = groups.concat(goal.main.slice(0, 1));
+  const hasWeights = p.equipment.some(e => WEIGHT_EQUIP.includes(e));
   const main = [];
   const skipped = new Set();
+  const seenGroup = {};
   for (const g of groups) {
-    const ex = choose(g);
+    const first = !seenGroup[g];
+    seenGroup[g] = true;
+    const ex = choose(g, 3, !!goal.weights && hasWeights, setsMode && first);
     if (ex) main.push(makeItem(ex, goal.id === "flexibility" ? 1 : k));
     else skipped.add(g);
   }
+  if (setsMode) s.rest = REST_SETS[level] + (mode === "light" ? 15 : 0);
   if (goal.id === "flexibility") s.rest = 15;
   if (goal.id === "joints") s.rest = Math.min(s.rest, 25);
 
@@ -348,10 +372,11 @@ export function buildSession(state, { variant = 0 } = {}) {
   const sec = items => items.reduce((a, it) => a + itemSeconds(it) + 8, 0);
   const roundSec = main.reduce((a, it) => a + itemSeconds(it) + s.rest + (EX[it.id].type === "hold" ? PREP_SEC : 0), 0);
   const avail = minutes * 60 - sec(warm) - sec(cool) - sec(balance);
-  const rounds = main.length ? clamp(Math.round(avail / roundSec) || 1, 1, 6) : 0;
+  const rounds = main.length ? clamp(Math.round(avail / roundSec) || 1, setsMode ? 2 : 1, setsMode ? 4 : 6) : 0;
 
   s.blocks.push({ kind: "warm", name: "Разминка", rounds: 1, items: warm });
-  if (main.length) s.blocks.push({ kind: "main", name: "Основная часть", rounds, items: main });
+  if (main.length && setsMode) s.blocks.push({ kind: "sets", name: "Силовая часть", rounds: 1, sets: rounds, items: main });
+  else if (main.length) s.blocks.push({ kind: "main", name: "Основная часть", rounds, items: main });
   if (balance.length) s.blocks.push({ kind: "balance", name: "Равновесие", rounds: 1, items: balance });
   if (cool.length) s.blocks.push({ kind: "cool", name: "Заминка", rounds: 1, items: cool });
   s.title = `${goal.short}: ${MODES[mode].name.toLowerCase()} тренировка`;
@@ -363,7 +388,7 @@ export function buildSession(state, { variant = 0 } = {}) {
 }
 
 // Тренировка из заданного списка упражнений: неподходящие заменяются безопасными
-export function buildCustom(state, { title, ids, k = 1, kind = "custom", goal = "custom", rest = 8 }) {
+export function buildCustom(state, { title, ids, k = 1, kind = "custom", goal = "custom", rest = 8, rounds = 1 }) {
   const p = state.profile;
   const r = restrictions(state);
   const s = { kind, title, goal, mode: "normal", rest, blocks: [], adaptations: [], notes: [...new Set(r.notes)], blocked: false };
@@ -388,13 +413,13 @@ export function buildCustom(state, { title, ids, k = 1, kind = "custom", goal = 
       s.adaptations.push(`${ex.name} — пропущено: безопасной замены нет.`);
     }
   }
-  s.blocks.push({ kind: "main", name: title, rounds: 1, items });
+  s.blocks.push({ kind: "main", name: title, rounds: clamp(rounds, 1, 6), items });
   return finalize(s);
 }
 
 export function buildQuick(state, id) {
   const q = QUICK.find(x => x.id === id) || QUICK[0];
-  const s = buildCustom(state, { title: q.name, ids: q.items, kind: "quick", goal: q.id });
+  const s = buildCustom(state, { title: q.name, ids: q.items, kind: "quick", goal: q.id, rounds: q.rounds || 1, rest: q.rest || 8 });
   s.quick = q.id;
   return s;
 }
@@ -409,7 +434,11 @@ export function programProgress(state, id) {
 export function buildProgramDay(state, id) {
   const { prog, next } = programProgress(state, id);
   const phase = prog.phases.find(ph => next <= ph.until) || prog.phases[prog.phases.length - 1];
-  const s = buildCustom(state, { title: `${prog.name} · день ${next}`, ids: phase.items, k: phase.k, kind: "program", goal: "program", rest: 10 });
+  const strength = prog.kind === "strength";
+  const s = buildCustom(state, {
+    title: `${prog.name} · занятие ${next}`, ids: phase.items, k: phase.k, kind: "program",
+    goal: strength ? "strength" : "program", rest: prog.rest || 10, rounds: prog.rounds || 1
+  });
   s.program = id;
   s.programDay = next;
   return s;
@@ -419,6 +448,17 @@ export function buildProgramDay(state, id) {
 export function flatten(session) {
   const steps = [];
   for (const b of session.blocks) {
+    if (b.sets) {
+      // Подходы подряд: упражнение × подходы, между подходами и упражнениями — отдых
+      b.items.forEach((it, i) => {
+        for (let set = 1; set <= b.sets; set++) {
+          steps.push({ type: "ex", block: b.name, kind: b.kind, round: 1, rounds: 1, set, sets: b.sets, item: { ...it } });
+          const last = set === b.sets && i === b.items.length - 1;
+          if (session.rest && !last) steps.push({ type: "rest", sec: session.rest });
+        }
+      });
+      continue;
+    }
     for (let round = 1; round <= b.rounds; round++) {
       b.items.forEach((it, i) => {
         steps.push({ type: "ex", block: b.name, kind: b.kind, round, rounds: b.rounds, item: { ...it } });
@@ -458,6 +498,30 @@ export function painTrend(state, region, days = 30) {
 export function painRegions(state, days = 30) {
   const from = shiftDay(dayKey(), -(days - 1));
   return [...new Set(state.painLog.filter(x => x.d >= from).map(x => x.region))];
+}
+
+// ----- Рабочие веса -----
+// Шаг изменения веса: маленькие гантели — по 0,5 кг, штанга — по 2,5 кг
+export const weightStep = kg => (kg < 10 ? 0.5 : kg < 30 ? 1 : 2.5);
+export const roundWeight = kg => Math.round(clamp(kg, 0.5, 500) * 2) / 2;
+export function startWeight(ex) {
+  if (ex.equip.includes("barbell")) return 20;
+  if (ex.equip.includes("kettlebell")) return 8;
+  return 3;
+}
+export function weightUnit(ex) {
+  if (ex.equip.includes("barbell")) return "кг — общий вес штанги";
+  if (ex.equip.includes("kettlebell")) return "кг — вес гири";
+  return "кг — одна гантель";
+}
+export function recordWeight(state, exId, kg, day = dayKey()) {
+  const value = roundWeight(kg);
+  const w = state.weights[exId] || { kg: value, d: day, best: 0, hist: [] };
+  w.kg = value;
+  w.d = day;
+  w.best = Math.max(w.best || 0, value);
+  w.hist = w.hist.filter(x => x[0] !== day).concat([[day, value]]).slice(-20);
+  state.weights[exId] = w;
 }
 
 // ----- Прогрессия -----
@@ -521,6 +585,10 @@ export function newBadges(state) {
   check("joints5", state.sessions.filter(s => JOINT_GOALS.includes(s.goal)).length >= 5);
   check("reader", state.guideRead.length >= 5);
   check("statics", Object.keys(state.records || {}).length >= 3);
+  const lifts = Object.values(state.weights || {});
+  check("lifter", lifts.length >= 5);
+  check("stronger", lifts.some(w => w.hist.length >= 3 && w.best >= w.hist[0][1] * 1.2));
+  check("builder", (state.custom || []).length > 0);
   check("checkin7", state.checkins.length >= 7);
   check("water", state.water.d === dayKey() && state.water.n >= 8);
   check("early", state.sessions.some(s => s.hour < 8));

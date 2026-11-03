@@ -84,7 +84,11 @@ const ICONS = {
   minus: ["M5 12h14"],
   aid: ["M4 7h16v13H4z", "M9 7V4h6v3", "M12 10.5v6", "M9 13.5h6"],
   trophy: ["M8 21h8", "M12 17v4", "M7 4h10v5a5 5 0 0 1-10 0z", "M7 6H4a3 3 0 0 0 3 4", "M17 6h3a3 3 0 0 1-3 4"],
-  share: ["M12 3v12", "M7 8l5-5 5 5", "M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"]
+  share: ["M12 3v12", "M7 8l5-5 5 5", "M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"],
+  up: ["M12 19V5", "M5 12l7-7 7 7"],
+  down: ["M12 5v14", "M19 12l-7 7-7-7"],
+  chart: ["M4 19h16", "M5 15l4-4 4 3 6-7", "M15 7h4v4"],
+  puzzle: ["M9 3h6v3a2 2 0 1 0 4 0h0V3h2v6h-3a2 2 0 1 0 0 4h3v8h-6v-3a2 2 0 1 0-4 0v3H3v-8h3a2 2 0 1 0 0-4H3V3h6z"]
 };
 
 export function icon(name, size = 22) {

@@ -17,6 +17,8 @@ const AGE_IDS = AGE_GROUPS.map(a => a.id);
 const GOAL_IDS = GOALS.map(g => g.id);
 const EQUIP_IDS = EQUIPMENT.map(e => e.id);
 const EX_IDS = Object.keys(EX);
+const WEIGHTED_IDS = EX_IDS.filter(id => EX[id].weighted);
+const CUSTOM_REST = [0, 15, 30, 45, 60, 90];
 const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom"];
 const SYMPTOM_IDS = SYMPTOMS.map(x => x.id);
 const ONSET_IDS = ONSET.map(x => x.id);
@@ -45,6 +47,8 @@ export const defaultState = () => ({
   programs: {},
   guideRead: [],
   records: {},
+  weights: {},
+  custom: [],
   settings: { sound: true, voice: false, vibrate: true, lessGlass: false }
 });
 
@@ -183,6 +187,39 @@ export function sanitize(raw) {
   }
 
   d.guideRead = ids(own(raw, "guideRead"), GUIDE_IDS, 100);
+
+  // Рабочие веса: последний, лучший и история (до 20 записей) — только для упражнений с весом
+  const weights = own(raw, "weights");
+  const kg = v => {
+    const x = num(v, 0.5, 500);
+    return x === null ? null : Math.round(x * 2) / 2;
+  };
+  for (const id of WEIGHTED_IDS) {
+    const w = own(weights, id);
+    if (!isObj(w)) continue;
+    const last = kg(w.kg);
+    if (last === null) continue;
+    const hist = Array.isArray(w.hist)
+      ? w.hist.filter(h => Array.isArray(h) && h.length === 2 && day(h[0]) && kg(h[1]) !== null).slice(-20).map(h => [day(h[0]), kg(h[1])])
+      : [];
+    const best = Math.max(last, kg(w.best) || 0, ...hist.map(h => h[1]));
+    d.weights[id] = { kg: last, d: day(w.d), best, hist };
+  }
+
+  // Свои тренировки из конструктора
+  const custom = own(raw, "custom");
+  if (Array.isArray(custom)) {
+    for (const c of custom.slice(0, 20)) {
+      if (!isObj(c)) continue;
+      const items = Array.isArray(c.items) ? [...new Set(c.items.filter(x => EX_IDS.includes(x)))].slice(0, 20) : [];
+      if (!items.length) continue;
+      d.custom.push({
+        id: str(c.id, 24) || Math.random().toString(36).slice(2, 12),
+        name: str(c.name, 40) || "Моя тренировка", items,
+        rounds: int(c.rounds, 1, 5, 1), rest: oneOf(c.rest, CUSTOM_REST, 30), d: day(c.d)
+      });
+    }
+  }
 
   // Рекорды статики: лучшее время в секундах
   const records = own(raw, "records");
