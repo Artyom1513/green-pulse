@@ -3,7 +3,7 @@
 // По желанию пользователя всё шифруется паролем: AES-GCM 256 бит, ключ — PBKDF2-SHA-256, 600 000 итераций.
 // Любые загруженные данные (из памяти браузера или из файла) проходят строгую проверку и пересобираются
 // по известной схеме: лишние поля отбрасываются, значения ограничиваются по типу и длине.
-import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX, CHALLENGES } from "./data.js";
+import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX, CHALLENGES, RUN_DAYS } from "./data.js";
 import { GUIDE } from "./guide.js";
 
 const KEY = "lpapp-v1";
@@ -19,21 +19,24 @@ const EQUIP_IDS = EQUIPMENT.map(e => e.id);
 const EX_IDS = Object.keys(EX);
 const WEIGHTED_IDS = EX_IDS.filter(id => EX[id].weighted);
 const CUSTOM_REST = [0, 15, 30, 45, 60, 90];
-const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom", "morning", "challenge"];
+const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom", "morning", "challenge", "run"];
 const SYMPTOM_IDS = SYMPTOMS.map(x => x.id);
 const ONSET_IDS = ONSET.map(x => x.id);
 const TRIGGER_IDS = TRIGGERS.map(x => x.id);
 const GUIDE_IDS = GUIDE.map(x => x.id);
 const SIDE_IDS = ["L", "R"];
 const MODES = ["recovery", "light", "normal", "push"];
-const SCREEN_IDS = ["chest", "dizzy", "heart", "pressure", "joints", "pregnant", "surgery"];
+const SCREEN_IDS = ["chest", "dizzy", "heart", "pressure", "chronic", "joints", "pregnant", "surgery"];
+const PLACES = ["", "home", "outdoor", "gym", "work"];
+const AFTER = ["", "better", "same", "worse"];
+const hhmm = v => (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : "");
 
 export const defaultState = () => ({
   v: 1,
   profile: {
     onboarded: false, ack: false, name: "", ageGroup: "adult", goal: "health", level: 1,
     equipment: ["chair"], minutes: 20, days: [1, 3, 5], conditions: [], screening: [],
-    sex: "", height: 0
+    sex: "", height: 0, screenedAt: "", planTime: "", planPlace: "", planCue: ""
   },
   body: {},
   checkins: [],
@@ -52,7 +55,8 @@ export const defaultState = () => ({
   custom: [],
   challenges: {},
   bodyWeight: [],
-  settings: { sound: true, voice: false, vibrate: true, lessGlass: false, lastBackup: "", backupSnooze: "" }
+  run: null,
+  settings: { sound: true, voice: false, vibrate: true, lessGlass: false, lastBackup: "", backupSnooze: "", seenVersion: "", weekSummary: "" }
 });
 
 // ----- Проверка значений -----
@@ -92,7 +96,12 @@ export function sanitize(raw) {
       conditions: ids(p.conditions, COND_IDS, 20),
       screening: ids(p.screening, SCREEN_IDS, 10),
       sex: oneOf(p.sex, ["", "m", "f"], ""),
-      height: int(p.height, 100, 250, 0)
+      height: int(p.height, 100, 250, 0),
+      screenedAt: day(p.screenedAt),
+      // План «когда и где»: время, место и привычка-якорь
+      planTime: hhmm(p.planTime),
+      planPlace: oneOf(p.planPlace, PLACES, ""),
+      planCue: str(p.planCue, 60)
     };
   }
 
@@ -130,12 +139,18 @@ export function sanitize(raw) {
       const ex = Array.isArray(s.ex)
         ? s.ex.filter(x => Array.isArray(x) && x.length === 2 && EX_IDS.includes(x[0]) && Number.isInteger(x[1]) && x[1] >= 1 && x[1] <= 50).slice(0, 40).map(x => [x[0], x[1]])
         : [];
-      d.sessions.push({
+      const km = num(s.km, 0, 300);
+      const entry = {
         id: str(s.id, 24) || Math.random().toString(36).slice(2, 12),
         d: day(s.d), hour: int(s.hour, 0, 23, 12), mins: int(s.mins, 0, 300, 0),
         title: str(s.title, 80), goal: oneOf(s.goal, SESSION_GOALS, "health"), mode: oneOf(s.mode, MODES, "normal"),
         rpe: int(s.rpe, 0, 10, 0), count: int(s.count, 0, 500, 0), pains, ex
-      });
+      };
+      // Дистанция прогулки с GPS и ответ «как зона на следующий день»
+      if (km) entry.km = Math.round(km * 100) / 100;
+      const after = oneOf(s.after, AFTER, "");
+      if (after) entry.after = after;
+      d.sessions.push(entry);
     }
   }
 
@@ -249,13 +264,22 @@ export function sanitize(raw) {
   if (Array.isArray(bw)) {
     const seen = new Set();
     for (const x of bw.slice(-500)) {
-      if (!Array.isArray(x) || x.length !== 2 || !day(x[0]) || seen.has(x[0])) continue;
+      if (!Array.isArray(x) || (x.length !== 2 && x.length !== 3) || !day(x[0]) || seen.has(x[0])) continue;
       const v = num(x[1], 20, 400);
       if (v === null) continue;
       seen.add(x[0]);
-      d.bodyWeight.push([day(x[0]), Math.round(v * 10) / 10]);
+      // Третье значение — обхват талии в сантиметрах (необязательно)
+      const waist = x.length === 3 ? num(x[2], 40, 200) : null;
+      d.bodyWeight.push(waist ? [day(x[0]), Math.round(v * 10) / 10, Math.round(waist * 2) / 2] : [day(x[0]), Math.round(v * 10) / 10]);
     }
     d.bodyWeight.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  }
+
+  // Бег с нуля: начало, пройденные занятия и дата последнего
+  const run = own(raw, "run");
+  if (isObj(run) && day(run.start)) {
+    const done = Array.isArray(run.done) ? [...new Set(run.done.filter(n => Number.isInteger(n) && n >= 1 && n <= RUN_DAYS))].sort((a, b) => a - b) : [];
+    d.run = { start: day(run.start), done, last: day(run.last) };
   }
 
   // Рекорды статики: лучшее время в секундах
@@ -273,7 +297,8 @@ export function sanitize(raw) {
     d.settings = {
       sound: bool(st.sound, true), voice: bool(st.voice, false),
       vibrate: bool(st.vibrate, true), lessGlass: bool(st.lessGlass, false),
-      lastBackup: day(st.lastBackup), backupSnooze: day(st.backupSnooze)
+      lastBackup: day(st.lastBackup), backupSnooze: day(st.backupSnooze),
+      seenVersion: str(st.seenVersion, 12), weekSummary: day(st.weekSummary)
     };
   }
   return d;

@@ -104,16 +104,21 @@ export function icon(name, size = 22) {
 
 // ----- Всплывающие сообщения -----
 let toastTimer = null;
-export function toast(message) {
+// action: { label, onClick } — кнопка в сообщении, например «Вернуть» после удаления
+export function toast(message, { action = null } = {}) {
   let node = document.querySelector(".toast");
   if (!node) {
     node = h("div", { class: "toast glass", role: "status" });
     document.body.append(node);
   }
-  node.textContent = message;
+  const hide = () => node.classList.remove("is-visible");
+  const parts = [h("span", { text: message })];
+  if (action) parts.push(h("button", { class: "toast-btn", type: "button", text: action.label, onClick: () => { clearTimeout(toastTimer); hide(); action.onClick(); } }));
+  node.replaceChildren(...parts);
+  node.classList.toggle("has-action", !!action);
   requestAnimationFrame(() => node.classList.add("is-visible"));
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => node.classList.remove("is-visible"), 3000);
+  toastTimer = setTimeout(hide, action ? 7000 : 3000);
 }
 
 // ----- Нижняя панель-«шторка» -----

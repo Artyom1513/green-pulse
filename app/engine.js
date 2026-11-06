@@ -1,6 +1,6 @@
 // ===== Листопульс: логика подбора тренировок =====
 // Чистые функции без доступа к DOM и сети. Всё считается на устройстве пользователя.
-import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP, MORNING, CHALLENGES } from "./data.js";
+import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP, MORNING, CHALLENGES, RUN_WEEKS, RUN_DAYS } from "./data.js";
 
 export const REGION_NAME = Object.fromEntries(REGIONS.map(r => [r.id, r.name]));
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
@@ -675,6 +675,109 @@ export function weekWorkouts(state, day = dayKey()) {
   const monday = shiftDay(day, -((d.getDay() + 6) % 7));
   return new Set(state.sessions.filter(x => x.d >= monday && x.d <= day && x.goal !== "activity").map(x => x.d)).size;
 }
+// ----- Недельные ориентиры ВОЗ (2020) -----
+// Взрослым: 150–300 минут умеренной активности или 75–150 интенсивной (минута интенсивной = две умеренной)
+// и силовые на основные мышцы не реже 2 дней в неделю. После 65 лет — ещё упражнения на равновесие
+// и силу 3 дня в неделю. Подросткам: в среднем 60 минут в день, силовые и интенсивные — 3 дня в неделю.
+const STRENGTH_GROUPS = ["legs", "push", "pull", "core", "iso"];
+const isStrengthSession = s => s.goal === "strength" || s.goal === "muscle" ||
+  (s.ex || []).reduce((a, [id, n]) => a + (EX[id] && STRENGTH_GROUPS.includes(EX[id].group) ? n : 0), 0) >= 4;
+const isBalanceSession = s => s.goal === "balance" || (s.ex || []).some(([id]) => EX[id] && EX[id].group === "balance");
+const isVigorous = s => (s.goal === "run" && s.mode !== "light") || s.goal === "hiit" || s.mode === "push" || s.rpe >= 7;
+export function whoTargets(state) {
+  const age = state.profile.ageGroup;
+  if (age === "teen") return { mins: 420, strength: 3, balance: 0, teen: true };
+  return { mins: 150, strength: 2, balance: age === "senior" ? 3 : 0, teen: false };
+}
+export function whoWeek(state, day = dayKey()) {
+  const t = whoTargets(state);
+  const from = shiftDay(day, -6);
+  const list = state.sessions.filter(x => x.d >= from && x.d <= day);
+  const raw = list.reduce((a, x) => a + x.mins, 0);
+  const mins = t.teen ? raw : list.reduce((a, x) => a + x.mins * (isVigorous(x) ? 2 : 1), 0);
+  const days = f => new Set(list.filter(f).map(x => x.d)).size;
+  return { ...t, done: mins, raw, vigorous: list.filter(isVigorous).reduce((a, x) => a + x.mins, 0), strengthDays: days(isStrengthSession), balanceDays: days(isBalanceSession) };
+}
+
+// Серия недель, когда выполнен план по дням тренировок. Дни отдыха её не рвут — в отличие от серии дней
+const mondayOf = d => shiftDay(d, -((new Date(`${d}T12:00:00`).getDay() + 6) % 7));
+export function weekStreak(state, day = dayKey()) {
+  const goal = Math.max(1, state.profile.days.length);
+  const workoutDays = new Set(state.sessions.filter(x => x.goal !== "activity").map(x => x.d));
+  const count = mon => { let n = 0; for (let i = 0; i < 7; i++) if (workoutDays.has(shiftDay(mon, i))) n += 1; return n; };
+  let mon = mondayOf(day);
+  let n = count(mon) >= goal ? 1 : 0;
+  for (let i = 0; i < 520; i++) {
+    mon = shiftDay(mon, -7);
+    if (count(mon) >= goal) n += 1;
+    else break;
+  }
+  return n;
+}
+
+// Итоги прошлой недели: для карточки в понедельник и картинки «Поделиться»
+export function lastWeek(state, day = dayKey()) {
+  const mon = shiftDay(mondayOf(day), -7);
+  const sun = shiftDay(mon, 6);
+  const list = state.sessions.filter(x => x.d >= mon && x.d <= sun);
+  const workouts = new Set(list.filter(x => x.goal !== "activity").map(x => x.d)).size;
+  const prs = Object.entries(state.weights || {}).filter(([, w]) => w.prD && w.prD >= mon && w.prD <= sun).map(([id]) => id);
+  const badges = Object.values(state.badges).filter(d => d >= mon && d <= sun).length;
+  const km = Math.round(list.reduce((a, x) => a + (x.km || 0), 0) * 10) / 10;
+  return { mon, sun, workouts, goal: Math.max(1, state.profile.days.length), mins: list.reduce((a, x) => a + x.mins, 0), sessions: list.length, prs, badges, km };
+}
+
+// Правило 24 часов: если тренировка вызвала боль, на следующий день спрашиваем, как зона
+export function pendingFollowup(state, day = dayKey()) {
+  const from = shiftDay(day, -2);
+  const list = state.sessions.slice(-60).filter(s => s.d >= from && s.d < day && s.pains.length && !s.after);
+  list.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : a.hour - b.hour));
+  return list.length ? list[list.length - 1] : null;
+}
+
+// Обхват талии: ориентиры, которые ВОЗ приводит для европейцев (у азиатов пороги ниже)
+export function waistRisk(sex, cm) {
+  if (!cm || (sex !== "m" && sex !== "f")) return null;
+  const [up, high] = sex === "m" ? [94, 102] : [80, 88];
+  return cm >= high ? 2 : cm >= up ? 1 : 0;
+}
+
+// ----- Бег с нуля -----
+export function runSession(n) {
+  const week = Math.min(RUN_WEEKS.length, Math.ceil(n / 3));
+  const w = RUN_WEEKS[week - 1];
+  if (w.days) return { week, run: w.days[(n - 1) % 3], walk: 0, reps: 1 };
+  return { week, ...w };
+}
+const RUN_REGIONS = ["hip", "thighFront", "hamstring", "knee", "kneeBack", "shin", "calf", "achilles", "ankle", "foot", "heel", "toes"];
+export function runState(state, day = dayKey()) {
+  const st = state.run;
+  const done = st ? st.done.length : 0;
+  const next = Math.min(done + 1, RUN_DAYS);
+  const r = restrictions(state, day);
+  // Бег — ударная нагрузка: при запрете прыжков и бега или боли в ногах предлагаем ту же схему быстрой ходьбой
+  const sore = RUN_REGIONS.filter(id => r.regionSev[id] >= 2);
+  const walkOnly = r.banned.has("impact") || sore.length > 0;
+  const why = r.banned.has("impact") ? `бег сейчас не подходит: ${r.banSource.impact}` : sore.length ? `бережём зону «${REGIONS.find(x => x.id === sore[0]).name.toLowerCase()}»` : "";
+  return {
+    started: !!st, done, next, finished: done >= RUN_DAYS, doneToday: !!st && st.last === day,
+    yesterday: !!st && st.last === shiftDay(day, -1), walkOnly, why, blocked: r.block, session: runSession(next)
+  };
+}
+// Шаги для плеера: разминка, интервалы бега и ходьбы, заминка
+export function buildRunDay(state, n, walkOnly = false) {
+  const s = runSession(n);
+  const runLabel = walkOnly ? "Быстрая ходьба" : "Бег";
+  const steps = [{ type: "work", sec: 300, label: "Разминка: бодрая ходьба", cue: "Постепенно ускоряйте шаг, руки согнуты", round: 0, rounds: 0 }];
+  for (let i = 1; i <= s.reps; i++) {
+    steps.push({ type: "work", sec: s.run, label: runLabel, cue: walkOnly ? "Широкий быстрый шаг, руки работают" : "Лёгкий темп: можно говорить фразами", round: i, rounds: s.reps });
+    if (s.walk && i < s.reps) steps.push({ type: "rest", sec: s.walk, label: walkOnly ? "Спокойная ходьба" : "Ходьба", cue: "Восстановите дыхание, не останавливайтесь" });
+  }
+  steps.push({ type: "work", sec: 300, label: "Заминка: спокойная ходьба", cue: "Дыхание успокаивается, затем — растяжка икр и бёдер", round: 0, rounds: 0 });
+  const session = { kind: "run", title: `${walkOnly ? "Ходьба по схеме бега" : "Бег с нуля"} · занятие ${n}`, goal: "run", mode: walkOnly ? "light" : "normal", runDay: n, walkOnly };
+  return { session, steps };
+}
+
 export function streak(state) {
   const set = new Set(state.sessions.map(s => s.d));
   let day = dayKey();
@@ -727,6 +830,9 @@ export function newBadges(state) {
   check("water", state.water.d === dayKey() && state.water.n >= 8);
   check("early", state.sessions.some(s => s.hour < 8));
   check("flex5", state.sessions.filter(s => ["flexibility", "back", "evening"].includes(s.goal)).length >= 5);
+  check("steady", weekStreak(state) >= 4);
+  check("runner", state.sessions.some(s => s.goal === "run"));
+  check("run30", !!state.run && state.run.done.length >= RUN_DAYS);
   return got;
 }
 
