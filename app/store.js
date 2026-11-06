@@ -3,7 +3,7 @@
 // По желанию пользователя всё шифруется паролем: AES-GCM 256 бит, ключ — PBKDF2-SHA-256, 600 000 итераций.
 // Любые загруженные данные (из памяти браузера или из файла) проходят строгую проверку и пересобираются
 // по известной схеме: лишние поля отбрасываются, значения ограничиваются по типу и длине.
-import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX } from "./data.js";
+import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX, CHALLENGES } from "./data.js";
 import { GUIDE } from "./guide.js";
 
 const KEY = "lpapp-v1";
@@ -19,7 +19,7 @@ const EQUIP_IDS = EQUIPMENT.map(e => e.id);
 const EX_IDS = Object.keys(EX);
 const WEIGHTED_IDS = EX_IDS.filter(id => EX[id].weighted);
 const CUSTOM_REST = [0, 15, 30, 45, 60, 90];
-const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom"];
+const SESSION_GOALS = [...GOAL_IDS, ...QUICK.map(q => q.id), "timer", "activity", "program", "custom", "morning", "challenge"];
 const SYMPTOM_IDS = SYMPTOMS.map(x => x.id);
 const ONSET_IDS = ONSET.map(x => x.id);
 const TRIGGER_IDS = TRIGGERS.map(x => x.id);
@@ -32,7 +32,8 @@ export const defaultState = () => ({
   v: 1,
   profile: {
     onboarded: false, ack: false, name: "", ageGroup: "adult", goal: "health", level: 1,
-    equipment: ["chair"], minutes: 20, days: [1, 3, 5], conditions: [], screening: []
+    equipment: ["chair"], minutes: 20, days: [1, 3, 5], conditions: [], screening: [],
+    sex: "", height: 0
   },
   body: {},
   checkins: [],
@@ -49,7 +50,9 @@ export const defaultState = () => ({
   records: {},
   weights: {},
   custom: [],
-  settings: { sound: true, voice: false, vibrate: true, lessGlass: false }
+  challenges: {},
+  bodyWeight: [],
+  settings: { sound: true, voice: false, vibrate: true, lessGlass: false, lastBackup: "", backupSnooze: "" }
 });
 
 // ----- Проверка значений -----
@@ -87,7 +90,9 @@ export function sanitize(raw) {
       minutes: oneOf(p.minutes, [10, 20, 30, 45], 20),
       days: days.length ? days : [1, 3, 5],
       conditions: ids(p.conditions, COND_IDS, 20),
-      screening: ids(p.screening, SCREEN_IDS, 10)
+      screening: ids(p.screening, SCREEN_IDS, 10),
+      sex: oneOf(p.sex, ["", "m", "f"], ""),
+      height: int(p.height, 100, 250, 0)
     };
   }
 
@@ -121,11 +126,15 @@ export function sanitize(raw) {
       const pains = Array.isArray(s.pains)
         ? s.pains.filter(x => isObj(x) && EX_IDS.includes(x.ex) && REGION_IDS.includes(x.region)).slice(0, 20).map(x => ({ ex: x.ex, region: x.region }))
         : [];
+      // Какие упражнения выполнены и сколько раз — для карты восстановления мышц
+      const ex = Array.isArray(s.ex)
+        ? s.ex.filter(x => Array.isArray(x) && x.length === 2 && EX_IDS.includes(x[0]) && Number.isInteger(x[1]) && x[1] >= 1 && x[1] <= 50).slice(0, 40).map(x => [x[0], x[1]])
+        : [];
       d.sessions.push({
         id: str(s.id, 24) || Math.random().toString(36).slice(2, 12),
         d: day(s.d), hour: int(s.hour, 0, 23, 12), mins: int(s.mins, 0, 300, 0),
         title: str(s.title, 80), goal: oneOf(s.goal, SESSION_GOALS, "health"), mode: oneOf(s.mode, MODES, "normal"),
-        rpe: int(s.rpe, 0, 10, 0), count: int(s.count, 0, 500, 0), pains
+        rpe: int(s.rpe, 0, 10, 0), count: int(s.count, 0, 500, 0), pains, ex
       });
     }
   }
@@ -200,10 +209,15 @@ export function sanitize(raw) {
     const last = kg(w.kg);
     if (last === null) continue;
     const hist = Array.isArray(w.hist)
-      ? w.hist.filter(h => Array.isArray(h) && h.length === 2 && day(h[0]) && kg(h[1]) !== null).slice(-20).map(h => [day(h[0]), kg(h[1])])
+      ? w.hist.filter(h => Array.isArray(h) && (h.length === 2 || h.length === 3) && day(h[0]) && kg(h[1]) !== null)
+        .slice(-30).map(h => (h.length === 3 && Number.isInteger(h[2]) && h[2] >= 1 && h[2] <= 50 ? [day(h[0]), kg(h[1]), h[2]] : [day(h[0]), kg(h[1])]))
       : [];
     const best = Math.max(last, kg(w.best) || 0, ...hist.map(h => h[1]));
-    d.weights[id] = { kg: last, d: day(w.d), best, hist };
+    const sets = Array.isArray(w.last)
+      ? w.last.filter(x => Array.isArray(x) && x.length === 2 && kg(x[0]) !== null && Number.isInteger(x[1]) && x[1] >= 1 && x[1] <= 50).slice(0, 10).map(x => [kg(x[0]), x[1]])
+      : [];
+    const e1 = num(w.e1rm, 0, 2000);
+    d.weights[id] = { kg: last, d: day(w.d), best, hist, last: sets, e1rm: e1 === null ? 0 : Math.round(e1 * 10) / 10, prD: day(w.prD) };
   }
 
   // Свои тренировки из конструктора
@@ -221,6 +235,29 @@ export function sanitize(raw) {
     }
   }
 
+  // Челленджи: начало и выполненные дни
+  const ch = own(raw, "challenges");
+  for (const c of CHALLENGES) {
+    const x = own(ch, c.id);
+    if (!isObj(x) || !day(x.start)) continue;
+    const done = Array.isArray(x.done) ? [...new Set(x.done.filter(n => Number.isInteger(n) && n >= 1 && n <= 30))].sort((a, b) => a - b) : [];
+    d.challenges[c.id] = { start: day(x.start), done, last: day(x.last) };
+  }
+
+  // Вес тела: [дата, кг]
+  const bw = own(raw, "bodyWeight");
+  if (Array.isArray(bw)) {
+    const seen = new Set();
+    for (const x of bw.slice(-500)) {
+      if (!Array.isArray(x) || x.length !== 2 || !day(x[0]) || seen.has(x[0])) continue;
+      const v = num(x[1], 20, 400);
+      if (v === null) continue;
+      seen.add(x[0]);
+      d.bodyWeight.push([day(x[0]), Math.round(v * 10) / 10]);
+    }
+    d.bodyWeight.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  }
+
   // Рекорды статики: лучшее время в секундах
   const records = own(raw, "records");
   for (const id of RECORD_EX) {
@@ -235,7 +272,8 @@ export function sanitize(raw) {
   if (isObj(st)) {
     d.settings = {
       sound: bool(st.sound, true), voice: bool(st.voice, false),
-      vibrate: bool(st.vibrate, true), lessGlass: bool(st.lessGlass, false)
+      vibrate: bool(st.vibrate, true), lessGlass: bool(st.lessGlass, false),
+      lastBackup: day(st.lastBackup), backupSnooze: day(st.backupSnooze)
     };
   }
   return d;

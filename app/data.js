@@ -500,7 +500,15 @@ export const EXERCISES = [
   E("hipHinge", "Наклон к стене: отработка тяги", "warm", 1, "reps", 8, { load: { hamstring: 1, lowerBack: 1 }, cues: ["Встаньте спиной к стене на полшага от неё", "Отводите таз назад, пока он не коснётся стены; спина прямая", "Так учатся становой и румынской тяге"] }),
   E("bandDislocate", "Проводка эспандера за спину", "warm", 1, "reps", 8, { equip: ["band"], load: { shoulder: 1 }, tags: ["overhead"], cues: ["Широкий хват, прямые руки", "Проведите ленту над головой за спину и обратно — без боли"] }),
   E("squatHold", "Удержание полуприседа", "iso", 2, "hold", 4, { hold: 20, relax: 20, load: { knee: 1, hip: 1 }, tags: ["iso"], cues: ["Присядьте на треть глубины, руки вперёд", "Колени над стопами, дыхание ровное"] }),
-  E("pressHold", "Изометрия жима ладонями", "iso", 1, "hold", 6, { hold: 10, relax: 10, load: { chest: 1, shoulder: 1 }, cues: ["Ладони вместе перед грудью, локти в стороны", "Давите ладонями друг в друга на 50–70% усилия"] })
+  E("pressHold", "Изометрия жима ладонями", "iso", 1, "hold", 6, { hold: 10, relax: 10, load: { chest: 1, shoulder: 1 }, cues: ["Ладони вместе перед грудью, локти в стороны", "Давите ладонями друг в друга на 50–70% усилия"] }),
+
+  // ----- Йога и растяжка -----
+  E("reachUp", "Потягивание вверх на носках", "warm", 1, "reps", 8, { load: { shoulder: 1, ankle: 1 }, cues: ["На вдохе поднимите руки и встаньте на носки", "Потянитесь всем телом, на выдохе плавно опуститесь"] }),
+  E("sunFlow", "Плавный наклон с руками вверх", "mobility", 1, "reps", 6, { load: { hamstring: 1, lowerBack: 1, shoulder: 1 }, tags: ["flexion"], cues: ["Вдох — руки вверх, потянитесь", "Выдох — плавный наклон вперёд, колени мягкие", "Поднимайтесь медленно, позвонок за позвонком"] }),
+  E("warrior", "Поза воина (упрощённая)", "mobility", 1, "time", 30, { side: true, load: { knee: 1, hip: 1, shoulder: 1 }, cues: ["Широкий шаг вперёд, переднее колено над стопой", "Задняя нога прямая, руки вверх", "Если колено беспокоит — шаг короче"] }),
+  E("tree", "Поза дерева у опоры", "balance", 1, "time", 30, { side: true, load: { ankle: 1, hip: 1 }, tags: ["balance"], cues: ["Стопа согнутой ноги — на голени или бедре, но не на колене", "Можно держаться за стену", "Взгляд в одну точку, дыхание ровное"] }),
+  E("cobra", "Мягкая «кобра»", "mobility", 1, "reps", 6, { load: { lowerBack: 1, wrist: 1 }, tags: ["floor"], cues: ["Лёжа на животе, ладони под плечами", "На вдохе приподнимите грудь, таз остаётся на полу", "Без боли в пояснице: амплитуда маленькая"] }),
+  E("seatedFold", "Наклон к ногам сидя", "cool", 1, "time", 40, { load: { hamstring: 1, lowerBack: 1 }, tags: ["floor", "flexion"], cues: ["Сидя на полу, ноги прямые или чуть согнуты", "Тянитесь грудью к коленям с ровной спиной", "До лёгкого натяжения, дыхание спокойное"] })
 ];
 
 export const EX = Object.fromEntries(EXERCISES.map(e => [e.id, e]));
@@ -518,6 +526,8 @@ export const QUICK = [
   { id: "seated", name: "Сидя, без нагрузки на ноги", desc: "Когда травмирована нога", items: ["armCircles", "armBike", "seatedMarch", "bandRow", "tricepsBand", "gripIso", "neckStretch", "bellyBreath"] },
   { id: "evening", name: "Перед сном", desc: "7 минут мягкой растяжки и дыхания", items: ["neckStretch", "openBook", "figure4", "childPose", "bellyBreath"] },
   { id: "balance", name: "Равновесие", desc: "6 минут — особенно полезно после 60", items: ["singleLeg", "heelToe", "legSwingSide", "calfRaise", "standingKnee"] },
+  { id: "yoga", name: "Йога для начинающих", desc: "12 минут мягких поз и спокойного дыхания", items: ["catCow", "sunFlow", "warrior", "tree", "downDog", "cobra", "childPose", "seatedFold", "bellyBreath"] },
+  { id: "stretchAll", name: "Растяжка всего тела", desc: "10 минут: шея, грудь, спина, бёдра и икры", items: ["neckStretch", "chestStretch", "latStretch", "openBook", "hipFlexor", "hamStretch", "quadStretch", "calfStretch", "figure4", "butterfly"] },
   { id: "noEquip", name: "Всё тело без инвентаря", desc: "Силовая с весом своего тела, 2 круга", rounds: 2, rest: 20, items: ["squat", "kneePush", "doorRow", "reverseLunge", "plank", "bridge", "superman"] },
   { id: "hiit", name: "Кардио-интервалы", desc: "Бодрые интервалы; прыжки уберутся, если вам их нельзя", rounds: 2, rest: 20, items: ["highKnees", "skater", "jacks", "mountain", "burpeeLow", "fastMarch"] },
   { id: "warmW", name: "Разминка перед силовой", cat: "weights", desc: "8 минут: суставы, наклон, активация", items: ["march", "armCircles", "hipCircles", "catCow", "hipHinge", "inchworm", "legSwings", "bridge"] },
@@ -528,6 +538,30 @@ export const QUICK = [
   { id: "coreW", name: "Корпус с весом", cat: "weights", equip: ["dumbbell"], desc: "Пресс и стабилизация с гантелью", rounds: 2, rest: 20, items: ["dbDeadBug", "woodchop", "suitcaseCarry", "russianTwist", "sidePlank", "plank"] },
   { id: "kbBase", name: "Гиря: базовый комплекс", cat: "weights", equip: ["kettlebell"], desc: "Тяга, присед, жим, махи", rounds: 3, rest: 30, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbSwing", "kbPress", "kbRow", "kbCarry"] },
   { id: "bbBase", name: "Штанга: силовая база", cat: "weights", equip: ["barbell"], desc: "Для зала: рама, упоры и страховка", rounds: 3, rest: 90, items: ["bbSquat", "bbBench", "bbRow", "bbRdl", "bbPress"] }
+];
+
+// Утренняя зарядка: варианты меняются по дням, всё — стоя и без инвентаря
+export const MORNING = [
+  ["reachUp", "neckMob", "armCircles", "hipCircles", "chairSquat", "wallPush", "march", "torsoTurns"],
+  ["reachUp", "armCircles", "torsoTurns", "squat", "stepJack", "legSwings", "standingKnee", "sunFlow"],
+  ["neckMob", "wristMob", "reachUp", "hipCircles", "reverseLunge", "wallAngel", "calfRaise", "highKnees"]
+];
+
+// Челленджи на 30 дней: каждый день цель чуть больше; rest — каждый N-й день отдых.
+// unit: reps — повторы, sec — секунды, walk — минуты ходьбы, routine — короткий комплекс
+export const CHALLENGES = [
+  { id: "squat30", name: "30 дней приседаний", icon: "🦵", unit: "reps", ex: "squat", start: 10, step: 2, max: 60, rest: 4,
+    desc: "С 10 до 60 приседаний: каждый день немного больше, каждый 4-й день — отдых." },
+  { id: "plank30", name: "30 дней планки", icon: "🧱", unit: "sec", ex: "plank", start: 20, step: 5, max: 150, rest: 4,
+    desc: "С 20 секунд до 2,5 минуты. Дышите ровно — техника важнее секунд." },
+  { id: "pushup30", name: "30 дней отжиманий", icon: "💪", unit: "reps", ex: ["wallPush", "inclinePush", "kneePush", "pushUp"], start: 6, step: 1, max: 20, rest: 4,
+    desc: "От стены — к столу, коленям и полу. Каждую неделю — следующий шаг." },
+  { id: "stretch30", name: "Гибкость за 30 дней", icon: "🧘", unit: "routine", rest: 0,
+    items: [["neckStretch", "chestStretch", "catCow", "hamStretch", "calfStretch"], ["openBook", "hipFlexor", "quadStretch", "figure4", "childPose"],
+      ["sunFlow", "seatedFold", "butterfly", "latStretch", "cobra"], ["downDog", "worldStretch", "strapHam", "tricepsStretch", "bellyBreath"]],
+    desc: "7 минут растяжки в день. Каждую неделю — новые упражнения." },
+  { id: "walk30", name: "30 дней ходьбы", icon: "🚶", unit: "walk", start: 15, step: 1, max: 40, rest: 0,
+    desc: "Прогулка каждый день: с 15 до 40 минут. Отмечайте выполнение — можно гулять без телефона." }
 ];
 
 // Программы: kind — rehab (восстановление) или strength (сила); этапы по дням,
@@ -610,7 +644,11 @@ export const BADGES = [
   { id: "statics", name: "Железная статика", desc: "Рекорды в 3 упражнениях на статику", icon: "🧱" },
   { id: "lifter", name: "Свой вес", desc: "Рабочий вес записан в 5 упражнениях", icon: "🏋️" },
   { id: "stronger", name: "Сильнее, чем был", desc: "Рабочий вес вырос на 20% и больше", icon: "📈" },
-  { id: "builder", name: "Конструктор", desc: "Собрал(а) свою тренировку", icon: "🧩" }
+  { id: "builder", name: "Конструктор", desc: "Собрал(а) свою тренировку", icon: "🧩" },
+  { id: "pr", name: "Личный рекорд", desc: "Побит рекорд в упражнении с весом", icon: "🥇" },
+  { id: "morning7", name: "Утренний ритуал", desc: "7 утренних зарядок", icon: "☀️" },
+  { id: "challenger", name: "Вызов принят", desc: "Пройден челлендж на 30 дней", icon: "🏆" },
+  { id: "planner", name: "По расписанию", desc: "Недельная цель по тренировкам выполнена", icon: "📅" }
 ];
 
 // Упражнения для «Рекордов статики»: удержание на время, без резких движений

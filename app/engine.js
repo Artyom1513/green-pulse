@@ -1,6 +1,6 @@
 // ===== Листопульс: логика подбора тренировок =====
 // Чистые функции без доступа к DOM и сети. Всё считается на устройстве пользователя.
-import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP } from "./data.js";
+import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP, MORNING, CHALLENGES } from "./data.js";
 
 export const REGION_NAME = Object.fromEntries(REGIONS.map(r => [r.id, r.name]));
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
@@ -198,10 +198,10 @@ export function doseText(item) {
 const totalLoad = e => Object.values(e.load).reduce((a, b) => a + b, 0);
 // Насколько похожи упражнения по нагрузке на суставы и мышцы — так замена ближе по движению
 const similarity = (a, b) => Object.keys(a.load).reduce((sum, k) => sum + Math.min(a.load[k], b.load[k] || 0), 0);
-export function findReplacement(ex, r, profile, exclude = new Set()) {
+// Несколько замен, от самой похожей: для выбора вручную в плеере
+export function findReplacements(ex, r, profile, exclude = new Set(), n = 4) {
   const groups = RELATED[ex.group] || [ex.group];
   const pool = EXERCISES.filter(e => groups.includes(e.group) && e.id !== ex.id && !exclude.has(e.id) && fits(e, r, profile));
-  if (!pool.length) return null;
   pool.sort((a, b) =>
     groups.indexOf(a.group) - groups.indexOf(b.group) ||
     Math.max(0, a.level - ex.level) - Math.max(0, b.level - ex.level) ||
@@ -210,7 +210,10 @@ export function findReplacement(ex, r, profile, exclude = new Set()) {
     (a.type !== ex.type) - (b.type !== ex.type) ||
     Math.abs(a.level - ex.level) - Math.abs(b.level - ex.level) ||
     totalLoad(a) - totalLoad(b));
-  return pool[0];
+  return pool.slice(0, n);
+}
+export function findReplacement(ex, r, profile, exclude = new Set()) {
+  return findReplacements(ex, r, profile, exclude, 1)[0] || null;
 }
 
 // ----- Самочувствие -----
@@ -282,9 +285,15 @@ export function buildSession(state, { variant = 0 } = {}) {
   const level = Math.min(p.level, r.maxLevel);
   const rand = mulberry32(hashStr(JSON.stringify([day, p.goal, p.minutes, p.level, p.equipment, p.conditions, p.ageGroup, r.regionSev, mode, variant])));
   const used = new Set();
+  // Усталость считаем на начало дня: план не меняется в течение дня от часа к часу
+  const fatigue = muscleFatigue(state, new Date(`${day}T00:00:00`).getTime());
+  const tired = LOAD_KEYS.filter(k => fatigue[k] >= 0.6);
   const choose = (group, maxLevel = 3, preferWeights = false, compound = false) => {
     let pool = EXERCISES.filter(e => e.group === group && !used.has(e.id) && e.level <= maxLevel && fits(e, r, p));
     if (!pool.length) return null;
+    // Как у силовых тренеров: сначала мышцы, которые успели восстановиться
+    const fresh = pool.filter(e => maxFatigue(e, fatigue) < 0.6);
+    if (tired.length && fresh.length && rand() < 0.9) pool = fresh;
     const weighted = pool.filter(e => e.weighted);
     if (preferWeights && weighted.length && rand() < 0.85) pool = weighted;
     // Многосуставные упражнения (нагрузка на 3 и больше зон) — основа силовой тренировки
@@ -340,6 +349,16 @@ export function buildSession(state, { variant = 0 } = {}) {
   else if (minutes >= 45) groups = groups.concat(goal.main.slice(0, 2));
   else if (minutes >= 30) groups = groups.concat(goal.main.slice(0, 1));
   const hasWeights = p.equipment.some(e => WEIGHT_EQUIP.includes(e));
+  // Если почти все упражнения группы нагружают уставшие мышцы — меняем её на другую, «свежую»
+  if (tired.length) {
+    const freshShare = g => {
+      const all = EXERCISES.filter(e => e.group === g && fits(e, r, p));
+      return all.length ? all.filter(e => maxFatigue(e, fatigue) < 0.6 && Object.keys(e.load).length >= 2).length / all.length : 0;
+    };
+    const alts = ["core", "pull", "push", "legs"].filter(g => freshShare(g) >= 0.4);
+    let ai = 0;
+    groups = groups.map(g => (freshShare(g) < 0.3 && alts.length ? alts[ai++ % alts.length] : g));
+  }
   const main = [];
   const skipped = new Set();
   const seenGroup = {};
@@ -383,6 +402,7 @@ export function buildSession(state, { variant = 0 } = {}) {
   for (const g of skipped) {
     s.adaptations.push(`Группа «${GROUPS[g]}» пропущена: с вашими ограничениями и инвентарём подходящих упражнений сейчас нет.`);
   }
+  if (tired.length) s.adaptations.push(`Даём восстановиться мышцам после недавних тренировок: ${tired.map(k => KEY_NAME[k]).join(", ")}.`);
   explain(s, r, [...new Set(["warm", ...groups, "cool", "mobility", ...(r.balance ? ["balance"] : [])])]);
   return finalize(s);
 }
@@ -421,6 +441,51 @@ export function buildQuick(state, id) {
   const q = QUICK.find(x => x.id === id) || QUICK[0];
   const s = buildCustom(state, { title: q.name, ids: q.items, kind: "quick", goal: q.id, rounds: q.rounds || 1, rest: q.rest || 8 });
   s.quick = q.id;
+  return s;
+}
+
+// ----- Утренняя зарядка -----
+export function buildMorning(state, day = dayKey()) {
+  const n = Math.floor(new Date(`${day}T12:00:00`).getTime() / 864e5);
+  const items = MORNING[((n % MORNING.length) + MORNING.length) % MORNING.length];
+  const s = buildCustom(state, { title: "Утренняя зарядка", ids: items, k: 0.8, kind: "morning", goal: "morning", rest: 0 });
+  return s;
+}
+
+// ----- Челленджи на 30 дней -----
+export function challengeState(state, id) {
+  const c = CHALLENGES.find(x => x.id === id);
+  const st = state.challenges[id];
+  const done = st ? st.done.length : 0;
+  const day = Math.min(done + 1, 30);
+  const rest = !!c.rest && day % c.rest === 0;
+  let target = 0, ex = null, items = null;
+  if (c.unit === "reps" || c.unit === "sec") {
+    target = Math.min(c.max, c.start + c.step * (day - 1));
+    ex = Array.isArray(c.ex) ? c.ex[Math.min(c.ex.length - 1, Math.floor((day - 1) / 7.5))] : c.ex;
+  } else if (c.unit === "walk") {
+    target = Math.min(c.max, c.start + c.step * (day - 1));
+  } else if (c.unit === "routine") {
+    items = c.items[Math.min(c.items.length - 1, Math.floor((day - 1) / 7.5))];
+  }
+  // Один день челленджа — один календарный день
+  const doneToday = !!st && st.last === dayKey();
+  return { c, started: !!st, done, day, rest, target, ex, items, finished: done >= 30, doneToday };
+}
+export function buildChallengeDay(state, id) {
+  const cs = challengeState(state, id);
+  const { c } = cs;
+  let s;
+  if (c.unit === "routine") s = buildCustom(state, { title: `${c.name} · день ${cs.day}`, ids: cs.items, kind: "challenge", goal: "challenge", rest: 5 });
+  else {
+    const ex = EX[cs.ex];
+    // Повторы распределяются на 2–4 подхода, чтобы не делать всё за один раз; удержание — одним подходом
+    const sets = c.unit === "sec" ? 1 : cs.target >= 40 ? 4 : cs.target >= 20 ? 3 : 2;
+    const k = cs.target / sets / ex.base;
+    s = buildCustom(state, { title: `${c.name} · день ${cs.day}`, ids: [cs.ex], k, kind: "challenge", goal: "challenge", rest: 30, rounds: sets });
+  }
+  s.challenge = id;
+  s.challengeDay = cs.day;
   return s;
 }
 
@@ -514,15 +579,74 @@ export function weightUnit(ex) {
   if (ex.equip.includes("kettlebell")) return "кг — вес гири";
   return "кг — одна гантель";
 }
+// Оценка разового максимума по формуле Эпли — для сравнения подходов с разным числом повторов
+export const e1rm = (kg, reps) => Math.round(kg * (1 + Math.min(reps, 15) / 30) * 10) / 10;
+const emptyLift = () => ({ kg: 0, d: "", best: 0, hist: [], last: [], e1rm: 0, prD: "" });
 export function recordWeight(state, exId, kg, day = dayKey()) {
-  const value = roundWeight(kg);
-  const w = state.weights[exId] || { kg: value, d: day, best: 0, hist: [] };
-  w.kg = value;
-  w.d = day;
-  w.best = Math.max(w.best || 0, value);
-  w.hist = w.hist.filter(x => x[0] !== day).concat([[day, value]]).slice(-20);
-  state.weights[exId] = w;
+  return recordSets(state, exId, [[kg, 0]], day);
 }
+// Подходы одного упражнения за тренировку: [[кг, повторы], ...]. Возвращает, побит ли рекорд
+export function recordSets(state, exId, sets, day = dayKey()) {
+  const clean = sets.filter(x => x[0] > 0).map(([kg, reps]) => [roundWeight(kg), reps || 0]);
+  if (!clean.length) return { pr: false };
+  const w = state.weights[exId] || emptyLift();
+  const top = clean.reduce((a, b) => (b[0] > a[0] || (b[0] === a[0] && b[1] > a[1]) ? b : a));
+  const bestE = Math.max(...clean.map(([kg, reps]) => (reps ? e1rm(kg, reps) : 0)));
+  const prev = w.e1rm || 0;
+  const pr = prev > 0 && bestE > prev;
+  w.kg = clean[clean.length - 1][0];
+  w.d = day;
+  w.best = Math.max(w.best || 0, top[0]);
+  w.hist = (w.hist || []).filter(x => x[0] !== day).concat([top[1] ? [day, top[0], top[1]] : [day, top[0]]]).slice(-30);
+  w.last = clean.filter(x => x[1]).slice(0, 10);
+  if (bestE > prev) w.e1rm = bestE;
+  if (pr) w.prD = day;
+  state.weights[exId] = w;
+  return { pr, e1rm: bestE };
+}
+// Двойная прогрессия: если в прошлый раз все подходы выполнены на целевые повторы — прибавить вес
+export function suggestWeight(state, exId, targetReps) {
+  const w = state.weights[exId];
+  if (!w || !w.kg) return null;
+  const last = (w.last || []).filter(x => x[0] === w.kg);
+  if (last.length && targetReps && last.every(x => x[1] >= targetReps)) {
+    const next = roundWeight(Math.max(w.kg * 1.05, w.kg + weightStep(w.kg)));
+    return { kg: next, up: true };
+  }
+  return { kg: w.kg, up: false };
+}
+
+// ----- Восстановление мышц -----
+// Нагрузка за последние 72 часа по зонам: чем больше подходов и тяжелее тренировка, тем дольше восстановление
+export const KEY_NAME = {
+  neck: "шея", shoulder: "плечи", elbow: "руки", wrist: "предплечья и кисти", upperBack: "верх спины", lowerBack: "поясница",
+  hip: "ягодицы", knee: "передняя поверхность бёдер", ankle: "икры", chest: "грудь", abdomen: "пресс", groin: "приводящие мышцы",
+  hamstring: "задняя поверхность бёдер"
+};
+export function muscleFatigue(state, now = Date.now()) {
+  // Одна тренировка утомляет мышцу не больше чем на 100%, усталость спадает за 72 часа;
+  // несколько тренировок подряд складываются, но тоже не больше 100%
+  const fresh = Object.fromEntries(LOAD_KEYS.map(k => [k, 1]));
+  for (const ss of state.sessions) {
+    if (!ss.ex || !ss.ex.length) continue;
+    const t = new Date(`${ss.d}T${String(ss.hour).padStart(2, "0")}:00:00`).getTime();
+    const hours = (now - t) / 36e5;
+    if (!(hours >= 0) || hours >= 72) continue;
+    const decay = 1 - hours / 72;
+    const effort = ss.rpe ? 0.6 + ss.rpe / 15 : 1;
+    const raw = {};
+    for (const [id, n] of ss.ex) {
+      const ex = EX[id];
+      if (!ex) continue;
+      const w = ex.weighted ? 1.4 : ex.group === "warm" || ex.group === "cool" || ex.group === "mobility" ? 0.3 : 1;
+      // Лёгкая нагрузка (1): сустав участвует, но мышцы почти не работают
+      for (const [k, v] of Object.entries(ex.load)) raw[k] = (raw[k] || 0) + (v === 1 ? 0.5 : v) * n * w * effort;
+    }
+    for (const [k, v] of Object.entries(raw)) if (Object.prototype.hasOwnProperty.call(fresh, k)) fresh[k] *= 1 - Math.min(1, v / 16) * decay;
+  }
+  return Object.fromEntries(LOAD_KEYS.map(k => [k, Math.round((1 - fresh[k]) * 1000) / 1000]));
+}
+const maxFatigue = (ex, fat) => Math.max(0, ...Object.keys(ex.load).map(k => fat[k] || 0));
 
 // ----- Прогрессия -----
 export function applyFeedback(state, rpe, painCount) {
@@ -545,6 +669,12 @@ export function minutesByDay(state, days = 7) {
   return out;
 }
 export const weekMinutes = state => minutesByDay(state, 7).reduce((a, x) => a + x.mins, 0);
+// Тренировки на текущей неделе (с понедельника), без прогулок и другой активности
+export function weekWorkouts(state, day = dayKey()) {
+  const d = new Date(`${day}T12:00:00`);
+  const monday = shiftDay(day, -((d.getDay() + 6) % 7));
+  return new Set(state.sessions.filter(x => x.d >= monday && x.d <= day && x.goal !== "activity").map(x => x.d)).size;
+}
 export function streak(state) {
   const set = new Set(state.sessions.map(s => s.d));
   let day = dayKey();
@@ -589,6 +719,10 @@ export function newBadges(state) {
   check("lifter", lifts.length >= 5);
   check("stronger", lifts.some(w => w.hist.length >= 3 && w.best >= w.hist[0][1] * 1.2));
   check("builder", (state.custom || []).length > 0);
+  check("pr", Object.values(state.weights || {}).some(w => !!w.prD));
+  check("morning7", state.sessions.filter(x => x.goal === "morning").length >= 7);
+  check("challenger", Object.values(state.challenges || {}).some(c => c.done.length >= 30));
+  check("planner", weekWorkouts(state) >= Math.max(1, state.profile.days.length));
   check("checkin7", state.checkins.length >= 7);
   check("water", state.water.d === dayKey() && state.water.n >= 8);
   check("early", state.sessions.some(s => s.hour < 8));

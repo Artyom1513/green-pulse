@@ -663,6 +663,118 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .w-row { display: flex; align-items: center; gap: 14px; }
 .w-val { min-width: 104px; font-size: 1.6rem; font-variant-numeric: tabular-nums; text-align: center; }
 
+/* ----- Схема техники ----- */
+.demo { margin: 4px auto 12px; padding: 8px 6px 4px; border-radius: 22px; background: var(--accent-soft); }
+.demo-svg { display: block; width: 100%; max-width: 340px; height: auto; margin: 0 auto; overflow: visible; }
+.demo-svg .d-ground { stroke: var(--line); }
+.demo-svg .d-near, .demo-svg .d-body { stroke: var(--accent); }
+.demo-svg .d-far { stroke: var(--accent); opacity: .38; }
+.demo-svg .d-head { fill: var(--accent); }
+.demo-svg .d-prop { stroke: var(--muted); fill: none; }
+.demo-svg .d-prop-fill { fill: var(--muted); }
+.demo-svg .d-plate { fill: none; stroke: var(--muted); stroke-width: .045; }
+.demo-svg .d-band { stroke: #f59e0b; stroke-dasharray: .05 .035; }
+.player-card .demo { max-width: 250px; margin: 8px auto 4px; }
+@media (max-height: 740px) {
+  .player-card .demo { max-width: 190px; padding: 4px; margin: 6px auto 2px; }
+}
+@media (max-height: 680px) {
+  .player-card .demo { max-width: 150px; border-radius: 16px; }
+  .swap-btn { padding: 2px 10px; }
+}
+.swap-btn { display: inline-flex; align-items: center; gap: 5px; margin: 2px auto 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.swap-btn:hover { color: var(--accent); border-color: var(--accent); }
+.spark-row { display: flex; align-items: center; gap: 10px; margin: 6px 0 4px; }
+.spark-row .mini-spark { width: 120px; height: 34px; }
+
+/* ----- Подходы с весом ----- */
+.weight-ctl { width: 100%; max-width: 380px; }
+.w-cols { display: grid; gap: 6px; width: 100%; }
+.w-col { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.w-col > span { flex: 1; min-width: 0; text-align: left; line-height: 1.25; }
+.w-col .w-row { flex: none; gap: 4px; }
+.w-col .w-val { min-width: 0; width: 4.2em; font-size: 1.3rem; }
+.w-col .icon-btn { width: 40px; height: 40px; }
+.up-hint { color: var(--accent); font-weight: 650; }
+.pr-line { color: var(--accent); font-weight: 650; }
+.center-row { justify-content: center; }
+.center-row .btn { flex: 0 1 auto; }
+
+/* ----- Неделя: два кольца ----- */
+.rings { display: flex; justify-content: center; gap: 28px; margin: 6px 0 12px; }
+.ring-col { display: grid; justify-items: center; gap: 4px; }
+.ring-col .ring-label b { font-size: 1.25rem; }
+
+/* ----- Карта восстановления мышц ----- */
+.stage-layer { margin-bottom: 8px; }
+.pill.load-0 { background: var(--line); color: var(--muted); }
+.pill.load-1 { background: rgba(139, 92, 246, .16); color: #6d28d9; }
+.pill.load-2 { background: #7c3aed; color: #fff; }
+.recovery-list { display: grid; gap: 12px; margin-top: 12px; }
+.recovery-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.recovery-bar { margin-top: 6px; }
+.recovery-bar i { background: #8b5cf6; }
+.card-head > .btn { flex: none; white-space: nowrap; }
+:root[data-theme="dark"] .pill.load-1 { color: #c4b5fd; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.load-1 { color: #c4b5fd; } }
+
+/* ----- Челленджи ----- */
+.day-dots i.rest { outline: 2px dashed var(--line); outline-offset: -2px; background: transparent; }
+.day-dots i.rest.done { outline: 0; background: var(--accent-soft); color: var(--accent); }
+.row .fi.emoji, .quick-item .fi.emoji { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 14px; background: var(--accent-soft); font-size: 1.35rem; }
+.list a.row { color: inherit; text-decoration: none; }
+
+/* ----- Календарь ----- */
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin: 6px 0 10px; }
+.cal-wd { color: var(--muted); font-size: .72rem; font-weight: 700; text-align: center; }
+.cal-cell { position: relative; display: grid; place-items: center; aspect-ratio: 1; max-height: 48px; padding: 0; border: 0; border-radius: 12px; background: transparent; color: var(--text); font: inherit; font-size: .86rem; font-variant-numeric: tabular-nums; }
+button.cal-cell { cursor: pointer; }
+.cal-cell.empty { visibility: hidden; }
+.cal-cell.future { color: var(--muted); opacity: .5; }
+.cal-cell.a { background: var(--accent-soft); }
+.cal-cell.w { background: var(--accent); color: var(--accent-ink); font-weight: 750; }
+.cal-cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-cell.p::after { content: ""; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: .8rem; }
+.cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cal-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; }
+.cal-legend i.w { background: var(--accent); }
+.cal-legend i.a { background: var(--accent-soft); outline: 1px solid var(--accent); outline-offset: -1px; }
+.cal-legend i.p { border-radius: 50%; background: var(--danger); }
+
+/* ----- Калькуляторы ----- */
+.calc-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0 12px; }
+.calc-result { display: grid; gap: 2px; margin: 6px 0 8px; }
+.calc-val { color: var(--accent); font-size: 1.9rem; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.calc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hr-zones .row { gap: 10px; padding: 9px 0; }
+.hr-zones .calc-val { font-size: 1.05rem; white-space: nowrap; }
+.hr-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.hr-1 { background: #94a3b8; }
+.hr-2 { background: #38bdf8; }
+.hr-3 { background: #22c55e; }
+.hr-4 { background: #f59e0b; }
+.hr-5 { background: #ef4444; }
+
+/* ----- Отчёт для врача ----- */
+.report-tools { display: grid; gap: 6px; margin: 0 0 14px; }
+.report-tools .btn-row { margin-top: 6px; }
+.report h2 { margin: 18px 0 6px; font-size: 1.05rem; }
+.report h2:first-of-type { margin-top: 8px; }
+.report-meta { margin: 0; font-weight: 600; }
+.report-note { margin-top: 18px; }
+@media print {
+  @page { margin: 16mm; }
+  :root { --text: #000; --muted: #333; --accent: #14532d; }
+  body { background: #fff !important; color: #000; }
+  body::before, .topbar, .tabbar, .no-print, .toast, .skip-link { display: none !important; }
+  .shell { max-width: none; padding: 0 !important; }
+  .card, .report { margin: 0; padding: 0; border: 0; background: none !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  .report li { break-inside: avoid; }
+  .page-title { margin-top: 0; }
+}
+
+
 /* ----- Широкие экраны ----- */
 @media (min-width: 900px) {
   .page-title { font-size: 2.1rem; }
