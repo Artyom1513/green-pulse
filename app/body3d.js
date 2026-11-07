@@ -214,7 +214,7 @@ function buildFigure(regionIndex) {
 
   // ----- Туловище -----
   loft(mesh, {
-    step: 0.011, segs: 48, power: 2.4,
+    step: 0.0095, segs: 60, power: 2.4,
     rows: [
       [0.812, 0, 0, 0, -0.012], [0.818, 0.045, 0.034, 0.045, -0.012], [0.835, 0.075, 0.050, 0.065, -0.012],
       [0.865, 0.112, 0.068, 0.085, -0.012], [0.905, 0.148, 0.082, 0.096, -0.010], [0.950, 0.160, 0.088, 0.097, -0.008],
@@ -228,15 +228,33 @@ function buildFigure(regionIndex) {
       const ax = Math.abs(x);
       let e = 0;
       if (z > 0) {
-        // грудные мышцы и лёгкая линия пресса
+        // грудные мышцы, складка под ними и граница с дельтой
         e += 0.015 * smooth(1.19, 1.26, y) * (1 - smooth(1.33, 1.40, y)) * bell(ax, 0.078, 0.06);
+        e -= 0.0042 * bell(y, 1.188, 0.011) * bell(ax, 0.085, 0.05);
+        e -= 0.003 * bell(ax, 0.152, 0.012) * smooth(1.24, 1.3, y) * (1 - smooth(1.38, 1.42, y));
+        // ключицы и ямка между ними
+        e += 0.0032 * bell(y, 1.43, 0.008) * smooth(0.02, 0.04, ax) * (1 - smooth(0.12, 0.15, ax));
+        e -= 0.003 * bell(ax, 0, 0.012) * bell(y, 1.435, 0.01);
+        // пресс: белая линия, три поперечные перемычки и пупок
+        const abs = smooth(0.96, 1.0, y) * (1 - smooth(1.16, 1.2, y)) * (1 - smooth(0.06, 0.078, ax));
         e -= 0.0035 * bell(ax, 0, 0.009) * smooth(0.97, 1.02, y) * (1 - smooth(1.18, 1.24, y));
+        e += 0.0035 * abs * bell(ax, 0.033, 0.022);
+        e -= 0.0026 * abs * (bell(y, 1.035, 0.007) + bell(y, 1.09, 0.007) + 0.8 * bell(y, 1.142, 0.007));
+        e -= 0.004 * bell(ax, 0, 0.007) * bell(y, 0.995, 0.007);
+        // зубчатые мышцы на боках
+        e += 0.0016 * bell(ax, 0.128, 0.014) * (bell(y, 1.13, 0.009) + bell(y, 1.165, 0.009) + bell(y, 1.2, 0.009));
       } else {
         // лопатки, ложбинка позвоночника, ягодицы и их разделение
         e += 0.011 * smooth(1.21, 1.27, y) * (1 - smooth(1.36, 1.41, y)) * bell(ax, 0.088, 0.045);
         e -= 0.006 * bell(ax, 0, 0.011) * smooth(0.99, 1.04, y) * (1 - smooth(1.40, 1.44, y));
         e += 0.026 * bell(y, 0.885, 0.048) * bell(ax, 0.072, 0.058);
         e -= 0.006 * bell(ax, 0, 0.01) * (1 - smooth(0.9, 0.95, y));
+        // мышцы-разгибатели вдоль позвоночника, широчайшие и трапеция
+        e += 0.0042 * bell(ax, 0.03, 0.012) * smooth(0.97, 1.02, y) * (1 - smooth(1.2, 1.28, y));
+        e += 0.006 * bell(ax, 0.128, 0.03) * smooth(1.1, 1.16, y) * (1 - smooth(1.28, 1.33, y));
+        e += 0.004 * bell(ax, 0.05, 0.03) * smooth(1.33, 1.38, y);
+        // ягодичная складка
+        e -= 0.004 * bell(y, 0.832, 0.01) * bell(ax, 0.075, 0.04);
       }
       return e;
     },
@@ -284,7 +302,9 @@ function buildFigure(regionIndex) {
       const ax = Math.abs(x);
       return -0.005 * bell(ax, 0.031, 0.015) * bell(y, 1.668, 0.011) // глазницы
         + 0.004 * bell(y, 1.689, 0.007) * (1 - smooth(0.05, 0.07, ax)) // надбровья
-        + 0.004 * bell(y, 1.645, 0.012) * bell(ax, 0.056, 0.014); // скулы
+        + 0.004 * bell(y, 1.645, 0.012) * bell(ax, 0.056, 0.014) // скулы
+        - 0.0018 * bell(y, 1.601, 0.0035) * (1 - smooth(0.012, 0.022, ax)) // линия губ
+        + 0.0035 * bell(y, 1.574, 0.009) * (1 - smooth(0.018, 0.032, ax)); // подбородок
     },
     classify: () => C("head")
   });
@@ -297,7 +317,7 @@ function buildFigure(regionIndex) {
     const upper = [[0.054, 0.058], [0.051, 0.054], [0.046, 0.046], [0.041, 0.042], [0.036, 0.041]];
     const lower = [[0.036, 0.041], [0.042, 0.046], [0.037, 0.039], [0.033, 0.030], [0.030, 0.021]];
     sweep(mesh, {
-      pts: armPts, rings: 46, segs: 28,
+      pts: armPts, rings: 52, segs: 32,
       shape: (u, ct, st, K) => {
         const ue = K[3], out = -s * st;
         if (u <= ue) {
@@ -356,7 +376,7 @@ function buildFigure(regionIndex) {
     const shank = [[0.050, 0.051], [0.048, 0.049], [0.050, 0.047], [0.043, 0.042], [0.035, 0.034], [0.031, 0.031], [0.030, 0.033]];
     sweep(mesh, {
       pts: [[s * 0.086, 0.965, -0.01], [s * 0.094, 0.8, 0.006], [s * 0.097, 0.62, 0.012], [s * 0.099, 0.5, 0.012], [s * 0.1, 0.3, -0.006], [s * 0.1, 0.095, -0.01]],
-      rings: 72, segs: 32,
+      rings: 80, segs: 36,
       shape: (u, ct, st, K) => {
         const uk = K[3], out = -s * st, inn = -out;
         if (u <= uk) {
@@ -412,10 +432,68 @@ function buildFigure(regionIndex) {
     });
   }
 
-  return {
+  const geo = {
     pos: new Float32Array(pos), nor: new Float32Array(nor),
     reg: new Uint8Array(reg), sid: new Uint8Array(sid), idx: new Uint16Array(idx)
   };
+  geo.shade = bakeShade(geo);
+  return geo;
+}
+
+// Запечённое затенение: впадины и складки темнее, выпуклости светлее, плюс тонкие швы между зонами —
+// модель выглядит объёмнее, а зоны тела читаются как на анатомическом атласе
+function bakeShade(geo) {
+  const n = geo.pos.length / 3;
+  const shade = new Float32Array(n).fill(1);
+  // Вершины с одинаковыми координатами (шов развёртки) считаем одной точкой
+  const key = v => `${Math.round(geo.pos[v * 3] * 2e4)},${Math.round(geo.pos[v * 3 + 1] * 2e4)},${Math.round(geo.pos[v * 3 + 2] * 2e4)}`;
+  const group = new Int32Array(n), ids = new Map();
+  for (let v = 0; v < n; v++) {
+    const k = key(v);
+    if (!ids.has(k)) ids.set(k, ids.size);
+    group[v] = ids.get(k);
+  }
+  const G = ids.size;
+  const sum = new Float32Array(G * 3), cnt = new Float32Array(G), dist = new Float32Array(G);
+  const seam = new Uint8Array(G);
+  const idx = geo.idx;
+  for (let t = 0; t < idx.length; t += 3) {
+    const tri = [idx[t], idx[t + 1], idx[t + 2]];
+    const mixed = geo.reg[tri[0]] !== geo.reg[tri[1]] || geo.reg[tri[0]] !== geo.reg[tri[2]];
+    for (let i = 0; i < 3; i++) {
+      const a = tri[i], ga = group[a];
+      if (mixed) seam[ga] = 1;
+      for (let j = 1; j < 3; j++) {
+        const b = tri[(i + j) % 3];
+        sum[ga * 3] += geo.pos[b * 3];
+        sum[ga * 3 + 1] += geo.pos[b * 3 + 1];
+        sum[ga * 3 + 2] += geo.pos[b * 3 + 2];
+        dist[ga] += Math.hypot(geo.pos[b * 3] - geo.pos[a * 3], geo.pos[b * 3 + 1] - geo.pos[a * 3 + 1], geo.pos[b * 3 + 2] - geo.pos[a * 3 + 2]);
+        cnt[ga] += 1;
+      }
+    }
+  }
+  for (let v = 0; v < n; v++) {
+    const g = group[v];
+    if (!cnt[g]) continue;
+    const px = geo.pos[v * 3], py = geo.pos[v * 3 + 1], pz = geo.pos[v * 3 + 2];
+    const nx = geo.nor[v * 3], ny = geo.nor[v * 3 + 1], nz = geo.nor[v * 3 + 2];
+    // Кривизна: насколько соседи «выше» вершины вдоль нормали (впадина) или ниже (выпуклость)
+    const ax = sum[g * 3] / cnt[g] - px, ay = sum[g * 3 + 1] / cnt[g] - py, az = sum[g * 3 + 2] / cnt[g] - pz;
+    const mean = dist[g] / cnt[g] || 1;
+    const curv = (ax * nx + ay * ny + az * nz) / mean;
+    let s = 1 - Math.max(-0.05, Math.min(0.16, curv * 1.6));
+    // Мягкая тень в складках: подмышки, пах и внутренняя сторона бёдер, под подбородком, подошвы
+    const sx = Math.sign(px) || 1, inward = -nx * sx;
+    const axp = Math.abs(px);
+    s -= 0.16 * smooth(0.2, 0.7, inward) * bell(py, 1.33, 0.07) * bell(axp, 0.185, 0.03);
+    s -= 0.14 * smooth(0.2, 0.7, inward) * bell(py, 0.86, 0.09) * (1 - smooth(0.1, 0.14, axp));
+    s -= 0.1 * (pz > 0 ? 1 : 0) * bell(py, 1.545, 0.018) * (1 - smooth(0.05, 0.07, axp));
+    s -= 0.12 * smooth(0.4, 0.9, -ny) * (1 - smooth(0.06, 0.12, py));
+    if (seam[g]) s *= 0.9;
+    shade[v] = Math.max(0.6, Math.min(1.06, s));
+  }
+  return shade;
 }
 
 // ----- Шейдеры -----
@@ -739,9 +817,10 @@ export function createFigure({ regions, onTap, onLasso, label }) {
           col = [col[0] + (SELECT[0] - col[0]) * w, col[1] + (SELECT[1] - col[1]) * w, col[2] + (SELECT[2] - col[2]) * w];
         }
       }
-      colors[v * 3] = col[0];
-      colors[v * 3 + 1] = col[1];
-      colors[v * 3 + 2] = col[2];
+      const k = geo.shade[v];
+      colors[v * 3] = col[0] * k;
+      colors[v * 3 + 1] = col[1] * k;
+      colors[v * 3 + 2] = col[2] * k;
     }
     if (gl && !lost) {
       gl.bindBuffer(gl.ARRAY_BUFFER, glState.col);

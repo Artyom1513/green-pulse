@@ -9,7 +9,7 @@ import {
 import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -338,10 +338,10 @@ function showLock(env) {
 
 // ===== Маршруты =====
 const ROUTES = { today: viewToday, workout: viewWorkout, body: viewBody, journal: viewJournal, more: viewMore, guide: viewGuide, program: viewProgram, builder: viewBuilder, challenge: viewChallenge, report: viewReport, run: viewRun };
-const TAB_OF = { guide: "body", program: "workout", builder: "workout", challenge: "workout", report: "more", run: "workout" };
+const TAB_OF = { guide: "body", program: "workout", builder: "workout", challenge: "workout", report: "body", run: "workout" };
 // Адрес приложения для приглашений и «Поделиться» (работает и на своём домене)
 const appUrl = () => new URL("./", window.location.href).href;
-const TABS = [["today", "Сегодня", "today"], ["workout", "Тренировка", "workout"], ["body", "Тело", "body"], ["journal", "Дневник", "journal"], ["more", "Ещё", "more"]];
+const TABS = [["today", "Сегодня", "today"], ["workout", "Тренировки", "workout"], ["body", "Тело", "body"], ["journal", "Прогресс", "journal"], ["more", "Профиль", "user"]];
 
 function render() {
   if (!state) return;
@@ -356,7 +356,7 @@ function render() {
   const keep = key === lastRoute;
   lastRoute = key;
   const main = h("main", { class: "view", id: "main" }, ROUTES[name](sub));
-  app.replaceChildren(h("div", { class: "shell" }, topbar(), main), tabbar(TAB_OF[name] || name));
+  app.replaceChildren(h("div", { class: "shell" }, topbar(), main), tabbar(tabOf(name, sub)));
   window.scrollTo(0, keep ? y : 0);
   runPostRender();
 }
@@ -400,6 +400,8 @@ const feature = (ic, title, textValue) => h("div", { class: "feature" }, h("span
 const equipName = id => (EQUIPMENT.find(e => e.id === id) || { name: id }).name;
 
 // ===== Сегодня =====
+// Главный экран отвечает на один вопрос: что сделать сегодня. Одна главная кнопка — «Начать»,
+// остальное — компактным списком, подсказки — по одной за раз
 function viewToday() {
   const d = E.dayKey();
   const r = E.restrictions(state, d);
@@ -407,21 +409,148 @@ function viewToday() {
   return [
     h("p", { class: "eyebrow", text: fmtDate(d, { weekday: "long", day: "numeric", month: "long" }) }),
     h("h1", { class: "page-title", text: greeting() }),
-    whatsNewCard(),
     r.acute.length ? acuteCard(r) : null,
-    rescreenCard(),
-    followupCard(),
-    ci ? readinessCard(ci) : checkinCard(),
-    planCard(currentPlan(), r, state.sessions.filter(x => x.d === d)),
-    weekSummaryCard(),
-    backupCard(),
-    morningCard(),
-    challengeTodayCard(),
-    runTodayCard(),
+    todayNotice(),
+    heroCard(currentPlan(), r, ci, state.sessions.filter(x => x.d === d)),
+    todayTasks(),
     weekCard(),
-    waterCard(),
-    h("section", { class: "card glass" }, h("p", { class: "eyebrow", text: "Совет тренера" }), h("p", { text: TIPS[dayIndex() % TIPS.length] }))
+    h("p", { class: "tip-line" }, h("b", { text: "Совет. " }), TIPS[dayIndex() % TIPS.length])
   ];
+}
+// Подсказки по важности: самое срочное — вопрос о боли после вчерашней тренировки
+function todayNotice() {
+  return followupCard() || rescreenCard() || weekSummaryCard() || whatsNewCard() || backupCard();
+}
+// Интенсивность дня словами: «обычная нагрузка», а не «режим обычная»
+const MODE_PHRASE = { recovery: "день восстановления", light: "лёгкая нагрузка", normal: "обычная нагрузка", push: "нагрузка посильнее" };
+function heroCard(plan, r, ci, done) {
+  const mode = MODE_PHRASE[plan.mode] || E.MODES[plan.mode].name.toLowerCase();
+  const ready = ci
+    ? h("button", { class: "ready-chip", type: "button", onClick: checkinSheet, "aria-label": `Готовность ${ci.score} из 100, ${mode}. Изменить отметку самочувствия` },
+      h("b", { text: String(ci.score) }), h("span", { text: `готовность · ${mode}` }), icon("chevron", 14))
+    : h("button", { class: "ready-chip ask", type: "button", onClick: checkinSheet }, icon("heart", 16), h("span", { text: "Как самочувствие? Отметьте за 30 секунд" }), icon("chevron", 14));
+  if (plan.blocked) {
+    return h("section", { class: "card glass warn hero" },
+      h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
+      h("h2", { class: "hero-title", text: plan.title }),
+      h("ul", { class: "adapt" }, plan.notes.map(n => h("li", { class: "note", text: n }))),
+      ready,
+      h("div", { class: "btn-row" }, h("a", { class: "btn primary", href: "#more/breath", text: "Дыхательная практика" })));
+  }
+  const care = r.reasons.slice(0, 3).join(", ").toLowerCase() + (r.reasons.length > 3 ? ` и ещё ${r.reasons.length - 3}` : "");
+  return h("section", { class: "card glass hero" },
+    h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
+    h("h2", { class: "hero-title", text: plan.title }),
+    h("p", { class: "muted", text: `≈ ${plan.est} мин · ${plan.count} ${E.plural(plan.count, "подход", "подхода", "подходов")}` }),
+    r.reasons.length ? h("p", { class: "small hero-care" }, h("span", { class: "muted", text: "Учтено: " }), care) : null,
+    done.length ? h("p", { class: "small hero-done", text: "Сегодня тренировка уже есть ✓ Можно отдохнуть или размяться перед сном." }) : null,
+    ready,
+    h("div", { class: "btn-row" },
+      h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), "Начать"),
+      h("a", { class: "btn ghost", href: "#workout", text: "Состав" })));
+}
+// Отметка самочувствия — в отдельном окне, чтобы главный экран оставался коротким
+function checkinSheet() {
+  const d = E.dayKey();
+  const prev = state.checkins.find(c => c.d === d);
+  const draft = prev
+    ? { sleep: prev.sleep, energy: prev.energy, soreness: prev.soreness, stress: prev.stress, pain: prev.pain.slice() }
+    : { sleep: 3, energy: 3, soreness: 2, stress: 2, pain: [] };
+  const close = sheet({
+    title: "Как вы сегодня?",
+    body: [
+      h("p", { class: "muted small", text: "30 секунд — и тренировка подстроится под ваше состояние." }),
+      SCALES.map(sc => h("div", { class: "q" },
+        h("b", { text: sc.q }),
+        choice({
+          className: "scale", label: sc.q, value: draft[sc.key],
+          options: [1, 2, 3, 4, 5].map(v => ({ value: v, label: sc.up ? FACES[v - 1] : FACES[5 - v], aria: `${v} из 5` })),
+          onChange: v => { draft[sc.key] = v; }
+        }),
+        h("div", { class: "scale-labels" }, h("span", { text: sc.lo }), h("span", { text: sc.hi })))),
+      h("div", { class: "q" }, h("b", { text: "Что-то болит сегодня?" }), painPicker(draft))
+    ],
+    actions: [h("button", {
+      class: "btn primary", type: "button", text: "Сохранить",
+      onClick: () => {
+        const entry = { d, sleep: draft.sleep, energy: draft.energy, soreness: draft.soreness, stress: draft.stress, pain: draft.pain.slice() };
+        entry.score = E.readinessScore(entry);
+        state.checkins = state.checkins.filter(c => c.d !== d).concat(entry).slice(-400);
+        if (state.modeOverride && state.modeOverride.d === d) state.modeOverride = null;
+        const nb = E.newBadges(state);
+        persist();
+        close();
+        refresh();
+        toast(nb.length ? badgeToast(nb) : `Сегодня: ${MODE_PHRASE[currentPlan().mode] || E.MODES[currentPlan().mode].name.toLowerCase()}`);
+      }
+    })]
+  });
+}
+// «Ещё на сегодня»: зарядка, челленджи, бег и вода — короткими строками
+function todayTasks() {
+  const d = E.dayKey();
+  const rows = [];
+  const line = (lead, title, sub, trailing) => [lead, h("span", { class: "row-text" }, h("b", { text: title }), h("span", { class: "muted small", text: sub })), trailing];
+  const lead = (ic, emoji) => (emoji ? h("span", { class: "fi emoji", "aria-hidden": "true", text: emoji }) : h("span", { class: "fi" }, icon(ic, 18)));
+  // Утренняя зарядка — до 14:00
+  const morningDone = state.sessions.some(x => x.d === d && x.goal === "morning");
+  const hr = new Date().getHours();
+  if (morningDone || (hr >= 4 && hr < 14)) {
+    const s = E.buildMorning(state, d);
+    const items = s.blocked ? [] : s.blocks.flatMap(b => b.items);
+    if (items.length) {
+      const open = () => sessionSheet(s, { title: s.title, info: `${roundsInfo(s)} · каждый день новый набор`, actions: close => [h("button", { class: "btn primary", type: "button", onClick: () => { close(); startPlayer(s); } }, icon("play", 18), "Начать зарядку")] });
+      rows.push(h("button", { class: "row row-btn task-row", type: "button", onClick: open },
+        line(lead("today"), "Утренняя зарядка", morningDone ? "Сделана — бодрого дня!" : `${s.est} мин без инвентаря · каждый день новая`, morningDone ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 16))));
+    }
+  }
+  // Челленджи
+  for (const c of CHALLENGES) {
+    if (!own(state.challenges, c.id)) continue;
+    const cs = E.challengeState(state, c.id);
+    if (cs.finished) continue;
+    rows.push(h("a", { class: "row task-row", href: `#challenge/${c.id}` }, line(lead(null, c.icon), c.name, challengeLine(cs), cs.doneToday ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 16))));
+  }
+  // Бег с нуля — в дни тренировок
+  const rs = E.runState(state);
+  const wd = new Date().getDay() || 7;
+  if (rs.started && !rs.finished && !rs.blocked && (rs.doneToday || state.profile.days.includes(wd))) {
+    rows.push(h("a", { class: "row task-row", href: "#run" }, line(lead(null, "👟"), "Бег с нуля", rs.doneToday ? `Занятие ${rs.done} сделано` : `Занятие ${rs.next}: ${runPlanText(rs.session)}`, rs.doneToday ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 16))));
+  }
+  rows.push(waterRow());
+  return h("section", { class: "card glass" },
+    h("p", { class: "eyebrow", text: "Ещё на сегодня" }),
+    h("div", { class: "list" }, rows));
+}
+// Вода: стакан добавляется одной кнопкой
+function waterRow() {
+  const goal = 8;
+  let count = state.water.d === E.dayKey() ? state.water.n : 0;
+  const sub = h("span", { class: "muted small" });
+  const bar = h("i", {});
+  const update = () => {
+    sub.textContent = count >= goal ? "8 стаканов — норма на сегодня" : `${count} из ${goal} стаканов · ${(count * 0.25).toLocaleString("ru-RU")} л`;
+    bar.style.width = `${Math.round((Math.min(count, goal) / goal) * 100)}%`;
+  };
+  const setCount = v => {
+    const before = count;
+    count = Math.max(0, Math.min(12, v));
+    state.water = { d: E.dayKey(), n: count };
+    update();
+    if (count >= goal && before < goal) {
+      const nb = E.newBadges(state);
+      confetti();
+      toast(nb.length ? badgeToast(nb) : "Водный баланс — в норме!");
+    }
+    persist();
+  };
+  update();
+  return h("div", { class: "row task-row water-row" },
+    h("span", { class: "fi water-fi" }, icon("drop", 18)),
+    h("span", { class: "row-text" }, h("b", { text: "Вода" }), sub, h("span", { class: "progress slim water-bar", "aria-hidden": "true" }, bar)),
+    h("div", { class: "row-tools" },
+      h("button", { class: "icon-btn mini", type: "button", "aria-label": "Убрать стакан", onClick: () => setCount(count - 1) }, icon("minus", 16)),
+      h("button", { class: "icon-btn mini on", type: "button", "aria-label": "Добавить стакан воды", onClick: () => setCount(count + 1) }, icon("plus", 16))));
 }
 
 function greeting() {
@@ -456,37 +585,6 @@ const SCALES = [
 ];
 const FACES = ["😫", "😕", "😐", "🙂", "😄"];
 
-function checkinCard() {
-  const draft = { sleep: 3, energy: 3, soreness: 2, stress: 2, pain: [] };
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Отметка дня" }),
-    h("h2", { text: "Как вы сегодня?" }),
-    h("p", { class: "muted small", text: "30 секунд — и тренировка подстроится под ваше состояние." }),
-    SCALES.map(sc => h("div", { class: "q" },
-      h("b", { text: sc.q }),
-      choice({
-        className: "scale", label: sc.q, value: draft[sc.key],
-        options: [1, 2, 3, 4, 5].map(v => ({ value: v, label: sc.up ? FACES[v - 1] : FACES[5 - v], aria: `${v} из 5` })),
-        onChange: v => { draft[sc.key] = v; }
-      }),
-      h("div", { class: "scale-labels" }, h("span", { text: sc.lo }), h("span", { text: sc.hi })))),
-    h("div", { class: "q" },
-      h("b", { text: "Что-то болит сегодня?" }),
-      painPicker(draft)),
-    h("button", {
-      class: "btn primary block", type: "button", text: "Сохранить",
-      onClick: () => {
-        const entry = { d: E.dayKey(), sleep: draft.sleep, energy: draft.energy, soreness: draft.soreness, stress: draft.stress, pain: draft.pain.slice() };
-        entry.score = E.readinessScore(entry);
-        state.checkins = state.checkins.filter(c => c.d !== entry.d).concat(entry).slice(-400);
-        if (state.modeOverride && state.modeOverride.d === entry.d) state.modeOverride = null;
-        const nb = E.newBadges(state);
-        persist();
-        refresh();
-        toast(nb.length ? badgeToast(nb) : `Режим на сегодня: ${E.MODES[currentPlan().mode].name.toLowerCase()}`);
-      }
-    }));
-}
 
 const BASE_PAIN = ["neck", "shoulder", "elbow", "wrist", "upperBack", "lowerBack", "hip", "knee", "ankle"];
 function painPicker(draft) {
@@ -504,41 +602,7 @@ function painPicker(draft) {
   return group;
 }
 
-function readinessCard(ci) {
-  const mode = currentPlan().mode; // с учётом острой боли: тогда режим всегда щадящий
-  const acute = mode !== E.currentMode(state);
-  return h("section", { class: "card glass" },
-    h("div", { class: "split" },
-      ring(ci.score, 100, { size: 104, stroke: 10, label: String(ci.score), sub: "готовность" }),
-      h("div", {},
-        h("p", { class: "eyebrow", text: "Самочувствие" }),
-        h("h2", { text: `Режим: ${E.MODES[mode].name.toLowerCase()}` }),
-        h("p", { class: "muted small", text: acute ? "Из-за острой боли тренировка сегодня щадящая." : E.MODES[mode].desc }),
-        ci.pain.length ? h("p", { class: "small", text: `Сегодня бережём: ${ci.pain.map(id => REGION[id].name.toLowerCase()).join(", ")}` }) : null,
-        h("button", { class: "link-btn small", type: "button", text: "Изменить отметку", onClick: () => { state.checkins = state.checkins.filter(c => c.d !== ci.d); persist(); refresh(); } }))));
-}
 
-function planCard(plan, r, done) {
-  if (plan.blocked) {
-    return h("section", { class: "card glass warn" },
-      h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
-      h("h2", { text: plan.title }),
-      h("ul", { class: "adapt" }, plan.notes.map(n => h("li", { class: "note", text: n }))),
-      h("div", { class: "btn-row" }, h("a", { class: "btn ghost", href: "#more/breath", text: "Дыхательная практика" })));
-  }
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
-    h("h2", { text: plan.title }),
-    h("p", { class: "muted", text: `≈ ${plan.est} мин · ${plan.count} ${E.plural(plan.count, "подход", "подхода", "подходов")}` }),
-    r.reasons.length ? h("div", { class: "tags" },
-      h("span", { class: "pill", text: "Учтено" }),
-      r.reasons.slice(0, 4).map(x => h("span", { class: "pill muted-pill", text: x })),
-      r.reasons.length > 4 ? h("span", { class: "pill muted-pill", text: `+${r.reasons.length - 4}` }) : null) : null,
-    done.length ? h("p", { class: "small", style: { marginTop: "10px" }, text: "Сегодня тренировка уже есть — отличная работа! Можно отдохнуть или сделать растяжку перед сном." }) : null,
-    h("div", { class: "btn-row" },
-      h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), "Начать"),
-      h("a", { class: "btn ghost", href: "#workout", text: "Смотреть план" })));
-}
 
 // ----- Неделя: ориентиры ВОЗ по возрасту, план недели и серия -----
 const WEEKDAY_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
@@ -553,26 +617,24 @@ function weekCard() {
   const left = Math.max(0, goal - wk);
   const st = E.streak(state);
   const ws = E.weekStreak(state);
-  const ringCol = (v, max, label, sub, caption) => h("div", { class: "ring-col" }, ring(v, max, { size: 88, stroke: 9, label, sub }), h("span", { class: "muted small", text: caption }));
+  const ringCol = (v, max, label, sub, caption) => h("div", { class: "ring-col" }, ring(v, max, { size: 78, stroke: 8, label, sub }), h("span", { class: "muted small", text: caption }));
   return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Неделя" }),
+    h("div", { class: "card-head" },
+      h("p", { class: "eyebrow", text: "Неделя" }),
+      h("a", { class: "head-link", href: "#journal", text: "Прогресс" })),
     h("div", { class: "rings" },
-      ringCol(wk, goal, `${wk}/${goal}`, "трениров.", "по плану"),
-      ringCol(w.done, w.mins, String(w.done), `из ${w.mins} мин`, "активность"),
-      ringCol(w.strengthDays, w.strength, `${w.strengthDays}/${w.strength}`, "дня", "силовые")),
-    h("h2", { text: left ? `Ещё ${left} ${E.plural(left, "тренировка", "тренировки", "тренировок")} до плана недели` : "План недели выполнен! 🎉" }),
-    h("p", { class: "muted small", text: w.teen
-      ? "Подросткам ВОЗ советует в среднем 60 минут движения в день, а силовые и интенсивные занятия — 3 дня в неделю."
-      : `ВОЗ советует 150–300 минут умеренной активности в неделю (интенсивная минута идёт за две) и силовые не реже 2 дней.${w.done < w.mins ? ` До нормы — ${w.mins - w.done} мин.` : " Норма выполнена!"}` }),
-    w.balance ? h("p", { class: "small" }, `Равновесие: ${w.balanceDays} из ${w.balance} дней — после 65 лет ВОЗ советует такие упражнения 3 раза в неделю. `,
+      ringCol(wk, goal, `${wk}/${goal}`, "", "тренировки"),
+      ringCol(w.done, w.mins, String(w.done), `/${w.mins}`, "минуты"),
+      ringCol(w.strengthDays, w.strength, `${w.strengthDays}/${w.strength}`, "", "силовые дни")),
+    h("p", { class: "week-line" }, h("b", { text: left ? `Ещё ${left} ${E.plural(left, "тренировка", "тренировки", "тренировок")} до плана недели` : "План недели выполнен! 🎉" }),
+      ws || st ? h("span", { class: "muted", text: ` · ${[ws ? `${ws} ${E.plural(ws, "неделя", "недели", "недель")} по плану` : "", st ? `${st} ${E.plural(st, "день", "дня", "дней")} подряд` : ""].filter(Boolean).join(", ")}` }) : null),
+    w.balance ? h("p", { class: "small" }, `Равновесие: ${w.balanceDays} из ${w.balance} дней. `,
       h("button", { class: "link-btn", type: "button", text: "Тренировка на равновесие", onClick: () => quickSheet("balance") })) : null,
-    ws || st ? h("p", { class: "small" }, h("b", { text: [ws ? `${ws} ${E.plural(ws, "неделя", "недели", "недель")} подряд по плану 🔁` : "", st ? `${st} ${E.plural(st, "день", "дня", "дней")} подряд 🔥` : ""].filter(Boolean).join(" · ") })) : null,
     p.planTime
       ? h("p", { class: "small plan-line" }, h("span", { class: "muted", text: "Мой план: " }), planText(p), " ", h("button", { class: "link-btn", type: "button", text: "Изменить", onClick: planSheet }))
-      : h("div", { class: "note-box ok small" }, "Решите заранее, когда и где будете заниматься, — так проще не пропускать. ",
+      : h("p", { class: "small plan-line" }, "Решите заранее, когда и где будете заниматься, — так проще не пропускать. ",
         h("button", { class: "link-btn", type: "button", text: "Составить план", onClick: planSheet })),
-    h("div", { class: "btn-row" },
-      h("button", { class: "btn small ghost", type: "button", text: "+ Добавить активность", onClick: addActivitySheet })));
+    h("div", { class: "btn-row" }, h("button", { class: "btn small ghost", type: "button", text: "+ Прогулка или другая активность", onClick: addActivitySheet })));
 }
 
 // План «когда, где и после чего»: заранее принятое решение помогает не пропускать тренировки
@@ -607,7 +669,7 @@ function planSheet() {
         persist();
         close();
         refresh();
-        toast("План сохранён. Добавьте его в календарь — раздел «Ещё» → «Напоминания»");
+        toast("План сохранён. Добавьте его в календарь: «Профиль» → «План и напоминания»");
       }
     })]
   });
@@ -633,10 +695,10 @@ function followupCard() {
     h("h2", { text: `Как ${names} после ${when}?` }),
     h("p", { class: "muted small" }, "Нормально, если к утру боль утихла. Если стало хуже, чем до тренировки, нагрузку на эту зону нужно снизить. ",
       h("a", { href: "#guide/pain-exercise", text: "Какая боль допустима" })),
-    h("div", { class: "btn-row" },
-      h("button", { class: "btn ghost", type: "button", text: "Не болит", onClick: () => answer("better") }),
-      h("button", { class: "btn ghost", type: "button", text: "Как до тренировки", onClick: () => answer("same") }),
-      h("button", { class: "btn pain", type: "button", text: "Сильнее, чем было", onClick: () => answer("worse") })));
+    h("div", { class: "btn-row answer-row" },
+      h("button", { class: "btn small ghost", type: "button", text: "Не болит", onClick: () => answer("better") }),
+      h("button", { class: "btn small ghost", type: "button", text: "Как до тренировки", onClick: () => answer("same") }),
+      h("button", { class: "btn small pain", type: "button", text: "Сильнее, чем было", onClick: () => answer("worse") })));
 }
 
 // Итоги прошлой недели — в понедельник и вторник, как еженедельная сводка у больших приложений
@@ -677,12 +739,12 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "«Бег с нуля»: 9 недель от минуты бега до 30 минут без остановки",
-  "Прогулки и пробежки с GPS: дистанция, темп и схема маршрута",
-  "Нормы ВОЗ по возрасту: минуты, силовые дни и равновесие после 65",
-  "Вопрос на следующий день, если тренировка вызвала боль",
-  "План «когда и где», серия недель по плану и итоги недели",
-  "Записи дневника можно исправить или удалить, обхват талии — в дневнике веса"
+  "Проще навигация: Сегодня · Тренировки · Тело · Прогресс · Профиль",
+  "«Сегодня» — одна главная тренировка, дела на день и итоги недели",
+  "Каталог тренировок с поиском: комплексы, программы, кардио, челленджи",
+  "35 новых упражнений: равновесие, осанка, эспандер, пресс и кардио без прыжков",
+  "Новые комплексы и челленджи «Осанка за 30 дней» и «30 дней равновесия»",
+  "Детальнее фигуры в схемах — с подсветкой работающих мышц; рельефнее 3D-модель"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -693,32 +755,6 @@ function whatsNewCard() {
     h("div", { class: "btn-row" }, h("button", { class: "btn small ghost", type: "button", text: "Понятно", onClick: () => { state.settings.seenVersion = VERSION; persist(); refresh(); } })));
 }
 
-// Утренняя зарядка: каждый день новый набор, без инвентаря и отдыха
-function morningCard() {
-  const d = E.dayKey();
-  const done = state.sessions.some(x => x.d === d && x.goal === "morning");
-  const hr = new Date().getHours();
-  if (!done && (hr < 4 || hr >= 14)) return null;
-  const s = E.buildMorning(state, d);
-  const items = s.blocked ? [] : s.blocks.flatMap(b => b.items);
-  if (!items.length) return null;
-  const head = h("p", { class: "eyebrow", text: "Утренняя зарядка" });
-  if (done) {
-    return h("section", { class: "card glass" },
-      h("div", { class: "card-head" }, h("div", {}, head, h("h2", { text: "Сделана — бодрого дня! ☀️" })), h("span", { class: "pill", text: "✓" })));
-  }
-  const start = () => startPlayer(s);
-  return h("section", { class: "card glass" },
-    head,
-    h("h2", { text: `${s.est} ${E.plural(s.est, "минута", "минуты", "минут")}, чтобы проснуться` }),
-    h("p", { class: "muted small", text: `${items.length} ${E.plural(items.length, "упражнение", "упражнения", "упражнений")} без инвентаря и без пауз. Каждый день — новый набор.` }),
-    h("div", { class: "btn-row" },
-      h("button", { class: "btn primary", type: "button", onClick: start }, icon("play", 18), "Начать зарядку"),
-      h("button", {
-        class: "btn ghost", type: "button", text: "Состав",
-        onClick: () => sessionSheet(s, { title: s.title, info: roundsInfo(s), actions: close => [h("button", { class: "btn primary", type: "button", onClick: () => { close(); start(); } }, icon("play", 18), "Начать")] })
-      })));
-}
 
 // Напоминание о резервной копии: данные живут только на устройстве
 function saveBackup() {
@@ -748,46 +784,16 @@ function requestPersistence() {
   } catch (e) { /* не поддерживается */ }
 }
 
-function waterCard() {
-  const goal = 8;
-  let count = state.water.d === E.dayKey() ? state.water.n : 0;
-  const label = h("p", { class: "muted small", style: { marginTop: "10px" } });
-  const btns = [];
-  const update = () => {
-    btns.forEach((b, i) => b.setAttribute("aria-pressed", i < count ? "true" : "false"));
-    label.textContent = count >= goal ? "8 стаканов — водный баланс в норме!" : `Выпито ${count} из ${goal} стаканов · ${(count * 0.25).toLocaleString("ru-RU")} л`;
-  };
-  for (let i = 0; i < goal; i++) {
-    const b = h("button", { class: "glass-btn", type: "button", "aria-label": `Стакан ${i + 1}` });
-    b.addEventListener("click", () => {
-      const before = count;
-      count = count === i + 1 ? i : i + 1;
-      state.water = { d: E.dayKey(), n: count };
-      update();
-      if (count >= goal && before < goal) {
-        const nb = E.newBadges(state);
-        confetti();
-        toast(nb.length ? badgeToast(nb) : "Водный баланс — в норме!");
-      }
-      persist();
-    });
-    btns.push(b);
-  }
-  update();
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Вода" }),
-    h("h2", { text: "Стаканы на сегодня" }),
-    h("div", { class: "glasses", role: "group", "aria-label": "Стаканы воды по 250 мл" }, btns),
-    label);
-}
 
-// ===== Тренировка =====
-const WORKOUT_TABS = [["", "План"], ["ready", "Готовые"], ["programs", "Программы"], ["mine", "Мои"]];
+// ===== Тренировки =====
+// Три раздела: «План» на сегодня, «Каталог» всего, что можно сделать, и «Мои» тренировки
+const WORKOUT_TABS = [["", "План"], ["catalog", "Каталог"], ["mine", "Мои"]];
 function workoutTabs(active) {
   return h("nav", { class: "seg sub-tabs", "aria-label": "Разделы тренировок" },
     WORKOUT_TABS.map(([id, label]) => h("a", { class: "chip", href: id ? `#workout/${id}` : "#workout", "aria-current": id === active ? "page" : null }, label)));
 }
-const fmtKg = kg => (kg === null || kg === undefined ? "— кг" : `${String(kg).replace(".", ",")} кг`);
+// Неразрывный пробел: «21,3 кг» не разрывается между строками
+const fmtKg = kg => (kg === null || kg === undefined ? "—\u00a0кг" : `${String(kg).replace(".", ",")}\u00a0кг`);
 const lastKg = id => (state.weights[id] ? state.weights[id].kg : null);
 // Доза для списка: подходы, повторы и рабочий вес, если он записан
 function doseLine(it, sets) {
@@ -805,13 +811,120 @@ function exRows(items, sets = 1, start = 0) {
   });
 }
 
+// Категории каталога: каждая — отдельная страница
+const CATALOG = [
+  ["ready", "bolt", "Готовые тренировки", () => `${QUICK.length} комплексов на 4–15 минут`],
+  ["programs", "flag", "Программы", () => "Восстановление и сила по шагам"],
+  ["cardio", "today", "Бег и прогулки", () => "Бег с нуля, GPS, интервалы"],
+  ["challenges", "trophy", "Челленджи", () => "30 дней: планка, осанка, равновесие и др."],
+  ["stretch", "leaf", "Йога и растяжка", () => "Гибкость, спина, перед сном"],
+  ["weights", "workout", "С весами", () => "Гантели, гиря, штанга"],
+  ["tools", "timer", "Таймеры и рекорды", () => "Интервалы, дыхание, статика"],
+  ["library", "book", "Все упражнения", () => `${EXERCISES.length} со схемами движений`]
+];
+const CATALOG_PAGES = {
+  ready: ["Готовые тренировки", () => readyWorkouts()],
+  programs: ["Программы", () => programsSection()],
+  cardio: ["Бег и прогулки", () => cardioSection()],
+  challenges: ["Челленджи на 30 дней", () => challengesSection()],
+  stretch: ["Йога и растяжка", () => stretchSection()],
+  weights: ["С весами", () => weightsSection()],
+  tools: ["Таймеры и рекорды", () => toolsSection()]
+};
 function viewWorkout(sub) {
-  const tab = WORKOUT_TABS.some(([id]) => id === sub) ? sub : "";
-  const head = [h("h1", { class: "page-title", text: "Тренировка" }), workoutTabs(tab)];
-  if (tab === "ready") return [...head, ...readyWorkouts()];
-  if (tab === "programs") return [...head, ...programsSection()];
+  if (own(CATALOG_PAGES, sub)) {
+    const [title, fn] = CATALOG_PAGES[sub];
+    return [h("a", { class: "back-link", href: "#workout/catalog" }, icon("back", 18), "Каталог"), h("h1", { class: "page-title", text: title }), ...fn()];
+  }
+  const tab = sub === "catalog" || sub === "mine" ? sub : "";
+  const head = [h("h1", { class: "page-title", text: "Тренировки" }), workoutTabs(tab)];
+  if (tab === "catalog") return [...head, ...catalogView()];
   if (tab === "mine") return [...head, ...myWorkouts()];
   return [...head, ...planView()];
+}
+const catalogFilter = { q: "" };
+function catalogView() {
+  const results = h("div", { class: "list search-results", "aria-live": "polite" });
+  const fill = () => {
+    const q = catalogFilter.q.trim().toLowerCase();
+    results.hidden = q.length < 2;
+    if (q.length < 2) { results.replaceChildren(); return; }
+    const quick = QUICK.filter(x => `${x.name} ${x.desc}`.toLowerCase().includes(q)).slice(0, 5);
+    const progs = PROGRAMS.filter(x => `${x.name} ${x.desc}`.toLowerCase().includes(q)).slice(0, 4);
+    const chals = CHALLENGES.filter(x => `${x.name} ${x.desc}`.toLowerCase().includes(q)).slice(0, 3);
+    const exs = EXERCISES.filter(x => x.name.toLowerCase().includes(q)).slice(0, 12);
+    const rowOf = (ic, title, sub, onClick, href) => {
+      const inner = [h("span", { class: "fi" }, icon(ic, 18)), h("span", { class: "row-text" }, h("b", { text: title }), h("span", { class: "muted small", text: sub })), icon("chevron", 16)];
+      return href ? h("a", { class: "row", href }, inner) : h("button", { class: "row row-btn", type: "button", onClick }, inner);
+    };
+    const rows = [
+      ...quick.map(x => rowOf("bolt", x.name, `Тренировка · ${x.desc}`, () => quickSheet(x.id))),
+      ...progs.map(x => rowOf("flag", x.name, `Программа · ${x.days} ${E.plural(x.days, "занятие", "занятия", "занятий")}`, null, `#program/${x.id}`)),
+      ...chals.map(x => rowOf("trophy", x.name, "Челлендж на 30 дней", null, `#challenge/${x.id}`)),
+      ...exs.map(x => rowOf("info", x.name, `Упражнение · ${GROUPS[x.group]}`, () => exerciseSheet(x.id)))
+    ];
+    results.replaceChildren(...(rows.length ? rows : [h("p", { class: "muted", text: "Ничего не нашлось" })]));
+  };
+  const search = h("input", { class: "input", type: "search", placeholder: "Найти упражнение или тренировку", "aria-label": "Поиск по каталогу", maxlength: 60 });
+  search.value = catalogFilter.q;
+  search.addEventListener("input", () => { catalogFilter.q = search.value; fill(); });
+  fill();
+  return [
+    h("div", { class: "catalog-search" }, search),
+    results,
+    h("div", { class: "tiles" }, CATALOG.map(([id, ic, title, desc]) => h("a", { class: "tile glass", href: id === "library" ? "#more/library" : `#workout/${id}` },
+      h("span", { class: "fi" }, icon(ic, 20)), h("b", { text: title }), h("span", { class: "muted small", text: desc() }))))
+  ];
+}
+function cardioSection() {
+  const walk = CHALLENGES.find(c => c.id === "walk30");
+  return [
+    h("p", { class: "lead", text: "Выносливость, сердце и настроение: от прогулки до 30 минут бега без остановки." }),
+    h("div", { class: "quick" },
+      runCard(),
+      h("a", { class: "quick-item glass", href: "#more/gps" },
+        h("span", { class: "fi" }, icon("today", 20)),
+        h("span", { class: "row-text" }, h("b", { text: "Прогулка или пробежка с GPS" }), h("span", { class: "muted small", text: "Дистанция, время и темп — координаты не сохраняются" })),
+        icon("chevron", 18)),
+      challengeCard(walk),
+      ...["quietCardio", "hiit"].map(id => QUICK.find(q => q.id === id)).filter(Boolean).map(quickCard),
+      h("a", { class: "quick-item glass", href: "#more/timer" },
+        h("span", { class: "fi" }, icon("timer", 20)),
+        h("span", { class: "row-text" }, h("b", { text: "Интервальный таймер" }), h("span", { class: "muted small", text: "Свои интервалы работы и отдыха" })),
+        icon("chevron", 18)))
+  ];
+}
+function challengesSection() {
+  return [
+    h("p", { class: "lead", text: "Каждый день немного больше. Один день челленджа — один календарный день, отдых тоже засчитывается." }),
+    h("div", { class: "quick" }, CHALLENGES.map(challengeCard))
+  ];
+}
+function stretchSection() {
+  const ids = ["yoga", "stretchAll", "evening", "posture", "back", "desk", "snack"];
+  return [
+    h("p", { class: "lead", text: "Мягкие тренировки для гибкости, спины и хорошего сна." }),
+    h("div", { class: "quick" }, ids.map(id => QUICK.find(q => q.id === id)).filter(Boolean).map(quickCard), challengeCard(CHALLENGES.find(c => c.id === "stretch30")))
+  ];
+}
+function weightsSection() {
+  return [
+    h("p", { class: "lead", text: "Гантели, гиря или штанга. Отметьте свой инвентарь в профиле — тогда упражнения не придётся заменять." }),
+    h("h2", { class: "section-title", text: "Тренировки" }),
+    h("div", { class: "quick" }, QUICK.filter(q => q.cat === "weights").map(quickCard)),
+    h("h2", { class: "section-title", text: "Силовые программы" }),
+    h("div", { class: "quick" }, PROGRAMS.filter(p => p.kind === "strength").map(programCard)),
+    h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#journal/strength", text: "Мои рабочие веса и рекорды →" }))
+  ];
+}
+function toolsSection() {
+  const item = (href, ic, title, desc) => h("a", { class: "quick-item glass", href },
+    h("span", { class: "fi" }, icon(ic, 20)), h("span", { class: "row-text" }, h("b", { text: title }), h("span", { class: "muted small", text: desc })), icon("chevron", 18));
+  return [h("div", { class: "quick" },
+    item("#more/timer", "timer", "Интервальный таймер", "Работа и отдых по кругу, готовые режимы"),
+    item("#more/breath", "wind", "Дыхание", "Спокойствие за пару минут"),
+    item("#more/records", "trophy", "Рекорды статики", "Планка, «стульчик», мостик — на время"),
+    item("#builder", "puzzle", "Конструктор тренировки", "Своя тренировка из любых упражнений"))];
 }
 
 function planView() {
@@ -882,25 +995,33 @@ function quickCard(q) {
       missing.length ? h("span", { class: "need", text: `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` }) : null),
     icon("chevron", 18));
 }
+// Готовые тренировки по смысловым группам: короткие списки легче просматривать, чем один длинный
+const READY_GROUPS = [
+  ["Быстро, в течение дня", ["snack", "desk", "posture", "morning"]],
+  ["Сила и кардио дома", ["noEquip", "coreSafe", "quietCardio", "hiit", "bandBody"]],
+  ["Суставы, спина и равновесие", ["joints", "knees", "ankles", "shoulders", "back", "balance", "balance2", "seated"]],
+  ["Растяжка и расслабление", ["yoga", "stretchAll", "evening"]]
+];
+// Строка списка: компактнее карточки, длинный каталог читается как «Настройки» в iPhone
+function quickRow(q) {
+  const missing = (q.equip || []).filter(e => !state.profile.equipment.includes(e));
+  return h("button", { class: "row row-btn lg-row", type: "button", onClick: () => quickSheet(q.id) },
+    h("span", { class: "fi" }, icon(q.cat === "weights" ? "workout" : "bolt", 18)),
+    h("span", { class: "row-text" },
+      h("b", { text: q.name }),
+      h("span", { class: "muted small", text: q.desc }),
+      missing.length ? h("span", { class: "need", text: `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` }) : null),
+    icon("chevron", 16));
+}
 function readyWorkouts() {
+  const listed = new Set(READY_GROUPS.flatMap(g => g[1]));
+  const rest = QUICK.filter(q => q.cat !== "weights" && !listed.has(q.id));
+  const group = (title, list) => list.length ? [h("h2", { class: "group-title", text: title }), h("section", { class: "card glass list-group" }, h("div", { class: "list" }, list.map(quickRow)))] : [];
   return [
     h("p", { class: "lead", text: "Комплексы на любой случай. Неподходящие вам упражнения тренер заменит безопасными." }),
-    h("h2", { class: "section-title", text: "Без инвентаря и с лёгким" }),
-    h("div", { class: "quick" }, QUICK.filter(q => q.cat !== "weights").map(quickCard)),
-    h("h2", { class: "section-title", text: "С весами" }),
-    h("p", { class: "muted small", style: { margin: "-4px 0 12px" }, text: "Гантели, гиря или штанга. Отметьте свой инвентарь в профиле — тогда упражнения не придётся заменять." }),
-    h("div", { class: "quick" }, QUICK.filter(q => q.cat === "weights").map(quickCard)),
-    h("h2", { class: "section-title", text: "Испытай себя" }),
-    h("div", { class: "quick" },
-      h("a", { class: "quick-item glass", href: "#more/records" },
-        h("span", { class: "fi" }, icon("trophy", 20)),
-        h("span", { class: "row-text" }, h("b", { text: "Рекорды статики" }), h("span", { class: "muted small", text: "Сколько продержитесь в планке или «стульчике»?" })),
-        icon("chevron", 18)),
-      h("a", { class: "quick-item glass", href: "#more/weights" },
-        h("span", { class: "fi" }, icon("chart", 20)),
-        h("span", { class: "row-text" }, h("b", { text: "Рабочие веса" }), h("span", { class: "muted small", text: "Как растут ваши веса по упражнениям" })),
-        icon("chevron", 18))),
-    h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#more/library", text: `Библиотека: ${EXERCISES.length} ${E.plural(EXERCISES.length, "упражнение", "упражнения", "упражнений")} →` }))
+    ...READY_GROUPS.flatMap(([title, ids]) => group(title, ids.map(id => QUICK.find(q => q.id === id)).filter(Boolean))),
+    ...group("Другие", rest),
+    ...group("С весами", QUICK.filter(q => q.cat === "weights"))
   ];
 }
 
@@ -1238,20 +1359,41 @@ function recoveryCard() {
     })));
 }
 
-function viewBody() {
+// Тело: три раздела вместо одной длинной страницы — модель, здоровье и справочник
+const BODY_TABS = [["", "Модель"], ["health", "Здоровье"], ["guide", "Справочник"]];
+function bodyTabs(active) {
+  return h("nav", { class: "seg sub-tabs", "aria-label": "Разделы «Тело»" },
+    BODY_TABS.map(([id, label]) => h("a", { class: "chip", href: id === "guide" ? "#guide" : id ? `#body/${id}` : "#body", "aria-current": id === active ? "page" : null }, label)));
+}
+function viewBody(sub) {
   const r = E.restrictions(state);
-  const caution = state.profile.conditions.includes("caution");
-  const cautionNote = CONDITIONS.find(c => c.id === "caution").notes[0];
-  const notes = [...new Set(r.notes)];
+  if (sub === "health") return [h("h1", { class: "page-title", text: "Тело" }), bodyTabs("health"), ...bodyHealth(r)];
   return [
     h("h1", { class: "page-title", text: "Тело" }),
-    h("p", { class: "lead", text: "Коснитесь зоны на модели или обведите место, которое болит, — тренер уберёт опасные упражнения и подскажет, что делать. Данные остаются на этом устройстве." }),
+    bodyTabs(""),
+    h("p", { class: "lead", text: "Коснитесь зоны или обведите место, которое болит, — тренер уберёт опасные упражнения и подскажет, что делать." }),
     h("section", { class: "card glass stage-card" }, bodyStage()),
     recoveryCard(),
     marksCard(),
+    regionsCard(r)
+  ];
+}
+function bodyHealth(r) {
+  const caution = state.profile.conditions.includes("caution");
+  const cautionNote = CONDITIONS.find(c => c.id === "caution").notes[0];
+  const notes = [...new Set(r.notes)];
+  const pains = state.sessions.slice().reverse().flatMap(x => x.pains.map(p => ({ d: x.d, ex: p.ex, region: p.region }))).slice(0, 8);
+  return [
+    h("p", { class: "lead", text: "Дневник боли, особенности здоровья и всё, что стоит показать врачу. Данные остаются на этом устройстве." }),
     painCard(),
-    regionsCard(r),
-    guideCard(),
+    pains.length ? h("section", { class: "card glass" },
+      h("h2", { text: "Боль во время тренировок" }),
+      h("div", { class: "list" }, pains.map(p => h("div", { class: "row" },
+        h("span", { class: "row-text" }, h("b", { text: REGION[p.region].name }), h("span", { class: "muted small", text: `${fmtDate(p.d)} · ${own(EX, p.ex) ? EX[p.ex].name : "упражнение"}` }))))),
+      h("p", { class: "muted small", text: "Если одна и та же зона болит снова и снова — покажитесь врачу или реабилитологу." })) : null,
+    h("section", { class: "card glass" },
+      h("div", { class: "card-head" }, h("div", {}, h("h2", { text: "Отчёт для врача" }), h("p", { class: "muted small", text: "Зоны, дневник боли и нагрузка на одной странице — распечатайте или сохраните в PDF." })),
+        h("a", { class: "btn small ghost", href: "#report" }, icon("print", 16), "Открыть"))),
     h("section", { class: "card glass" },
       h("h2", { text: "Особенности здоровья" }),
       h("p", { class: "muted small", text: "Выберите всё, что к вам относится, — уберём неподходящие типы нагрузки." }),
@@ -1271,21 +1413,20 @@ function viewBody() {
             if (ok) { state.profile.conditions = state.profile.conditions.filter(c => c !== "caution"); persist(); refresh(); }
           }
         })) : null,
-      notes.length ? h("ul", { class: "adapt", style: { marginTop: "14px" } }, notes.map(n => h("li", { class: "note", text: n }))) : null),
-    h("section", { class: "card glass" },
-      h("h2", { text: "Возраст" }),
-      choice({ label: "Возраст", value: state.profile.ageGroup, options: AGE_GROUPS.map(a => ({ value: a.id, label: a.name })), onChange: v => { state.profile.ageGroup = v; persist(); refresh(); } })),
+      notes.length ? h("ul", { class: "adapt", style: { marginTop: "14px" } }, notes.map(n => h("li", { class: "note", text: n }))) : null,
+      h("div", { class: "q" }, h("b", { text: "Возраст" }),
+        choice({ label: "Возраст", value: state.profile.ageGroup, options: AGE_GROUPS.map(a => ({ value: a.id, label: a.name })), onChange: v => { state.profile.ageGroup = v; persist(); refresh(); } }))),
     h("section", { class: "card glass alert" },
       h("h2", { text: "Когда сразу остановиться" }),
       h("ul", { class: "bullets" }, RED_FLAGS.map(t => h("li", { text: t }))),
       h("p", {}, h("b", { text: "Боль в груди, обморок, сильная одышка — звоните 112." }))),
-    h("section", { class: "card glass" },
-      h("h2", { text: "Как работает тренер" }),
+    h("details", { class: "card glass details-card" },
+      h("summary", { text: "Как тренер учитывает боль" }),
       h("ul", { class: "bullets" },
         h("li", { text: "«Дискомфорт» убирает упражнения с заметной нагрузкой на зону, «ограничение» и «острая боль» — все упражнения, которые её нагружают." }),
         h("li", { text: "Обведённая область работает так же: тренер учитывает каждую зону внутри обводки." }),
         h("li", { text: "Особенности здоровья исключают опасные типы нагрузки: прыжки, высокую интенсивность, положения вниз головой и другие." }),
-        h("li", { text: "Кнопка «Больно» во время тренировки сразу заменяет упражнение и 7 дней бережёт эту зону." }),
+        h("li", { text: "Кнопка «Больно» во время тренировки сразу заменяет упражнение и 7 дней бережёт эту зону, а на следующий день приложение спросит, как она." }),
         h("li", { text: "Это общие правила безопасности, а не диагноз. Если что-то болит долго или сильно — покажитесь врачу." })))
   ];
 }
@@ -1493,15 +1634,6 @@ function guideLinks(regionIds, beforeGo) {
   const list = guideFor(regionIds).slice(0, 4);
   if (!list.length) return null;
   return [h("h3", { class: "sub-title", text: "Что почитать" }), h("div", { class: "list" }, list.map(a => guideRow(a, beforeGo)))];
-}
-function guideCard() {
-  const mine = guideFor(trackedRegions());
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Справочник" }),
-    h("h2", { text: "Травмы и боль: что делать" }),
-    h("p", { class: "muted small", text: `${GUIDE.length} ${E.plural(GUIDE.length, "статья", "статьи", "статей")}: первая помощь, когда идти к врачу и как вернуться к нагрузке. По открытым рекомендациям NHS, NICE и консенсусам спортивных врачей.` }),
-    mine.length ? h("div", { class: "list" }, mine.slice(0, 3).map(a => guideRow(a))) : null,
-    h("div", { class: "btn-row" }, h("a", { class: "btn primary", href: "#guide" }, icon("book", 18), "Открыть справочник")));
 }
 
 // ----- Список зон -----
@@ -2191,52 +2323,57 @@ function shareWeek() {
   }, weekShareText());
 }
 
-function viewJournal() {
+// ===== Прогресс =====
+// Обзор, сила, тело и награды — каждый раздел отвечает на свой вопрос
+const PROGRESS_TABS = [["", "Обзор"], ["strength", "Сила"], ["body", "Тело"], ["awards", "Награды"]];
+function progressTabs(active) {
+  return h("nav", { class: "seg sub-tabs", "aria-label": "Разделы прогресса" },
+    PROGRESS_TABS.map(([id, label]) => h("a", { class: "chip", href: id ? `#journal/${id}` : "#journal", "aria-current": id === active ? "page" : null }, label)));
+}
+function viewJournal(sub) {
+  const tab = PROGRESS_TABS.some(([id]) => id === sub) ? sub : "";
+  const head = [
+    h("div", { class: "card-head" },
+      h("h1", { class: "page-title", text: "Прогресс" }),
+      h("button", { class: "btn small ghost", type: "button", onClick: addActivitySheet }, icon("plus", 16), "Активность")),
+    progressTabs(tab)
+  ];
+  if (tab === "strength") return [...head, ...weightsBlocks(), recordsCard()];
+  if (tab === "body") return [...head, bodyWeightCard(), calcCard()];
+  if (tab === "awards") return [...head, badgesCard()];
+  return [...head, ...progressOverview()];
+}
+function progressOverview() {
   const days = E.minutesByDay(state, 7);
   const w = weekStats();
+  const who = E.whoWeek(state);
   const max = Math.max(30, ...days.map(x => x.mins));
   const total = state.sessions.reduce((a, x) => a + x.mins, 0);
-  const week = E.weekMinutes(state);
   const recent = state.checkins.filter(c => c.d >= E.shiftDay(E.dayKey(), -13));
-  const pains = state.sessions.slice().reverse().flatMap(x => x.pains.map(p => ({ d: x.d, ex: p.ex, region: p.region }))).slice(0, 8);
   const hist = state.sessions.slice(-40).reverse();
   return [
-    h("div", { class: "card-head" },
-      h("h1", { class: "page-title", text: "Дневник" }),
-      h("button", { class: "btn small primary", type: "button", onClick: addActivitySheet, text: "+ Активность" })),
-    h("p", { class: "lead", text: "Тренировки, прогулки, самочувствие и награды." }),
     h("section", { class: "card glass" }, h("div", { class: "stats" },
       stat(state.sessions.length, E.plural(state.sessions.length, "занятие", "занятия", "занятий")),
       stat(total, E.plural(total, "минута всего", "минуты всего", "минут всего")),
-      stat(E.streak(state), E.plural(E.streak(state), "день подряд", "дня подряд", "дней подряд")))),
+      stat(E.weekStreak(state), E.plural(E.weekStreak(state), "неделя по плану", "недели по плану", "недель по плану")))),
     h("section", { class: "card glass" },
       h("div", { class: "card-head" },
         h("h2", { text: "Последние 7 дней" }),
         h("button", { class: "btn small ghost", type: "button", onClick: shareWeek }, icon("share", 16), "Поделиться")),
-      h("p", { class: "muted small", text: `${week} мин из 150 рекомендованных ВОЗ · ${w.workouts} ${E.plural(w.workouts, "тренировка", "тренировки", "тренировок")}${w.avg !== null ? ` · средняя готовность ${w.avg}` : ""}` }),
+      h("p", { class: "muted small", text: `${who.done} из ${who.mins} мин по норме ВОЗ · силовых дней: ${who.strengthDays} из ${who.strength}${who.balance ? ` · равновесие: ${who.balanceDays} из ${who.balance}` : ""}${w.avg !== null ? ` · средняя готовность ${w.avg}` : ""}` }),
       h("div", { class: "bars", role: "img", "aria-label": days.map(x => `${fmtDate(x.d, { weekday: "short" })}: ${x.mins} мин`).join(", ") },
         days.map(x => h("div", { class: `bar${x.mins ? "" : " zero"}` },
           x.mins ? h("small", { text: String(x.mins) }) : null,
           h("i", { style: { height: `${Math.max(4, Math.round((x.mins / max) * 96))}px` } }),
-          h("span", { text: fmtDate(x.d, { weekday: "short" }) }))))),
+          h("span", { text: fmtDate(x.d, { weekday: "short" }) })))),
+      h("p", { class: "muted small", text: who.teen
+        ? "Подросткам ВОЗ советует в среднем 60 минут движения в день, а силовые и интенсивные занятия — 3 дня в неделю."
+        : "ВОЗ советует 150–300 минут умеренной активности в неделю (интенсивная минута идёт за две) и силовые не реже 2 дней." })),
     calendarCard(),
     recent.length >= 2 ? h("section", { class: "card glass" },
       h("h2", { text: "Готовность за 2 недели" }),
       h("p", { class: "muted small", text: "По отметкам самочувствия: чем выше, тем лучше сон, энергия и восстановление." }),
       sparkline(recent)) : null,
-    bodyWeightCard(),
-    painCard(),
-    pains.length ? h("section", { class: "card glass" },
-      h("h2", { text: "Сигналы боли" }),
-      h("div", { class: "list" }, pains.map(p => h("div", { class: "row" },
-        h("span", { class: "row-text" }, h("b", { text: REGION[p.region].name }), h("span", { class: "muted small", text: `${fmtDate(p.d)} · ${EX[p.ex].name}` }))))),
-      h("p", { class: "muted small", text: "Если одна и та же зона болит снова и снова — покажитесь врачу или реабилитологу." })) : null,
-    h("section", { class: "card glass" },
-      h("h2", { text: "Награды" }),
-      h("div", { class: "badges" }, BADGES.map(b => h("div", { class: `badge${state.badges[b.id] ? "" : " locked"}` },
-        h("span", { class: "b-icon", "aria-hidden": "true", text: b.icon }),
-        h("b", { text: b.name }),
-        h("span", { text: state.badges[b.id] ? fmtDate(state.badges[b.id]) : b.desc }))))),
     h("section", { class: "card glass" },
       h("h2", { text: "История" }),
       hist.length ? h("div", { class: "list" }, hist.map(x => h("button", { class: "row row-btn", type: "button", onClick: () => historySheet(x.id) },
@@ -2249,41 +2386,82 @@ function viewJournal() {
       hist.length ? h("p", { class: "muted small", text: "Нажмите на запись, чтобы исправить или удалить её." }) : null)
   ];
 }
+function badgesCard() {
+  const got = BADGES.filter(b => state.badges[b.id]).length;
+  return h("section", { class: "card glass" },
+    h("div", { class: "card-head" }, h("h2", { text: "Награды" }), h("span", { class: "pill", text: `${got} из ${BADGES.length}` })),
+    h("div", { class: "badges" }, BADGES.map(b => h("div", { class: `badge${state.badges[b.id] ? "" : " locked"}` },
+      h("span", { class: "b-icon", "aria-hidden": "true", text: b.icon }),
+      h("b", { text: b.name }),
+      h("span", { text: state.badges[b.id] ? fmtDate(state.badges[b.id]) : b.desc })))));
+}
+function recordsCard() {
+  const recs = Object.entries(state.records || {}).filter(([id]) => own(EX, id));
+  return h("section", { class: "card glass" },
+    h("div", { class: "card-head" }, h("h2", { text: "Рекорды статики" }), h("a", { class: "btn small ghost", href: "#more/records" }, icon("timer", 16), "Замерить")),
+    recs.length
+      ? h("div", { class: "list" }, recs.map(([id, rec]) => h("div", { class: "row" },
+        h("span", { class: "row-text" }, h("b", { text: EX[id].name }), h("span", { class: "muted small", text: `${fmtDate(rec.d)} · попыток: ${rec.tries}` })),
+        h("b", { class: "rec-time", text: mmss(rec.best) }))))
+      : h("p", { class: "muted small", text: "Сколько продержитесь в планке или «стульчике»? Засеките время — рекорды появятся здесь." }));
+}
+function calcCard() {
+  const p = state.profile;
+  const lw = state.bodyWeight[state.bodyWeight.length - 1];
+  const bmi = p.height && lw ? lw[1] / (p.height / 100) ** 2 : 0;
+  return h("section", { class: "card glass" },
+    h("div", { class: "card-head" },
+      h("div", {}, h("h2", { text: "Калькуляторы" }), h("p", { class: "muted small", text: bmi ? `ИМТ ${bmi.toFixed(1).replace(".", ",")} · калории, белок, пульсовые зоны, 1ПМ` : "ИМТ, талия, калории, белок и вода, пульсовые зоны, 1ПМ" })),
+      h("a", { class: "btn small ghost", href: "#more/calc" }, icon("calc", 16), "Открыть")));
+}
 
-// ===== Ещё =====
-const MORE = [
-  ["guide", "aid", "Справочник травм", `${GUIDE.length} ${E.plural(GUIDE.length, "статья", "статьи", "статей")}: что делать при травмах`, "#guide"],
-  ["library", "book", "Упражнения", `${EXERCISES.length} ${E.plural(EXERCISES.length, "упражнение", "упражнения", "упражнений")} с подсказками`],
-  ["records", "trophy", "Рекорды статики", "Планка, «стульчик», мостик"],
-  ["weights", "chart", "Рабочие веса", "Подходы, рекорды и прогресс"],
-  ["challenges", "flag", "Челленджи", "30 дней приседаний, планки, ходьбы", "#workout/programs"],
-  ["report", "print", "Отчёт для врача", "Боль и нагрузка на одной странице", "#report"],
-  ["calc", "calc", "Калькуляторы", "ИМТ, талия, калории, пульс, 1ПМ"],
-  ["run", "bolt", "Бег с нуля", "9 недель до 30 минут бега", "#run"],
-  ["gps", "today", "Прогулка с GPS", "Дистанция, время и темп"],
-  ["builder", "puzzle", "Конструктор", "Своя тренировка из любых упражнений", "#workout/mine"],
-  ["timer", "timer", "Интервальный таймер", "Работа и отдых по кругу"],
-  ["breath", "wind", "Дыхание", "Спокойствие за пару минут"],
-  ["calendar", "calendar", "Напоминания", "Тренировки в календаре телефона"],
-  ["profile", "user", "Профиль и цели", "Цель, уровень, инвентарь"],
-  ["settings", "sliders", "Настройки", "Тема, звук, голос, стекло"],
-  ["data", "shield", "Данные и защита", "Пароль, копия, удаление"],
-  ["install", "phone", "Установить", "Иконка на главном экране"],
-  ["about", "doc", "О приложении", "Правила и безопасность"]
-];
+// ===== Профиль =====
+// Сгруппированные списки, как в настройках iOS: тренировки, здоровье, приложение
 const SUB = { library: subLibrary, records: subRecords, weights: subWeights, calc: subCalc, gps: subGps, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
-
+// Куда ведёт «Назад» и какая вкладка подсвечена у страниц, которые живут по старым адресам
+const MORE_BACK = {
+  library: ["#workout/catalog", "Каталог", "workout"], records: ["#workout/tools", "Таймеры и рекорды", "workout"],
+  timer: ["#workout/tools", "Таймеры и рекорды", "workout"], breath: ["#workout/tools", "Таймеры и рекорды", "workout"],
+  gps: ["#workout/cardio", "Бег и прогулки", "workout"], weights: ["#journal/strength", "Прогресс", "journal"], calc: ["#journal/body", "Прогресс", "journal"]
+};
+const tabOf = (name, sub) => (name === "more" && own(MORE_BACK, sub) ? MORE_BACK[sub][2] : TAB_OF[name] || name);
 function viewMore(sub) {
-  if (sub && own(SUB, sub)) return [h("a", { class: "back-link", href: "#more" }, icon("back", 18), "Ещё"), ...SUB[sub]()];
+  if (sub && own(SUB, sub)) {
+    const [href, label] = MORE_BACK[sub] || ["#more", "Профиль"];
+    return [h("a", { class: "back-link", href }, icon("back", 18), label), ...SUB[sub]()];
+  }
+  const p = state.profile;
+  const goal = GOALS.find(g => g.id === p.goal);
+  const level = LEVELS[p.level - 1];
+  const row = (href, ic, title, desc) => h("a", { class: "row lg-row", href },
+    h("span", { class: "fi" }, icon(ic, 18)), h("span", { class: "row-text" }, h("b", { text: title }), desc ? h("span", { class: "muted small", text: desc }) : null), icon("chevron", 16));
+  const group = (title, rows) => [h("h2", { class: "group-title", text: title }), h("section", { class: "card glass list-group" }, h("div", { class: "list" }, rows))];
   return [
-    h("h1", { class: "page-title", text: "Ещё" }),
-    h("p", { class: "lead", text: "Инструменты, настройки и защита данных." }),
-    h("div", { class: "menu-grid" }, MORE.map(([id, ic, title, desc, href]) => h("a", { class: "menu-item glass", href: href || `#more/${id}` },
-      h("span", { class: "fi" }, icon(ic, 22)), h("b", { text: title }), h("span", { text: desc })))),
-    h("section", { class: "card glass invite" },
-      h("h2", { text: "Пригласить друга" }),
-      h("p", { class: "muted small", text: "Вместе тренироваться веселее. Отправьте ссылку — приложение бесплатное и работает без регистрации." }),
-      h("button", { class: "btn ghost", type: "button", onClick: inviteFriend }, icon("share", 18), "Поделиться ссылкой")),
+    h("h1", { class: "page-title", text: "Профиль" }),
+    // Вся карточка — ссылка на профиль, как строка учётной записи в «Настройках» iPhone
+    h("a", { class: "card glass profile-card", href: "#more/profile" },
+      h("span", { class: "avatar", "aria-hidden": "true", text: (p.name || "Вы").slice(0, 1).toUpperCase() }),
+      h("span", { class: "row-text" },
+        h("b", { text: p.name || "Ваш профиль" }),
+        h("span", { class: "muted small", text: `${goal ? goal.short : ""} · ${level ? level.name.toLowerCase() : ""} · ${p.days.length} ${E.plural(p.days.length, "день", "дня", "дней")} в неделю` }),
+        h("span", { class: "small accent-text", text: "Цели, уровень, инвентарь" })),
+      icon("chevron", 18)),
+    ...group("Тренировки", [
+      row("#more/calendar", "calendar", "План и напоминания", p.planTime ? planText(p) : "Когда и где тренироваться, напоминания в календаре")
+    ]),
+    ...group("Здоровье", [
+      row("#body/health", "heart", "Боль и особенности здоровья", "Дневник боли, бережный режим, возраст"),
+      row("#report", "print", "Отчёт для врача", "Боль и нагрузка на одной странице"),
+      row("#more/calc", "calc", "Калькуляторы", "ИМТ, талия, калории, пульс, 1ПМ")
+    ]),
+    ...group("Приложение", [
+      row("#more/settings", "sliders", "Настройки", "Тема, звук, голос, прозрачность"),
+      row("#more/data", "shield", "Данные и защита", "Пароль, резервная копия, таблицы"),
+      row("#more/install", "phone", "Установить на телефон", "Иконка на экране, работа без интернета"),
+      h("button", { class: "row row-btn lg-row", type: "button", onClick: inviteFriend },
+        h("span", { class: "fi" }, icon("share", 18)), h("span", { class: "row-text" }, h("b", { text: "Пригласить друга" }), h("span", { class: "muted small", text: "Бесплатно и без регистрации" })), icon("chevron", 16)),
+      row("#more/about", "doc", "О приложении", "Документы и безопасность")
+    ]),
     h("p", { class: "muted small center", style: { marginTop: "18px" } }, `Листопульс ${VERSION} · 12+ · `, h("a", { href: "../index.html", text: "сайт о здоровье" }))
   ];
 }
@@ -2474,7 +2652,11 @@ function subCalendar() {
   const time = h("input", { class: "input", type: "time", value: state.profile.planTime || "19:00" });
   const err = h("p", { class: "error", role: "alert" });
   return [
-    h("h1", { class: "page-title", text: "Напоминания" }),
+    h("h1", { class: "page-title", text: "План и напоминания" }),
+    h("section", { class: "card glass" },
+      h("h2", { text: "Мой план" }),
+      h("p", { class: "muted small", text: state.profile.planTime ? planText(state.profile) : "Когда, где и после чего вы тренируетесь. Заранее принятое решение помогает не пропускать." }),
+      h("button", { class: "btn ghost", type: "button", text: state.profile.planTime ? "Изменить план" : "Составить план", onClick: planSheet })),
     h("p", { class: "lead", text: "Сохраните расписание в календарь телефона — он сам напомнит за 10 минут. Приложению не нужны уведомления и доступ к календарю." }),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Дни тренировок" }),
@@ -3066,10 +3248,15 @@ function weightSpark(hist) {
     s("circle", { cx: last[0].toFixed(1), cy: last[1].toFixed(1), r: 2.6 }));
 }
 function subWeights() {
-  const entries = Object.entries(state.weights).filter(([id]) => own(EX, id)).sort((a, b) => (a[1].d < b[1].d ? 1 : a[1].d > b[1].d ? -1 : 0));
   return [
     h("h1", { class: "page-title", text: "Рабочие веса" }),
     h("p", { class: "lead", text: "Листопульс запоминает вес, с которым вы делали упражнения, и подсказывает его в следующий раз." }),
+    ...weightsBlocks()
+  ];
+}
+function weightsBlocks() {
+  const entries = Object.entries(state.weights).filter(([id]) => own(EX, id)).sort((a, b) => (a[1].d < b[1].d ? 1 : a[1].d > b[1].d ? -1 : 0));
+  return [
     entries.length
       ? h("section", { class: "card glass" }, h("div", { class: "list" }, entries.map(([id, w]) => {
         const first = w.hist.length ? w.hist[0][1] : w.kg;
@@ -3079,9 +3266,10 @@ function subWeights() {
           h("span", { class: "row-text" },
             h("b", { text: `${w.prD && w.prD >= E.shiftDay(E.dayKey(), -13) ? "🥇 " : ""}${EX[id].name}` }),
             h("span", { class: "muted small", text: `${fmtKg(w.kg)}${w.d ? ` · ${fmtDate(w.d)}` : ""}${last}${grow > 0 ? ` · +${grow}% с начала` : ""}` }),
-            w.e1rm ? h("span", { class: "muted small", text: `Расчётный максимум на 1 повтор ≈ ${fmtKg(w.e1rm)}${w.prD ? ` · рекорд ${fmtDate(w.prD)}` : ""}` }) : null),
-          w.hist.length > 1 ? weightSpark(w.hist) : null,
-          h("span", { class: "pill", text: `лучший ${fmtKg(w.best)}` }));
+            w.e1rm ? h("span", { class: "muted small", text: `Расчётный максимум на 1 повтор ≈ ${fmtKg(w.e1rm)}${w.prD ? ` · рекорд ${fmtDate(w.prD)}` : ""}` }) : null,
+            // График и лучший вес — под текстом: на узком экране название не ломается на три строки
+            h("span", { class: "spark-row" }, w.hist.length > 1 ? weightSpark(w.hist) : null, h("span", { class: "pill", text: `лучший ${fmtKg(w.best)}` }))),
+          icon("chevron", 16));
       })))
       : h("section", { class: "card glass" }, h("p", { class: "muted", text: "Пока пусто. В плеере у упражнений с гантелями, гирей или штангой укажите вес и число повторов — подходы сохранятся вместе с тренировкой, а тренер подскажет, когда прибавить вес." })),
     h("section", { class: "card glass" },
@@ -3128,8 +3316,9 @@ function viewGuide(sub) {
   search.addEventListener("input", () => { guideFilter.q = search.value; fill(); });
   fill();
   return [
-    h("a", { class: "back-link", href: "#body" }, icon("back", 18), "Тело"),
-    h("h1", { class: "page-title", text: "Справочник травм" }),
+    h("h1", { class: "page-title", text: "Тело" }),
+    bodyTabs("guide"),
+    h("h2", { class: "section-title", text: "Справочник травм" }),
     h("p", { class: "lead", text: "Что делать при частых травмах и боли: первая помощь, тревожные признаки, когда идти к врачу и как безопасно вернуться к нагрузке." }),
     h("section", { class: "card glass warn" },
       h("p", { class: "small" }, h("b", { text: "Это не замена врачу. " }),
@@ -3230,9 +3419,7 @@ function programsSection() {
     h("div", { class: "quick" }, PROGRAMS.filter(p => p.kind === "strength").map(programCard)),
     h("h2", { class: "section-title", text: "Выносливость" }),
     h("div", { class: "quick" }, runCard()),
-    h("h2", { class: "section-title", text: "Челленджи на 30 дней" }),
-    h("p", { class: "muted small", style: { margin: "-4px 0 12px" }, text: "Каждый день немного больше. Один день челленджа — один календарный день, отдых тоже засчитывается." }),
-    h("div", { class: "quick" }, CHALLENGES.map(challengeCard))
+    h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#workout/challenges", text: "Челленджи на 30 дней →" }))
   ];
 }
 
@@ -3252,21 +3439,6 @@ function runCard() {
       h("span", { class: "muted small", text: rs.finished ? "Пройдена 🏅" : rs.started ? `Занятие ${rs.next} из ${RUN_DAYS} · ${runPlanText(rs.session)}` : "От минуты бега до 30 минут без остановки, 3 раза в неделю" }),
       rs.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((rs.done / RUN_DAYS) * 100)}%` } })) : null),
     icon("chevron", 18));
-}
-function runTodayCard() {
-  const rs = E.runState(state);
-  if (!rs.started || rs.finished || rs.blocked) return null;
-  const today = new Date().getDay() || 7;
-  if (!rs.doneToday && !state.profile.days.includes(today)) return null;
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: "Бег с нуля" }),
-    rs.doneToday
-      ? h("div", { class: "card-head" }, h("h2", { text: `Занятие ${rs.done} сделано ✓` }), h("span", { class: "pill", text: "✓" }))
-      : [h("h2", { text: `Занятие ${rs.next}: ${runPlanText(rs.session)}` }),
-        h("p", { class: "muted small", text: `≈ ${runTotalMin(rs.session)} мин вместе с разминкой и заминкой${rs.walkOnly ? " · сейчас — быстрой ходьбой" : ""}` }),
-        h("div", { class: "btn-row" },
-          h("button", { class: "btn primary", type: "button", onClick: () => startRun(rs.next) }, icon("play", 18), "Начать"),
-          h("a", { class: "btn ghost", href: "#run", text: "Программа" }))]);
 }
 function startRun(n, repeat = false) {
   const rs = E.runState(state);
@@ -3341,7 +3513,7 @@ function challengeTarget(cs) {
   if (c.unit === "reps") return `${cs.target} ${E.plural(cs.target, "повтор", "повтора", "повторов")}${Array.isArray(c.ex) ? ` · ${EX[cs.ex].name.toLowerCase()}` : ""}`;
   if (c.unit === "sec") return `${E.fmtSec(cs.target)} в планке`;
   if (c.unit === "walk") return `прогулка ${cs.target} мин`;
-  return `${cs.items.length} ${E.plural(cs.items.length, "упражнение", "упражнения", "упражнений")} растяжки`;
+  return `${cs.items.length} ${E.plural(cs.items.length, "упражнение", "упражнения", "упражнений")} ${c.what || "растяжки"}`;
 }
 function challengeLine(cs) {
   if (cs.finished) return "Пройден! 🏆";
@@ -3358,19 +3530,6 @@ function challengeCard(c) {
       h("span", { class: "muted small", text: cs.started ? challengeLine(cs) : c.desc }),
       cs.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((cs.done / 30) * 100)}%` } })) : null),
     icon("chevron", 18));
-}
-function challengeTodayCard() {
-  const active = CHALLENGES.filter(c => own(state.challenges, c.id) && !E.challengeState(state, c.id).finished);
-  if (!active.length) return null;
-  return h("section", { class: "card glass" },
-    h("p", { class: "eyebrow", text: active.length > 1 ? "Челленджи" : "Челлендж" }),
-    h("div", { class: "list" }, active.map(c => {
-      const cs = E.challengeState(state, c.id);
-      return h("a", { class: "row", href: `#challenge/${c.id}` },
-        h("span", { class: "fi emoji", "aria-hidden": "true", text: c.icon }),
-        h("span", { class: "row-text" }, h("b", { text: c.name }), h("span", { class: "muted small", text: challengeLine(cs) })),
-        cs.doneToday ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 18));
-    })));
 }
 function viewChallenge(id) {
   const c = CHALLENGES.find(x => x.id === id);

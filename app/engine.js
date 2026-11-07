@@ -202,11 +202,15 @@ const similarity = (a, b) => Object.keys(a.load).reduce((sum, k) => sum + Math.m
 export function findReplacements(ex, r, profile, exclude = new Set(), n = 4) {
   const groups = RELATED[ex.group] || [ex.group];
   const pool = EXERCISES.filter(e => groups.includes(e.group) && e.id !== ex.id && !exclude.has(e.id) && fits(e, r, profile));
+  // Упражнение с весом своего тела меняем на такое же без снарядов, с гантелью — на упражнение с весом;
+  // упражнение на равновесие — на упражнение на равновесие
+  const bal = e => e.tags.includes("balance") === ex.tags.includes("balance");
   pool.sort((a, b) =>
     groups.indexOf(a.group) - groups.indexOf(b.group) ||
     Math.max(0, a.level - ex.level) - Math.max(0, b.level - ex.level) ||
-    similarity(ex, b) - similarity(ex, a) ||
     (b.weighted === ex.weighted) - (a.weighted === ex.weighted) ||
+    bal(b) - bal(a) ||
+    similarity(ex, b) - similarity(ex, a) ||
     (a.type !== ex.type) - (b.type !== ex.type) ||
     Math.abs(a.level - ex.level) - Math.abs(b.level - ex.level) ||
     totalLoad(a) - totalLoad(b));
