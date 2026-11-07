@@ -2,11 +2,11 @@
    Матовое и прозрачное стекло поверх мягкого цветного фона. Простая сетка, системный шрифт. */
 
 :root {
-  --bg: #f1f7f3;
-  --bg-2: #e9eff9;
-  --blob-a: rgba(34, 197, 94, .30);
-  --blob-b: rgba(56, 189, 248, .24);
-  --blob-c: rgba(250, 204, 21, .20);
+  --bg: var(--u-bg, #f1f7f3);
+  --bg-2: var(--u-bg2, #e9eff9);
+  --blob-a: var(--u-blob-a, rgba(34, 197, 94, .30));
+  --blob-b: var(--u-blob-b, rgba(56, 189, 248, .24));
+  --blob-c: var(--u-blob-c, rgba(250, 204, 21, .20));
   --glass: rgba(255, 255, 255, .56);
   --glass-strong: rgba(255, 255, 255, .86);
   --glass-clear: rgba(255, 255, 255, .34);
@@ -16,13 +16,13 @@
   --figure: rgba(16, 42, 28, .12);
   --text: #0e1a13;
   --muted: #55675c;
-  --accent: #15803d;
-  --accent-text: #166534;
-  --accent-ink: #ffffff;
-  --accent-soft: rgba(21, 128, 61, .12);
+  --accent: var(--u-accent, #15803d);
+  --accent-text: var(--u-accent-text, #166534);
+  --accent-ink: var(--u-accent-ink, #ffffff);
+  --accent-soft: var(--u-accent-soft, rgba(21, 128, 61, .12));
   --bar-glass: rgba(255, 255, 255, .82);
-  --demo-body: #52675b;
-  --demo-far: #a9bbb1;
+  --demo-body: var(--u-demo-body, #52675b);
+  --demo-far: var(--u-demo-far, #a9bbb1);
   --demo-eye: #eef6f1;
   --demo-shadow: rgba(16, 42, 28, .13);
   --warn: #b45309;
@@ -32,44 +32,65 @@
   --water: #38bdf8;
   --shadow: 0 12px 32px rgba(18, 52, 33, .10);
   --blur: 20px;
+  --veil: rgb(241 247 243 / var(--u-dim, .45));
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-head: var(--font-body);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a110e; --bg-2: #0b1120;
-    --blob-a: rgba(34, 197, 94, .20); --blob-b: rgba(56, 189, 248, .15); --blob-c: rgba(250, 204, 21, .07);
+    --bg: var(--u-bg-dk, #0a110e); --bg-2: var(--u-bg2-dk, #0b1120);
+    --blob-a: var(--u-blob-a-dk, rgba(34, 197, 94, .20)); --blob-b: var(--u-blob-b-dk, rgba(56, 189, 248, .15)); --blob-c: var(--u-blob-c-dk, rgba(250, 204, 21, .07));
     --glass: rgba(24, 33, 29, .55); --glass-strong: rgba(25, 34, 30, .90); --glass-clear: rgba(16, 23, 20, .45);
     --solid: #151d19; --edge: rgba(255, 255, 255, .09); --line: rgba(255, 255, 255, .09); --figure: rgba(255, 255, 255, .12);
-    --text: #e8f1eb; --muted: #9db1a5; --accent: #4ade80; --accent-text: #4ade80; --accent-ink: #052e14; --accent-soft: rgba(74, 222, 128, .14);
+    --text: #e8f1eb; --muted: #9db1a5; --accent: var(--u-accent-dk, #4ade80); --accent-text: var(--u-accent-text-dk, #4ade80); --accent-ink: var(--u-accent-ink-dk, #052e14); --accent-soft: var(--u-accent-soft-dk, rgba(74, 222, 128, .14));
     --warn: #fbbf24; --warn-soft: rgba(251, 191, 36, .14); --danger: #f87171; --danger-soft: rgba(248, 113, 113, .15);
     --bar-glass: rgba(16, 23, 20, .84);
-    --demo-body: #c3d6cb; --demo-far: #5f7569; --demo-eye: #18231d; --demo-shadow: rgba(0, 0, 0, .35);
+    --demo-body: var(--u-demo-body-dk, #c3d6cb); --demo-far: var(--u-demo-far-dk, #5f7569); --demo-eye: #18231d; --demo-shadow: rgba(0, 0, 0, .35);
     --shadow: 0 12px 32px rgba(0, 0, 0, .35);
+    --veil: rgb(10 17 14 / var(--u-dim, .55));
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0a110e; --bg-2: #0b1120;
-  --blob-a: rgba(34, 197, 94, .20); --blob-b: rgba(56, 189, 248, .15); --blob-c: rgba(250, 204, 21, .07);
+  --bg: var(--u-bg-dk, #0a110e); --bg-2: var(--u-bg2-dk, #0b1120);
+  --blob-a: var(--u-blob-a-dk, rgba(34, 197, 94, .20)); --blob-b: var(--u-blob-b-dk, rgba(56, 189, 248, .15)); --blob-c: var(--u-blob-c-dk, rgba(250, 204, 21, .07));
   --glass: rgba(24, 33, 29, .55); --glass-strong: rgba(25, 34, 30, .90); --glass-clear: rgba(16, 23, 20, .45);
   --solid: #151d19; --edge: rgba(255, 255, 255, .09); --line: rgba(255, 255, 255, .09); --figure: rgba(255, 255, 255, .12);
-  --text: #e8f1eb; --muted: #9db1a5; --accent: #4ade80; --accent-text: #4ade80; --accent-ink: #052e14; --accent-soft: rgba(74, 222, 128, .14);
+  --text: #e8f1eb; --muted: #9db1a5; --accent: var(--u-accent-dk, #4ade80); --accent-text: var(--u-accent-text-dk, #4ade80); --accent-ink: var(--u-accent-ink-dk, #052e14); --accent-soft: var(--u-accent-soft-dk, rgba(74, 222, 128, .14));
   --warn: #fbbf24; --warn-soft: rgba(251, 191, 36, .14); --danger: #f87171; --danger-soft: rgba(248, 113, 113, .15);
   --bar-glass: rgba(16, 23, 20, .84);
-  --demo-body: #c3d6cb; --demo-far: #5f7569; --demo-eye: #18231d; --demo-shadow: rgba(0, 0, 0, .35);
+  --demo-body: var(--u-demo-body-dk, #c3d6cb); --demo-far: var(--u-demo-far-dk, #5f7569); --demo-eye: #18231d; --demo-shadow: rgba(0, 0, 0, .35);
   --shadow: 0 12px 32px rgba(0, 0, 0, .35);
+  --veil: rgb(10 17 14 / var(--u-dim, .55));
   color-scheme: dark;
 }
 
+/* ----- Шрифты на выбор (папка fonts, лицензия OFL). Файл загружается, только когда шрифт выбран ----- */
+@font-face { font-family: "LP Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url(fonts/nunito-cyrillic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP Nunito"; font-style: normal; font-weight: 200 1000; font-display: swap; src: url(fonts/nunito-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP Rubik"; font-style: normal; font-weight: 300 900; font-display: swap; src: url(fonts/rubik-cyrillic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP Rubik"; font-style: normal; font-weight: 300 900; font-display: swap; src: url(fonts/rubik-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP JetBrains Mono"; font-style: normal; font-weight: 100 800; font-display: swap; src: url(fonts/jetbrains-mono-cyrillic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP JetBrains Mono"; font-style: normal; font-weight: 100 800; font-display: swap; src: url(fonts/jetbrains-mono-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP Caveat"; font-style: normal; font-weight: 400 700; font-display: swap; src: url(fonts/caveat-cyrillic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP Caveat"; font-style: normal; font-weight: 400 700; font-display: swap; src: url(fonts/caveat-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP Comfortaa"; font-style: normal; font-weight: 300 700; font-display: swap; src: url(fonts/comfortaa-cyrillic.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP Comfortaa"; font-style: normal; font-weight: 300 700; font-display: swap; src: url(fonts/comfortaa-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP PT Serif"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/pt-serif-cyrillic-400.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP PT Serif"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/pt-serif-latin-400.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "LP PT Serif"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/pt-serif-cyrillic-700.woff2) format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "LP PT Serif"; font-style: normal; font-weight: 700; font-display: swap; src: url(fonts/pt-serif-latin-700.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
 /* ----- База ----- */
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { font-size: var(--u-scale, 100%); -webkit-text-size-adjust: 100%; }
 html.no-scroll body { overflow: hidden; }
 body {
   margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
-  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font: 1rem/1.5 var(--font-body);
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
@@ -89,7 +110,7 @@ body::before, .player::before, .lock-screen::before {
     linear-gradient(160deg, var(--bg), var(--bg-2));
   pointer-events: none;
 }
-h1, h2, h3 { margin: 0; line-height: 1.2; letter-spacing: -.01em; }
+h1, h2, h3 { margin: 0; font-family: var(--font-head); line-height: 1.2; letter-spacing: -.01em; }
 p { margin: 0 0 .75em; }
 a { color: var(--accent-text); }
 img, svg { display: block; }
@@ -189,7 +210,8 @@ img, svg { display: block; }
 .card.alert { border-color: rgba(220, 38, 38, .35); }
 .card.alert h2 { color: var(--danger); }
 .card.warn { border-color: rgba(245, 158, 11, .4); }
-.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
+.card-head > :first-child { flex: 1 1 140px; min-width: 0; }
 .split { display: flex; align-items: center; gap: 16px; }
 .split > :last-child { flex: 1; min-width: 0; }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -247,6 +269,8 @@ img, svg { display: block; }
 
 /* ----- Выбор: чипы и сегменты ----- */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip, .btn { max-width: 100%; }
+.chip { line-height: 1.25; overflow-wrap: anywhere; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -263,8 +287,8 @@ img, svg { display: block; }
   transition: background .2s, color .2s, border-color .2s;
 }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.seg { display: grid; grid-auto-columns: 1fr; grid-auto-flow: column; gap: 4px; padding: 4px; border-radius: 18px; background: var(--line); }
-.seg .chip { justify-content: center; min-height: 40px; padding: 0 6px; border: 0; border-radius: 14px; background: transparent; font-size: .88rem; }
+.seg { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; gap: 4px; padding: 4px; border-radius: 18px; background: var(--line); }
+.seg .chip { justify-content: center; min-width: 0; min-height: 40px; padding: 4px 6px; line-height: 1.2; overflow-wrap: anywhere; border: 0; border-radius: 14px; background: transparent; font-size: .88rem; }
 .seg .chip[aria-pressed="true"] { background: var(--glass-strong); color: var(--text); box-shadow: 0 2px 8px rgba(0, 0, 0, .10); font-weight: 650; }
 .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .scale .chip { justify-content: center; padding: 0; font-size: 1.35rem; }
@@ -858,7 +882,8 @@ button.cal-cell { cursor: pointer; }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .tile { display: grid; align-content: start; gap: 6px; min-height: 128px; padding: 16px 14px; border-radius: 22px; color: var(--text); text-decoration: none; }
 .tile .fi { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--accent-soft); color: var(--accent-text); }
-.tile b { font-size: .98rem; line-height: 1.25; }
+.tile b { font-size: .98rem; line-height: 1.25; overflow-wrap: anywhere; hyphens: auto; }
+.tile .small { overflow-wrap: anywhere; hyphens: auto; }
 .tile .small { line-height: 1.35; }
 /* ----- Профиль: сгруппированные списки ----- */
 .group-title { margin: 22px 6px 8px; color: var(--muted); font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
@@ -872,6 +897,95 @@ button.cal-cell { cursor: pointer; }
 .details-card summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
 .details-card[open] summary { margin-bottom: 6px; }
 .rec-time { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+/* ----- Персонализация ----- */
+/* Своё фото на фоне: размытие и затемнение настраиваются, текст всегда на плотной подложке */
+:root.bg-photo body::before, :root.bg-photo .player::before, :root.bg-photo .lock-screen::before {
+  background: linear-gradient(var(--veil), var(--veil)), var(--u-photo) center / cover no-repeat, var(--bg);
+  filter: blur(var(--u-blur, 0px));
+}
+/* Форма углов */
+:root.r-calm :is(.card, .topbar, .tabbar, .lock-card, .player-card, .onb-actions) { border-radius: 16px; }
+:root.r-calm .sheet { border-radius: 18px 18px 0 0; }
+:root.r-calm :is(.quick-item, .tile, .menu-item, .search-results, .weight-ctl, .demo, .stage3d, .toast, .badge, .tab, .bg-tile, .preset) { border-radius: 13px; }
+:root.r-calm :is(.btn, .chip, .swap-btn, .seg, .stat, .note-box, details.more, .pain-level, .route, .ready-chip, .input, .back-link) { border-radius: 11px; }
+:root.r-calm :is(.seg .chip, .fi, .cal-cell) { border-radius: 8px; }
+:root.r-sharp :is(.card, .topbar, .tabbar, .lock-card, .player-card, .onb-actions) { border-radius: 6px; }
+:root.r-sharp .sheet { border-radius: 8px 8px 0 0; }
+:root.r-sharp :is(.quick-item, .tile, .menu-item, .search-results, .weight-ctl, .demo, .stage3d, .toast, .badge, .tab, .bg-tile, .preset) { border-radius: 5px; }
+:root.r-sharp :is(.btn, .chip, .swap-btn, .seg, .stat, .note-box, details.more, .pain-level, .route, .ready-chip, .input, .back-link) { border-radius: 4px; }
+:root.r-sharp :is(.seg .chip, .fi, .cal-cell) { border-radius: 3px; }
+/* Плотность */
+:root.d-compact .card { margin-bottom: 10px; padding: 14px; }
+:root.d-compact .row { padding: 8px 0; }
+:root.d-compact .quick { gap: 6px; }
+:root.d-compact .quick-item { padding: 10px 12px; }
+:root.d-compact :is(.lg-row, .task-row) { min-height: 48px; }
+:root.d-compact .section-title { margin: 16px 4px 8px; }
+:root.d-airy .card { margin-bottom: 18px; padding: 22px; }
+:root.d-airy .row { padding: 15px 0; }
+:root.d-airy .quick { gap: 14px; }
+:root.d-airy .quick-item { padding: 18px; }
+:root.d-airy :is(.lg-row, .task-row) { min-height: 62px; }
+/* Текст: жирнее и свободнее для удобного чтения */
+:root.bold-text body { font-weight: 500; }
+:root.bold-text :is(b, strong, h1, h2, h3, .btn, .chip, .tab, .eyebrow, .brand) { font-weight: 800; }
+:root.bold-text .muted { color: var(--text); }
+:root.read-ease body { letter-spacing: .015em; word-spacing: .08em; }
+:root.read-ease :is(p, li) { line-height: 1.7; }
+:root.head-hand :is(h1, h2, h3) { font-size-adjust: .52; letter-spacing: 0; }
+/* Нижняя панель только со значками: подписи остаются для экранного диктора */
+:root.tabs-icons .tab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:root.tabs-icons .tab { padding: 12px 2px; }
+/* Схемы движений и эффекты */
+:root.no-muscles .demo-svg .d-work { display: none; }
+:root.still *, :root.still *::before, :root.still *::after { animation: none !important; transition-duration: .01ms !important; }
+
+/* Страница «Персонализация» */
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px; }
+.swatch { position: relative; display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border: 3px solid var(--solid); border-radius: 50%; box-shadow: 0 0 0 1px var(--line); color: #fff; cursor: pointer; }
+.swatch[aria-pressed="true"], .swatch[data-on="1"] { box-shadow: 0 0 0 3px var(--text); }
+.swatch[aria-pressed="true"]::after, .swatch[data-on="1"]::after { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, .35); }
+.swatch-custom { overflow: hidden; background: conic-gradient(#ef4444, #f59e0b, #22c55e, #06b6d4, #3b82f6, #a855f7, #ec4899, #ef4444); }
+.swatch-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.bg-tiles, .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bg-tile, .preset { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; min-height: 78px; padding: 10px; border: 2px solid var(--line); border-radius: 18px; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.bg-tile b, .preset b { font-size: .85rem; line-height: 1.2; }
+.bg-tile[aria-pressed="true"], .preset[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.bg-tile .tile-label { align-self: flex-start; padding: 2px 8px; border-radius: 99px; background: var(--glass-strong); }
+.preset { justify-content: space-between; min-height: 112px; }
+.preset-dots { display: flex; gap: 5px; }
+.preset-dots i { display: block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .8); }
+.preset .sample { font-size: 1.35rem; line-height: 1; }
+.preset .small { color: var(--muted); }
+.font-row .sample { flex: none; width: 52px; font-size: 1.45rem; text-align: center; }
+.font-row[aria-pressed="true"] .row-text b { color: var(--accent-text); }
+.font-row[aria-pressed="true"]::after { content: "✓"; color: var(--accent-text); font-weight: 800; }
+.range-row { display: flex; align-items: center; gap: 12px; }
+.range-row output { flex: none; min-width: 52px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+input.range.neutral::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--accent-soft), var(--accent)); }
+input.range.neutral::-moz-range-track { background: linear-gradient(90deg, var(--accent-soft), var(--accent)); }
+.size-sample { margin: 6px 0 0; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 14px; }
+.order-row { display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.order-row:last-child { border-bottom: 0; }
+.order-row .row-text { flex: 1; }
+.order-row.is-off .row-text b { color: var(--muted); text-decoration: line-through; }
+.emoji-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 8px; margin-top: 8px; }
+.emoji-btn { height: 46px; padding: 0; border: 2px solid var(--line); border-radius: 14px; background: var(--solid); font-size: 1.4rem; cursor: pointer; }
+.emoji-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.avatar.is-emoji { background: var(--accent-soft); color: var(--text); font-size: 1.6rem; }
+.avatar.has-photo { overflow: hidden; background: var(--solid); }
+.avatar.big { width: 76px; height: 76px; font-size: 2rem; }
+.today-head { display: flex; align-items: center; gap: 12px; }
+.today-head > div { flex: 1; min-width: 0; }
+.today-head .avatar { width: 46px; height: 46px; font-size: 1.15rem; text-decoration: none; }
+.today-head .avatar.is-emoji { font-size: 1.45rem; }
+.motto-line { margin: 0 6px 16px; color: var(--accent-text); font-family: var(--font-head); font-size: 1.08rem; font-weight: 700; line-height: 1.4; }
+.code-box { margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; word-break: break-all; user-select: all; }
+.look-note { margin-top: 8px; }
+.look-demo .demo { max-width: 230px; margin: 0 auto 12px; }
 
 /* ----- Широкие экраны ----- */
 @media (min-width: 900px) {

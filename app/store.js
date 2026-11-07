@@ -8,8 +8,11 @@ import { GUIDE } from "./guide.js";
 
 const KEY = "lpapp-v1";
 const THEME_KEY = "lpapp-theme"; // тема хранится отдельно и без шифрования: нужна до ввода пароля
+const LOOK_KEY = "lpapp-look"; // оформление (цвет, шрифт, расположение) — тоже без шифрования, в нём нет личных сведений
+const MEDIA_KEY = "lpapp-media"; // фото профиля и фона: отдельно от данных, при пароле — зашифрованы
 const ITERATIONS = 600000;
-export const MAX_IMPORT_BYTES = 1000000;
+export const MAX_IMPORT_BYTES = 4000000;
+export const MEDIA_MAX = 1200000; // символов на одну картинку в виде data:-строки
 
 const REGION_IDS = REGIONS.map(r => r.id);
 const COND_IDS = CONDITIONS.map(c => c.id);
@@ -56,7 +59,8 @@ export const defaultState = () => ({
   challenges: {},
   bodyWeight: [],
   run: null,
-  settings: { sound: true, voice: false, vibrate: true, lessGlass: false, lastBackup: "", backupSnooze: "", seenVersion: "", weekSummary: "" }
+  favs: [],
+  settings: { sound: true, voice: false, vibrate: true, lessGlass: false, lastBackup: "", backupSnooze: "", seenVersion: "", weekSummary: "", motto: "" }
 });
 
 // ----- Проверка значений -----
@@ -298,10 +302,22 @@ export function sanitize(raw) {
       sound: bool(st.sound, true), voice: bool(st.voice, false),
       vibrate: bool(st.vibrate, true), lessGlass: bool(st.lessGlass, false),
       lastBackup: day(st.lastBackup), backupSnooze: day(st.backupSnooze),
-      seenVersion: str(st.seenVersion, 12), weekSummary: day(st.weekSummary)
+      seenVersion: str(st.seenVersion, 12), weekSummary: day(st.weekSummary),
+      motto: str(st.motto, 80)
     };
   }
+  // Избранные готовые тренировки
+  d.favs = ids(own(raw, "favs"), QUICK.map(q => q.id), 12);
   return d;
+}
+
+// ----- Фото профиля и фона -----
+const isImage = v => typeof v === "string" && v.length <= MEDIA_MAX && /^data:image\/(?:webp|jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(v);
+export function sanitizeMedia(raw) {
+  const out = {};
+  if (!isObj(raw)) return out;
+  for (const k of ["avatar", "bg"]) if (isImage(raw[k])) out[k] = raw[k];
+  return out;
 }
 
 // ----- Base64 для бинарных данных -----
@@ -392,35 +408,106 @@ export async function setPassword(state, password) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await deriveKey(password, salt, ITERATIONS);
   session = { key, salt, it: ITERATIONS };
-  return save(state);
+  const ok = await save(state);
+  await saveMedia(mediaCache);
+  return ok;
 }
 
 export async function removePassword(state) {
   session = null;
-  return save(state);
+  const ok = await save(state);
+  await saveMedia(mediaCache);
+  return ok;
 }
 
 // Заблокировать: ключ стирается из памяти, данные остаются зашифрованными
 export function forgetKey() {
   session = null;
+  mediaCache = {};
 }
 
 export function wipe() {
   session = null;
+  mediaCache = {};
   try {
     localStorage.removeItem(KEY);
+    localStorage.removeItem(MEDIA_KEY);
+    localStorage.removeItem(LOOK_KEY);
   } catch (e) { /* нечего удалять */ }
 }
 
+// Фото хранятся под отдельным ключом, чтобы не переписывать их при каждом сохранении данных.
+// С паролем они шифруются тем же ключом AES-GCM, без пароля — лежат как есть
+let mediaCache = {};
+export async function loadMedia() {
+  let env = null;
+  try { env = JSON.parse(localStorage.getItem(MEDIA_KEY)); } catch (e) { env = null; }
+  mediaCache = {};
+  if (!isObj(env) || env.v !== 1) return {};
+  if (env.enc === true) {
+    if (!session || typeof env.iv !== "string" || typeof env.ct !== "string" || env.salt !== b64(session.salt)) return {};
+    try {
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(env.iv) }, session.key, unb64(env.ct));
+      mediaCache = sanitizeMedia(JSON.parse(dec.decode(plain)));
+    } catch (e) {
+      mediaCache = {};
+    }
+    return { ...mediaCache };
+  }
+  if (session) return {}; // данные под паролем, а фото — нет: такие фото не показываем
+  mediaCache = sanitizeMedia(env.data);
+  return { ...mediaCache };
+}
+let mediaSaving = Promise.resolve(true);
+export function saveMedia(media) {
+  const clean = sanitizeMedia(media);
+  mediaCache = clean;
+  mediaSaving = mediaSaving.then(async () => {
+    try {
+      if (!Object.keys(clean).length) {
+        localStorage.removeItem(MEDIA_KEY);
+        return true;
+      }
+      const json = JSON.stringify(clean);
+      if (session) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, session.key, enc.encode(json));
+        localStorage.setItem(MEDIA_KEY, JSON.stringify({ v: 1, enc: true, salt: b64(session.salt), iv: b64(iv), ct: b64(ct) }));
+      } else {
+        localStorage.setItem(MEDIA_KEY, JSON.stringify({ v: 1, enc: false, data: clean }));
+      }
+      return true;
+    } catch (e) {
+      return false; // например, не хватило места в памяти браузера
+    }
+  });
+  return mediaSaving;
+}
+
 // ----- Резервная копия -----
-export function exportJSON(state) {
-  return JSON.stringify({ app: "listopuls-trainer", v: 1, exported: new Date().toISOString(), data: state }, null, 2);
+// В копию по желанию входят оформление и фото — чтобы перенести всё на новый телефон
+export function exportJSON(state, extras = {}) {
+  const out = { app: "listopuls-trainer", v: 1, exported: new Date().toISOString(), data: state };
+  if (isObj(extras.look)) out.look = extras.look;
+  const media = sanitizeMedia(extras.media);
+  if (Object.keys(media).length) out.media = media;
+  return JSON.stringify(out, null, 2);
 }
 export function importJSON(textValue) {
   if (typeof textValue !== "string" || textValue.length > MAX_IMPORT_BYTES) throw new Error("Файл слишком большой");
   const parsed = JSON.parse(textValue);
   if (!isObj(parsed) || parsed.app !== "listopuls-trainer" || parsed.v !== 1) throw new Error("Это не резервная копия Листопульса");
   return sanitize(parsed.data);
+}
+// Оформление и фото из копии: оформление проверяет модуль look.js, фото — здесь
+export function readExtras(textValue) {
+  try {
+    const parsed = JSON.parse(textValue);
+    if (!isObj(parsed) || parsed.app !== "listopuls-trainer") return { look: null, media: {} };
+    return { look: isObj(parsed.look) ? parsed.look : null, media: sanitizeMedia(parsed.media) };
+  } catch (e) {
+    return { look: null, media: {} };
+  }
 }
 
 // ----- Тема -----

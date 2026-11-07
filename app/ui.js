@@ -93,7 +93,11 @@ const ICONS = {
   swap: ["M7 4L3 8l4 4", "M3 8h14", "M17 12l4 4-4 4", "M21 16H7"],
   calc: ["M6 3h12v18H6z", "M9 7h6", "M9 12h.01", "M12 12h.01", "M15 12h.01", "M9 16h.01", "M12 16h.01", "M15 16h.01"],
   print: ["M7 8V3h10v5", "M7 17H4V8h16v9h-3", "M7 14h10v7H7z"],
-  scale: ["M4 4h16v16H4z", "M8 10a4 4 0 0 1 8 0", "M12 10l1.6-2.4"]
+  scale: ["M4 4h16v16H4z", "M8 10a4 4 0 0 1 8 0", "M12 10l1.6-2.4"],
+  palette: ["M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.9 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.3-4-7.7-9-7.7z", "M7.5 11.5h.01", "M10 7.5h.01", "M14.5 7.5h.01", "M17 11h.01"],
+  star: ["M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"],
+  image: ["M4 5h16v14H4z", "M4 16l5-5 4 4 3-3 4 4", "M15.5 9.5h.01"],
+  trash: ["M4 7h16", "M10 11v6", "M14 11v6", "M6 7l1 13h10l1-13", "M9 7V4h6v3"]
 };
 
 export function icon(name, size = 22) {
@@ -297,6 +301,9 @@ export async function keepAwake(on) {
 // ----- Конфетти -----
 export function confetti() {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  // Персонализация: праздничные эффекты выключены или «меньше анимации»
+  const cl = document.documentElement.classList;
+  if (cl.contains("no-fx") || cl.contains("still")) return;
   const canvas = h("canvas", { class: "fx-canvas", "aria-hidden": "true" });
   const ctx = canvas.getContext("2d");
   if (!ctx) return;

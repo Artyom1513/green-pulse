@@ -783,20 +783,31 @@ const viewBoxFor = top => {
 // ----- Общий цикл анимации для всех показанных фигур -----
 const active = new Set();
 let raf = 0;
+// Настройки из персонализации: скорость показа и «меньше анимации»
+const opts = { speed: 1, still: false };
+let clock = 0, lastNow = 0;
+export function setOptions({ speed, still } = {}) {
+  if (typeof speed === "number" && speed >= 0.25 && speed <= 2) opts.speed = speed;
+  if (typeof still === "boolean") opts.still = still;
+}
 function loop(now) {
   raf = 0;
+  // Своё время анимации: скорость меняется плавно, без рывка фигуры
+  clock += (lastNow ? Math.min(now - lastNow, 100) : 0) * opts.speed;
+  lastNow = now;
   for (const d of active) {
     if (!d.svg.isConnected) {
       if (d.seen || now - d.born > 4000) active.delete(d);
       continue;
     }
     d.seen = true;
-    d.update(now / 1000);
+    d.update(clock / 1000);
   }
   if (active.size) raf = requestAnimationFrame(loop);
+  else lastNow = 0;
 }
 
-const reduced = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+const reduced = () => { if (opts.still) return true; try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
 // Демонстрация техники: SVG-фигура, которая повторяет движение упражнения
 export function exerciseDemo(id, { label } = {}) {

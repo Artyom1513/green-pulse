@@ -8,8 +8,9 @@ import {
 } from "./data.js";
 import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
+import * as L from "./look.js";
 
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -19,6 +20,10 @@ const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b
 
 let state = null;
 let started = false;
+// Оформление хранится отдельно от данных и применяется ещё до ввода пароля; фото — только после
+let look = L.loadLook();
+let media = {};
+const mediaUrls = { avatar: "", bg: "" };
 let lastRoute = "";
 let installPrompt = null;
 let player = null;
@@ -41,7 +46,11 @@ let animMod = null;
 let animLoading = null;
 function loadAnim() {
   if (animMod) return Promise.resolve(animMod);
-  animLoading = animLoading || import("./anim.js").then(m => (animMod = m)).catch(() => null);
+  animLoading = animLoading || import("./anim.js").then(m => {
+    animMod = m;
+    if (m.setOptions) m.setOptions({ speed: look.speed, still: look.still });
+    return m;
+  }).catch(() => null);
   return animLoading;
 }
 // Блок со схемой движения: пока модуль грузится, место под схему уже занято
@@ -95,8 +104,9 @@ const MUSCLE_KEYS = {
 function paintFigure() {
   if (!figure || !state) return;
   const dark = isDark();
-  figure.setTheme({ rim: dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29], amb: dark ? 0.3 : 0.4 });
-  const base = dark ? [0.55, 0.62, 0.6] : [0.86, 0.91, 0.89];
+  const tone = L.bodyColors(look, dark);
+  figure.setTheme({ rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4 });
+  const base = tone.base;
   if (bodyLayer === "load") {
     const f = E.muscleFatigue(state);
     const lvl = {};
@@ -152,6 +162,16 @@ function flush() {
 // Данные изменились в другой вкладке: подхватываем их, а зашифрованные — просим открыть заново
 function onStorage(e) {
   if (e.key === "lpapp-theme") { applyTheme(store.getTheme()); return; }
+  if (e.key === L.LOOK_KEY) {
+    look = L.loadLook();
+    applyLookNow();
+    if (state && !player && !tracker) render();
+    return;
+  }
+  if (e.key === "lpapp-media") {
+    if (state) loadMediaNow().then(() => { if (state && !player && !tracker) render(); });
+    return;
+  }
   if (e.key !== null && e.key !== "lpapp-v1") return;
   if (!state || player || tracker) return;
   clearTimeout(saveTimer);
@@ -178,7 +198,29 @@ function applyTheme(t) {
   else document.documentElement.dataset.theme = t;
 }
 function applyGlass() {
-  document.documentElement.classList.toggle("less-glass", !!(state && state.settings.lessGlass));
+  applyLookNow();
+}
+// ===== Оформление =====
+function setMediaUrls() {
+  for (const k of ["avatar", "bg"]) {
+    if (mediaUrls[k]) URL.revokeObjectURL(mediaUrls[k]);
+    mediaUrls[k] = media[k] ? L.dataUrlToBlobUrl(media[k]) : "";
+  }
+}
+function applyLookNow() {
+  L.applyLook(look, { photoUrl: mediaUrls.bg });
+  if (animMod && animMod.setOptions) animMod.setOptions({ speed: look.speed, still: look.still });
+  paintFigure();
+}
+async function loadMediaNow() {
+  media = await store.loadMedia();
+  setMediaUrls();
+  applyLookNow();
+}
+function clearMedia() {
+  media = {};
+  setMediaUrls();
+  applyLookNow();
 }
 
 // ===== Офлайн-режим =====
@@ -215,6 +257,7 @@ function showFrameGuard() {
 function boot() {
   if (document.documentElement.classList.contains("is-framed")) return showFrameGuard();
   applyTheme(store.getTheme());
+  applyLookNow();
   registerSW();
   window.addEventListener("beforeinstallprompt", e => {
     e.preventDefault();
@@ -227,9 +270,20 @@ function boot() {
 }
 
 function startApp() {
-  applyGlass();
+  // Переход со старой настройки «Меньше прозрачности» на оформление
+  let storedLook = null;
+  try { storedLook = localStorage.getItem(L.LOOK_KEY); } catch (e) { storedLook = null; }
+  if (storedLook === null && state.settings.lessGlass) {
+    look.glass = false;
+    look.preset = matchPreset(look);
+    L.saveLook(look);
+  }
+  applyLookNow();
+  loadMediaNow().then(() => { if (state && (media.avatar || media.bg)) render(); });
   if (!started) {
     started = true;
+    // Экран при запуске — как выбрано в персонализации
+    if (!window.location.hash && look.start !== "today") history.replaceState(null, "", `#${look.start}`);
     window.addEventListener("hashchange", () => render());
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", () => { flush(); });
@@ -265,6 +319,7 @@ async function lockNow() {
   await flush();
   store.forgetKey();
   state = null;
+  clearMedia();
   document.querySelectorAll(".backdrop").forEach(n => n.remove());
   document.documentElement.classList.remove("no-scroll");
   showLock(store.readEnvelope());
@@ -322,6 +377,8 @@ function showLock(env) {
         dirty = false;
         store.wipe();
         state = store.defaultState();
+        look = L.defaultLook();
+        clearMedia();
         startApp();
       }
     }
@@ -374,8 +431,9 @@ function topbar() {
 }
 
 function tabbar(active) {
+  const tabs = look.tabs.map(id => TABS.find(t => t[0] === id)).filter(Boolean);
   return h("nav", { class: "tabbar glass-clear", "aria-label": "Разделы" },
-    TABS.map(([id, label, ic]) => h("a", { class: "tab", href: `#${id}`, "aria-current": id === active ? "page" : null }, icon(ic, 22), h("span", { text: label }))));
+    tabs.map(([id, label, ic]) => h("a", { class: "tab", href: `#${id}`, "aria-current": id === active ? "page" : null }, icon(ic, look.labels ? 22 : 26), h("span", { text: label }))));
 }
 
 // ===== План дня =====
@@ -406,16 +464,48 @@ function viewToday() {
   const d = E.dayKey();
   const r = E.restrictions(state, d);
   const ci = state.checkins.find(c => c.d === d);
+  // Порядок и набор блоков выбирает пользователь; предупреждения о боли всегда сверху
+  const blocks = {
+    hero: () => heroCard(currentPlan(), r, ci, state.sessions.filter(x => x.d === d)),
+    tasks: () => todayTasks(),
+    fav: () => favCard(),
+    week: () => weekCard(),
+    motto: () => (state.settings.motto ? h("p", { class: "motto-line", text: `«${state.settings.motto}»` }) : null),
+    tip: () => h("p", { class: "tip-line" }, h("b", { text: "Совет. " }), TIPS[dayIndex() % TIPS.length])
+  };
+  const shown = look.home.filter(([, on]) => on).map(([id]) => blocks[id]()).filter(Boolean);
   return [
-    h("p", { class: "eyebrow", text: fmtDate(d, { weekday: "long", day: "numeric", month: "long" }) }),
-    h("h1", { class: "page-title", text: greeting() }),
+    h("div", { class: "today-head" },
+      h("div", {},
+        h("p", { class: "eyebrow", text: fmtDate(d, { weekday: "long", day: "numeric", month: "long" }) }),
+        h("h1", { class: "page-title", text: greeting() })),
+      avatarEl({ href: "#more", label: "Профиль" })),
     r.acute.length ? acuteCard(r) : null,
     todayNotice(),
-    heroCard(currentPlan(), r, ci, state.sessions.filter(x => x.d === d)),
-    todayTasks(),
-    weekCard(),
-    h("p", { class: "tip-line" }, h("b", { text: "Совет. " }), TIPS[dayIndex() % TIPS.length])
+    ...(shown.length ? shown : [h("section", { class: "card glass" },
+      h("p", { class: "muted", text: "Все блоки главного экрана скрыты." }),
+      h("a", { class: "btn ghost", href: "#more/look", text: "Настроить главный экран" }))])
   ];
+}
+// Избранные готовые тренировки — на главном экране одним касанием
+function favCard() {
+  const list = state.favs.map(id => QUICK.find(q => q.id === id)).filter(Boolean);
+  if (!list.length) return null;
+  return h("section", { class: "card glass" },
+    h("p", { class: "eyebrow", text: "Избранное" }),
+    h("div", { class: "list" }, list.map(q => h("button", { class: "row row-btn task-row", type: "button", onClick: () => quickSheet(q.id) },
+      h("span", { class: "fi" }, icon("star", 18)),
+      h("span", { class: "row-text" }, h("b", { text: q.name }), h("span", { class: "muted small", text: q.desc })),
+      icon("chevron", 16)))));
+}
+// Аватар: буква имени, эмодзи или своё фото
+function avatarEl({ big = false, href = "", label = "" } = {}) {
+  const p = state.profile;
+  const photo = look.avatar === "photo" && mediaUrls.avatar;
+  const cls = `avatar${big ? " big" : ""}${photo ? " has-photo" : look.avatar === "emoji" ? " is-emoji" : ""}`;
+  const inner = photo ? [h("img", { src: mediaUrls.avatar, alt: "" })] : [look.avatar === "emoji" ? look.emoji : (p.name || "Вы").slice(0, 1).toUpperCase()];
+  if (href) return h("a", { class: cls, href, "aria-label": label }, ...inner);
+  return h("span", { class: cls, "aria-hidden": "true" }, ...inner);
 }
 // Подсказки по важности: самое срочное — вопрос о боли после вчерашней тренировки
 function todayNotice() {
@@ -739,12 +829,12 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Проще навигация: Сегодня · Тренировки · Тело · Прогресс · Профиль",
-  "«Сегодня» — одна главная тренировка, дела на день и итоги недели",
-  "Каталог тренировок с поиском: комплексы, программы, кардио, челленджи",
-  "35 новых упражнений: равновесие, осанка, эспандер, пресс и кардио без прыжков",
-  "Новые комплексы и челленджи «Осанка за 30 дней» и «30 дней равновесия»",
-  "Детальнее фигуры в схемах — с подсветкой работающих мышц; рельефнее 3D-модель"
+  "Персонализация: «Профиль» → «Персонализация» — меняйте приложение под себя",
+  "7 готовых стилей, 8 цветов и любой свой цвет — текст всегда остаётся читаемым",
+  "Фон на выбор или своё фото, 6 встроенных шрифтов, размер и жирность текста",
+  "Порядок блоков главного экрана и вкладок, стартовый экран, свой девиз",
+  "Аватар: фото или эмодзи; избранные тренировки — на главном экране",
+  "Цвет фигур и 3D-манекена, скорость схем, код стиля, чтобы поделиться с другом"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -758,7 +848,7 @@ function whatsNewCard() {
 
 // Напоминание о резервной копии: данные живут только на устройстве
 function saveBackup() {
-  download(`listopuls-${E.dayKey()}.json`, store.exportJSON(state), "application/json");
+  download(`listopuls-${E.dayKey()}.json`, store.exportJSON(state, { look, media }), "application/json");
   state.settings.lastBackup = E.dayKey();
   state.settings.backupSnooze = "";
   persist();
@@ -1054,8 +1144,24 @@ function quickSheet(id) {
     extra: missing.length ? h("div", { class: "note-box" },
       h("p", { class: "small" }, `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}. Без этого упражнения заменятся похожими — или `,
         h("a", { href: "#more/profile", text: "отметьте инвентарь в профиле" }), ".")) : null,
-    actions: close => [h("button", { class: "btn primary", type: "button", onClick: () => { close(); startPlayer(s); } }, icon("play", 18), "Начать")]
+    actions: close => [favButton(id), h("button", { class: "btn primary", type: "button", onClick: () => { close(); startPlayer(s); } }, icon("play", 18), "Начать")]
   });
+}
+function favButton(id) {
+  const label = () => (state.favs.includes(id) ? "В избранном" : "В избранное");
+  const text = h("span", { text: label() });
+  const btn = h("button", { class: "btn ghost", type: "button", "aria-pressed": state.favs.includes(id) ? "true" : "false" }, icon("star", 18), text);
+  btn.addEventListener("click", () => {
+    if (state.favs.includes(id)) state.favs = state.favs.filter(x => x !== id);
+    else if (state.favs.length < 12) state.favs = [...state.favs, id];
+    else { toast("В избранном уже 12 тренировок"); return; }
+    persist();
+    btn.setAttribute("aria-pressed", state.favs.includes(id) ? "true" : "false");
+    text.textContent = label();
+    toast(state.favs.includes(id) ? "Добавлено на главный экран" : "Убрано из избранного");
+    if (!document.querySelector(".player")) setTimeout(refresh, 0);
+  });
+  return btn;
 }
 
 // ----- Свои тренировки -----
@@ -1065,6 +1171,7 @@ function myWorkouts() {
   return [
     h("p", { class: "lead", text: "Соберите тренировку из любых упражнений библиотеки. Тренер всё равно проверит её на безопасность и заменит то, что вам сейчас нельзя." }),
     h("div", { class: "btn-row", style: { margin: "0 0 16px" } }, h("a", { class: "btn primary", href: "#builder" }, icon("plus", 18), "Собрать тренировку")),
+    favCard(),
     list.length
       ? h("div", { class: "quick" }, list.map(w => h("button", { class: "quick-item glass", type: "button", onClick: () => customSheet(w.id) },
         h("span", { class: "fi" }, icon("puzzle", 20)),
@@ -2417,7 +2524,7 @@ function calcCard() {
 
 // ===== Профиль =====
 // Сгруппированные списки, как в настройках iOS: тренировки, здоровье, приложение
-const SUB = { library: subLibrary, records: subRecords, weights: subWeights, calc: subCalc, gps: subGps, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
+const SUB = { look: subLook, library: subLibrary, records: subRecords, weights: subWeights, calc: subCalc, gps: subGps, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
 // Куда ведёт «Назад» и какая вкладка подсвечена у страниц, которые живут по старым адресам
 const MORE_BACK = {
   library: ["#workout/catalog", "Каталог", "workout"], records: ["#workout/tools", "Таймеры и рекорды", "workout"],
@@ -2440,7 +2547,7 @@ function viewMore(sub) {
     h("h1", { class: "page-title", text: "Профиль" }),
     // Вся карточка — ссылка на профиль, как строка учётной записи в «Настройках» iPhone
     h("a", { class: "card glass profile-card", href: "#more/profile" },
-      h("span", { class: "avatar", "aria-hidden": "true", text: (p.name || "Вы").slice(0, 1).toUpperCase() }),
+      avatarEl(),
       h("span", { class: "row-text" },
         h("b", { text: p.name || "Ваш профиль" }),
         h("span", { class: "muted small", text: `${goal ? goal.short : ""} · ${level ? level.name.toLowerCase() : ""} · ${p.days.length} ${E.plural(p.days.length, "день", "дня", "дней")} в неделю` }),
@@ -2455,7 +2562,8 @@ function viewMore(sub) {
       row("#more/calc", "calc", "Калькуляторы", "ИМТ, талия, калории, пульс, 1ПМ")
     ]),
     ...group("Приложение", [
-      row("#more/settings", "sliders", "Настройки", "Тема, звук, голос, прозрачность"),
+      row("#more/look", "palette", "Персонализация", "Цвет, фон, шрифт, главный экран, аватар"),
+      row("#more/settings", "sliders", "Настройки", "Звук, голос, вибрация"),
       row("#more/data", "shield", "Данные и защита", "Пароль, резервная копия, таблицы"),
       row("#more/install", "phone", "Установить на телефон", "Иконка на экране, работа без интернета"),
       h("button", { class: "row row-btn lg-row", type: "button", onClick: inviteFriend },
@@ -2715,10 +2823,342 @@ function subProfile() {
   ];
 }
 
+// ===== Персонализация =====
+// Всё оформление меняется сразу и хранится на устройстве. Четыре раздела, чтобы не листать длинную страницу
+let lookTab = "style";
+const LOOK_TABS = [["style", "Стиль"], ["text", "Текст"], ["screens", "Экраны"], ["demo", "Схемы"]];
+const PRESET_KEYS = ["accent", "bg", "font", "head", "radius", "density", "glass", "bold", "reading", "scale"];
+const PRESET_BASE = { bold: false, reading: false, scale: 100 };
+function matchPreset(lk) {
+  const p = L.PRESETS.find(x => PRESET_KEYS.every(k => ({ ...PRESET_BASE, ...x.set })[k] === lk[k]));
+  return p ? p.id : "custom";
+}
+// rerender: false — для ползунков и выбора цвета, чтобы не мешать жесту
+function changeLook(patch, { rerender = true } = {}) {
+  look = L.sanitizeLook({ ...look, ...patch });
+  look.preset = matchPreset(look);
+  L.saveLook(look);
+  applyLookNow();
+  if (rerender) refresh();
+}
+function undoToast(message, before) {
+  toast(message, { action: { label: "Вернуть", onClick: () => { look = before; L.saveLook(look); applyLookNow(); refresh(); } } });
+}
+const lookCard = (title, ...body) => h("section", { class: "card glass" }, h("h2", { text: title }), ...body);
+const lookHint = textValue => h("p", { class: "muted small look-note", text: textValue });
+// Выбор картинки с устройства: уменьшается и пересжимается здесь же, без отправки куда-либо
+function pickImage(kind, onDone) {
+  const input = h("input", { type: "file", accept: "image/*", class: "visually-hidden", "aria-label": kind === "avatar" ? "Фото профиля" : "Фото фона" });
+  input.addEventListener("change", async () => {
+    const f = input.files[0];
+    input.remove();
+    if (!f) return;
+    try {
+      const data = await L.processImage(f, kind === "avatar" ? { max: 320, square: true, quality: 0.85 } : { max: 1440, quality: 0.78 });
+      if (data.length > store.MEDIA_MAX) throw new Error("Картинка слишком большая — выберите поменьше");
+      const next = { ...media, [kind]: data };
+      const ok = await store.saveMedia(next);
+      if (!ok) throw new Error("Не хватило места в памяти браузера — выберите картинку поменьше");
+      media = next;
+      setMediaUrls();
+      onDone();
+    } catch (e) {
+      toast(e.message || "Не удалось открыть картинку");
+    }
+  });
+  document.body.append(input);
+  input.click();
+}
+async function removeImage(kind, onDone) {
+  const next = { ...media };
+  delete next[kind];
+  await store.saveMedia(next);
+  media = next;
+  setMediaUrls();
+  onDone();
+}
+
+function subLook() {
+  const tabs = choice({ className: "seg", label: "Раздел персонализации", value: lookTab, options: LOOK_TABS.map(([value, label]) => ({ value, label })), onChange: v => { lookTab = v; refresh(); } });
+  const body = lookTab === "text" ? lookText() : lookTab === "screens" ? lookScreens() : lookTab === "demo" ? lookDemo() : lookStyle();
+  return [
+    h("h1", { class: "page-title", text: "Персонализация" }),
+    h("p", { class: "lead", text: "Настройте приложение под себя: изменения видны сразу и сохраняются только на этом устройстве." }),
+    tabs,
+    ...body
+  ];
+}
+
+// ----- Стиль: готовые наборы, цвет, тема, фон, форма -----
+function lookStyle() {
+  const dark = isDark();
+  const presets = L.PRESETS.map(p => {
+    const accent = L.accentSet((L.PALETTES.find(x => x.id === p.set.accent) || L.PALETTES[0]).seed);
+    const font = (L.FONTS.find(f => f.id === p.set.font) || L.FONTS[0]).stack;
+    const btn = h("button", { class: "preset", type: "button", "aria-pressed": look.preset === p.id ? "true" : "false" },
+      h("span", { class: "preset-dots", "aria-hidden": "true" }, h("i"), h("i")),
+      h("span", { class: "sample", "aria-hidden": "true", text: "Аа" }),
+      h("b", { text: p.name }), h("span", { class: "small", text: p.desc }));
+    btn.style.background = L.bgPreview(p.set.bg, dark);
+    const dots = btn.querySelectorAll(".preset-dots i");
+    dots[0].style.background = p.set.accent === "forest" ? (dark ? "#4ade80" : "#15803d") : (dark ? accent.accentDk : accent.accent);
+    dots[1].style.background = dark ? "#e8f1eb" : "#0e1a13";
+    btn.querySelector(".sample").style.fontFamily = font;
+    btn.addEventListener("click", () => {
+      const before = look;
+      look = L.sanitizeLook({ ...look, ...PRESET_BASE, ...p.set });
+      look.preset = p.id;
+      L.saveLook(look);
+      applyLookNow();
+      refresh();
+      undoToast(`Стиль «${p.name}»`, before);
+    });
+    return btn;
+  });
+
+  // Цвет акцента: готовые и свой; оттенки подбираются с проверкой контраста
+  const swatches = L.PALETTES.map(p => {
+    const c = L.accentSet(p.seed);
+    const b = h("button", { class: "swatch", type: "button", "aria-label": p.name, title: p.name, "aria-pressed": look.accent === p.id ? "true" : "false", onClick: () => changeLook({ accent: p.id }) });
+    b.style.background = p.id === "forest" ? (dark ? "#4ade80" : "#15803d") : (dark ? c.accentDk : c.accent);
+    return b;
+  });
+  const colorInput = h("input", { type: "color", value: look.custom || L.seedOf(look), "aria-label": "Свой цвет" });
+  colorInput.addEventListener("input", () => changeLook({ accent: "custom", custom: colorInput.value }, { rerender: false }));
+  colorInput.addEventListener("change", () => changeLook({ accent: "custom", custom: colorInput.value }));
+  const custom = h("label", { class: "swatch swatch-custom", title: "Свой цвет", "data-on": look.accent === "custom" ? "1" : "0" }, colorInput);
+
+  // Фон
+  const bgTiles = L.BACKGROUNDS.filter(b => b.id !== "photo").map(b => {
+    const t = h("button", { class: "bg-tile", type: "button", "aria-pressed": look.bg === b.id ? "true" : "false", onClick: () => changeLook({ bg: b.id }) }, h("b", { class: "tile-label", text: b.name }));
+    t.style.background = L.bgPreview(b.id, dark);
+    return t;
+  });
+  const photoTile = h("button", {
+    class: "bg-tile", type: "button", "aria-pressed": look.bg === "photo" ? "true" : "false",
+    onClick: () => (media.bg ? changeLook({ bg: "photo" }) : pickImage("bg", () => changeLook({ bg: "photo" })))
+  }, h("b", { class: "tile-label", text: media.bg ? "Своё фото" : "+ Своё фото" }));
+  if (mediaUrls.bg) {
+    photoTile.style.backgroundImage = `url("${mediaUrls.bg}")`;
+    photoTile.style.backgroundSize = "cover";
+    photoTile.style.backgroundPosition = "center";
+  }
+  const range = (label, value, min, max, step, unit, onLive) => {
+    const out = h("output", { text: `${value}${unit}` });
+    const input = h("input", { class: "range neutral", type: "range", min, max, step, value, "aria-label": label });
+    input.addEventListener("input", () => { out.textContent = `${input.value}${unit}`; onLive(Number(input.value), false); });
+    input.addEventListener("change", () => onLive(Number(input.value), true));
+    return h("div", { class: "q" }, h("b", { text: label }), h("div", { class: "range-row" }, input, out));
+  };
+  const photoControls = look.bg === "photo" && media.bg ? [
+    range("Размытие", look.blur, 0, 24, 1, " px", (v, done) => changeLook({ blur: v }, { rerender: done })),
+    range("Затемнение под текстом", look.dim, 20, 85, 5, " %", (v, done) => changeLook({ dim: v }, { rerender: done })),
+    lookHint("Чем сильнее затемнение, тем лучше читается текст поверх фото.")
+  ] : [];
+
+  return [
+    lookCard("Готовые стили", h("p", { class: "muted small", text: "Цвет, фон, шрифт и форма — одним касанием. Потом любую деталь можно поменять." }), h("div", { class: "preset-grid" }, presets)),
+    lookCard("Цвет акцента",
+      h("p", { class: "muted small", text: "Кнопки, ссылки, кольца и подсветка мышц. Оттенки подбираются так, чтобы текст хорошо читался в светлой и тёмной теме." }),
+      h("div", { class: "swatches", role: "group", "aria-label": "Цвет акцента" }, swatches, custom),
+      lookHint(look.accent === "custom" ? "Свой цвет: яркость подстроена для читаемости." : `Сейчас: ${(L.PALETTES.find(p => p.id === look.accent) || L.PALETTES[0]).name}.`)),
+    lookCard("Тема",
+      choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Авто" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); applyLookNow(); refresh(); } }),
+      lookHint("«Авто» — как в настройках телефона."),
+      h("div", { class: "list" }, toggle({ label: "Стеклянные панели", desc: "Полупрозрачные карточки. Выключите, чтобы фон был сплошным: легче читать и бережёт батарею", checked: look.glass, onChange: v => { changeLook({ glass: v }); state.settings.lessGlass = !v; persist(); } }))),
+    lookCard("Фон",
+      h("div", { class: "bg-tiles" }, bgTiles, photoTile),
+      ...photoControls,
+      media.bg ? h("div", { class: "btn-row" },
+        h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("bg", () => changeLook({ bg: "photo" })) }, icon("image", 16), "Другое фото"),
+        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("bg", () => changeLook({ bg: look.bg === "photo" ? "soft" : look.bg })) }, icon("trash", 16), "Убрать фото")) : null,
+      lookHint("Фото уменьшается и хранится только на этом устройстве, без геометки. С паролем оно шифруется вместе с данными.")),
+    lookCard("Форма",
+      h("div", { class: "q" }, h("b", { text: "Углы" }), choice({ className: "seg", label: "Углы", value: look.radius, options: L.RADII, onChange: v => changeLook({ radius: v }) })),
+      h("div", { class: "q" }, h("b", { text: "Плотность" }), choice({ className: "seg", label: "Плотность", value: look.density, options: L.DENSITY, onChange: v => changeLook({ density: v }) }))),
+    lookShareCard(),
+    lookCard("Сбросить",
+      h("p", { class: "muted small", text: "Вернуть оформление по умолчанию. Данные, фото и избранное останутся." }),
+      h("button", {
+        class: "btn ghost", type: "button", text: "Вернуть как было",
+        onClick: async () => {
+          const ok = await confirmSheet({ title: "Сбросить оформление?", message: "Цвет, фон, шрифты и расположение станут как при первом запуске.", ok: "Сбросить" });
+          if (!ok) return;
+          const before = look;
+          // Аватар — часть профиля, а не оформления: его сброс не трогает
+          look = { ...L.defaultLook(), avatar: before.avatar, emoji: before.emoji };
+          L.saveLook(look);
+          applyLookNow();
+          refresh();
+          undoToast("Оформление сброшено", before);
+        }
+      }))
+  ];
+}
+
+// Код стиля: передать оформление другу или перенести на другой телефон
+function lookShareCard() {
+  const code = L.lookCode(look);
+  const input = h("input", { class: "input", type: "text", placeholder: "Вставьте код стиля LP1-…", "aria-label": "Код стиля", maxlength: 4000, autocomplete: "off", spellcheck: "false" });
+  return lookCard("Поделиться стилем",
+    h("p", { class: "muted small", text: "Код содержит только оформление — без фото, имени и сведений о здоровье." }),
+    h("details", { class: "more" }, h("summary", { text: "Показать код" }), h("p", { class: "code-box", text: code })),
+    h("div", { class: "btn-row" },
+      h("button", {
+        class: "btn small ghost", type: "button",
+        onClick: async () => {
+          try { await navigator.clipboard.writeText(code); toast("Код стиля скопирован"); } catch (e) { toast("Выделите код и скопируйте вручную"); }
+        }
+      }, icon("share", 16), "Скопировать код")),
+    h("label", { class: "field" }, h("span", { text: "Применить чужой стиль" }), input),
+    h("div", { class: "btn-row" }, h("button", {
+      class: "btn small primary", type: "button", text: "Применить",
+      onClick: () => {
+        const parsed = L.parseLookCode(input.value);
+        if (!parsed) { toast("Код не подошёл — проверьте, что он скопирован целиком"); return; }
+        const before = look;
+        // Своя аватарка остаётся своей
+        look = { ...parsed, avatar: before.avatar, emoji: before.emoji, preset: matchPreset(parsed) };
+        L.saveLook(look);
+        applyLookNow();
+        refresh();
+        undoToast("Стиль применён", before);
+      }
+    })));
+}
+
+// ----- Текст: шрифт, заголовки, размер, жирность -----
+function lookText() {
+  const fontRows = L.FONTS.map(f => {
+    const sample = h("span", { class: "sample", "aria-hidden": "true", text: "Аа" });
+    sample.style.fontFamily = f.stack;
+    return h("button", { class: "row row-btn font-row", type: "button", "aria-pressed": look.font === f.id ? "true" : "false", onClick: () => changeLook({ font: f.id }) },
+      sample, h("span", { class: "row-text" }, h("b", { text: f.name }), h("span", { class: "muted small", text: FONT_DESC[f.id] })));
+  });
+  const heads = choice({
+    label: "Шрифт заголовков", value: look.head,
+    options: L.HEAD_FONTS.map(f => ({ value: f.id, label: f.name })),
+    onChange: v => changeLook({ head: v })
+  });
+  heads.querySelectorAll(".chip").forEach((b, i) => { const f = L.HEAD_FONTS[i]; if (f.stack) b.style.fontFamily = f.stack; });
+  const out = h("output", { text: `${look.scale} %` });
+  const size = h("input", { class: "range neutral", type: "range", min: 85, max: 130, step: 5, value: look.scale, "aria-label": "Размер текста" });
+  size.addEventListener("input", () => { out.textContent = `${size.value} %`; changeLook({ scale: Number(size.value) }, { rerender: false }); });
+  size.addEventListener("change", () => changeLook({ scale: Number(size.value) }));
+  return [
+    lookCard("Шрифт", h("div", { class: "list" }, fontRows), lookHint("Шрифты встроены в приложение и работают без интернета.")),
+    lookCard("Заголовки", heads),
+    lookCard("Размер текста",
+      h("div", { class: "range-row" }, size, out),
+      h("p", { class: "size-sample", text: "Так будет выглядеть текст: «Сделайте 10 приседаний, спина ровная»." }),
+      lookHint("Кнопки и отступы не меняются — растёт только текст.")),
+    h("section", { class: "card glass" }, h("div", { class: "list" },
+      toggle({ label: "Жирный текст", desc: "Плотнее начертание — легче читать на солнце", checked: look.bold, onChange: v => changeLook({ bold: v }) }),
+      toggle({ label: "Удобное чтение", desc: "Больше расстояние между буквами, словами и строками", checked: look.reading, onChange: v => changeLook({ reading: v }) })))
+  ];
+}
+const FONT_DESC = {
+  system: "Шрифт телефона: привычный и экономный",
+  rounded: "Nunito — мягкий и дружелюбный",
+  modern: "Rubik — чёткий, слегка скруглённый",
+  serif: "PT Serif — классика для чтения",
+  mono: "JetBrains Mono — ровные цифры и буквы"
+};
+
+// ----- Экраны: главный экран, девиз, нижняя панель, аватар -----
+function moveIn(list, i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= list.length) return list;
+  const next = list.map(x => (Array.isArray(x) ? [...x] : x));
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+function orderRow(label, i, len, onMove, extra = null, off = false) {
+  return h("div", { class: `order-row${off ? " is-off" : ""}` },
+    h("span", { class: "row-text" }, h("b", { text: label })),
+    h("button", { class: "icon-btn mini", type: "button", "aria-label": `Выше: ${label}`, disabled: i === 0, onClick: () => onMove(-1) }, icon("up", 16)),
+    h("button", { class: "icon-btn mini", type: "button", "aria-label": `Ниже: ${label}`, disabled: i === len - 1, onClick: () => onMove(1) }, icon("down", 16)),
+    extra);
+}
+function lookScreens() {
+  const names = Object.fromEntries(L.HOME_BLOCKS);
+  const homeRows = look.home.map(([id, on], i) => {
+    const sw = h("input", { type: "checkbox", class: "switch", checked: on, "aria-label": `Показывать: ${names[id]}` });
+    sw.addEventListener("change", () => changeLook({ home: look.home.map(([bid, v]) => [bid, bid === id ? sw.checked : v]) }));
+    return orderRow(names[id], i, look.home.length, dir => changeLook({ home: moveIn(look.home, i, dir) }), sw, !on);
+  });
+  const motto = h("input", { class: "input", type: "text", maxlength: 80, value: state.settings.motto, placeholder: "Например: шаг за шагом", "aria-label": "Мой девиз" });
+  motto.addEventListener("change", () => { state.settings.motto = motto.value.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 80); persist(); toast(state.settings.motto ? "Девиз сохранён" : "Девиз убран"); });
+  const tabRows = look.tabs.map((id, i) => orderRow(L.TAB_NAMES[id], i, look.tabs.length, dir => changeLook({ tabs: moveIn(look.tabs, i, dir) })));
+  const avatarKinds = choice({
+    className: "seg", label: "Аватар", value: look.avatar,
+    options: [{ value: "letter", label: "Буква" }, { value: "emoji", label: "Эмодзи" }, { value: "photo", label: "Фото" }],
+    onChange: v => (v === "photo" && !media.avatar ? pickImage("avatar", () => changeLook({ avatar: "photo" })) : changeLook({ avatar: v }))
+  });
+  const favs = state.favs.map(id => QUICK.find(q => q.id === id)).filter(Boolean);
+  return [
+    lookCard("Главный экран",
+      h("p", { class: "muted small", text: "Порядок блоков и что показывать. Предупреждения о боли и важные подсказки всегда остаются сверху." }),
+      h("div", {}, homeRows)),
+    lookCard("Мой девиз",
+      h("label", { class: "field" }, h("span", { text: "Фраза на главном экране" }), motto),
+      lookHint("Пусто — блок не показывается.")),
+    lookCard("Избранное",
+      favs.length
+        ? h("div", { class: "list" }, favs.map(q => h("div", { class: "row" },
+          h("span", { class: "row-text" }, h("b", { text: q.name })),
+          h("button", { class: "icon-btn mini", type: "button", "aria-label": `Убрать из избранного: ${q.name}`, onClick: () => { state.favs = state.favs.filter(x => x !== q.id); persist(); refresh(); } }, icon("close", 16)))))
+        : h("p", { class: "muted small", text: "Откройте любую готовую тренировку и нажмите «В избранное» — она появится на главном экране." }),
+      h("div", { class: "btn-row" }, h("a", { class: "btn small ghost", href: "#workout/ready" }, icon("star", 16), "К готовым тренировкам"))),
+    lookCard("Нижняя панель",
+      h("p", { class: "muted small", text: "Порядок вкладок." }),
+      h("div", {}, tabRows),
+      h("div", { class: "list" }, toggle({ label: "Подписи под значками", desc: "Без подписей значки крупнее", checked: look.labels, onChange: v => changeLook({ labels: v }) })),
+      h("div", { class: "q", style: { marginTop: "12px" } }, h("b", { text: "Экран при запуске" }),
+        choice({ label: "Экран при запуске", value: look.start, options: L.TAB_IDS.map(id => ({ value: id, label: L.TAB_NAMES[id] })), onChange: v => changeLook({ start: v }) }))),
+    lookCard("Аватар",
+      h("div", { class: "today-head" }, avatarEl({ big: true }), h("p", { class: "muted small", text: "Виден в профиле и на главном экране." })),
+      avatarKinds,
+      look.avatar === "emoji" ? h("div", { class: "emoji-grid", role: "group", "aria-label": "Эмодзи" },
+        L.EMOJI.map(em => h("button", { class: "emoji-btn", type: "button", text: em, "aria-pressed": look.emoji === em ? "true" : "false", onClick: () => changeLook({ emoji: em }) }))) : null,
+      look.avatar === "photo" && media.avatar ? h("div", { class: "btn-row" },
+        h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("avatar", () => changeLook({ avatar: "photo" })) }, icon("image", 16), "Другое фото"),
+        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("avatar", () => changeLook({ avatar: "letter" })) }, icon("trash", 16), "Убрать фото")) : null)
+  ];
+}
+
+// ----- Схемы движений, 3D-манекен и эффекты -----
+function lookDemo() {
+  const figChips = choice({ label: "Цвет фигуры", value: look.figure, options: L.FIGURES.map(f => ({ value: f.id, label: f.name })), onChange: v => changeLook({ figure: v }) });
+  const speed = choice({ className: "seg", label: "Скорость показа", value: look.speed, options: L.SPEEDS.map(v => ({ value: v, label: `${String(v).replace(".", ",")}×` })), onChange: v => changeLook({ speed: v }) });
+  const bodies = L.BODIES.map(b => {
+    const c = isDark() ? b.d : b.l;
+    const btn = h("button", { class: "swatch", type: "button", "aria-label": `Манекен: ${b.name.toLowerCase()}`, title: b.name, "aria-pressed": look.body === b.id ? "true" : "false", onClick: () => changeLook({ body: b.id }) });
+    btn.style.background = `rgb(${c.map(v => Math.round(v * 255)).join(", ")})`;
+    return btn;
+  });
+  return [
+    lookCard("Фигура в схемах движений",
+      h("div", { class: "look-demo" }, demoBox("squat")),
+      h("div", { class: "q" }, h("b", { text: "Цвет фигуры" }), figChips),
+      h("div", { class: "q" }, h("b", { text: "Скорость показа" }), speed),
+      h("div", { class: "list" }, toggle({ label: "Подсветка работающих мышц", desc: "Мышцы, которые нагружает упражнение, выделены цветом акцента", checked: look.muscles, onChange: v => changeLook({ muscles: v }) }))),
+    lookCard("3D-манекен",
+      h("div", { class: "swatches", role: "group", "aria-label": "Цвет манекена" }, bodies),
+      lookHint(`Сейчас: ${(L.BODIES.find(b => b.id === look.body) || L.BODIES[0]).name.toLowerCase()}. Манекен — во вкладке «Тело».`)),
+    h("section", { class: "card glass" }, h("div", { class: "list" },
+      toggle({ label: "Меньше анимации", desc: "Схемы показывают одну позу, без плавных переходов", checked: look.still, onChange: v => changeLook({ still: v }) }),
+      toggle({ label: "Праздничные эффекты", desc: "Конфетти после тренировки и наград", checked: look.fx, onChange: v => changeLook({ fx: v }) })))
+  ];
+}
+
 function subSettings() {
   const st = state.settings;
   return [
     h("h1", { class: "page-title", text: "Настройки" }),
+    h("section", { class: "card glass list-group" }, h("div", { class: "list" },
+      h("a", { class: "row lg-row", href: "#more/look" }, h("span", { class: "fi" }, icon("palette", 18)),
+        h("span", { class: "row-text" }, h("b", { text: "Персонализация" }), h("span", { class: "muted small", text: "Цвет, фон, шрифт, расположение, аватар" })), icon("chevron", 16)))),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Тема" }),
         choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Как в системе" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); } }))),
@@ -2726,7 +3166,7 @@ function subSettings() {
       toggle({ label: "Звуковые сигналы", desc: "Смена упражнений и отсчёт 3-2-1", checked: st.sound, onChange: v => { st.sound = v; persist(); } }),
       toggle({ label: "Голосовые подсказки", desc: "Название упражнения и отдых — вслух", checked: st.voice, onChange: v => { st.voice = v; persist(); if (v) speak("Голосовые подсказки включены"); } }),
       toggle({ label: "Вибрация", desc: "На телефонах с Android", checked: st.vibrate, onChange: v => { st.vibrate = v; persist(); } }),
-      toggle({ label: "Меньше прозрачности", desc: "Сплошной фон вместо стекла: легче читать и бережёт батарею", checked: st.lessGlass, onChange: v => { st.lessGlass = v; persist(); applyGlass(); } })))
+      toggle({ label: "Меньше прозрачности", desc: "Сплошной фон вместо стекла: легче читать и бережёт батарею", checked: !look.glass, onChange: v => { changeLook({ glass: !v }, { rerender: false }); st.lessGlass = v; persist(); } })))
   ];
 }
 
@@ -2815,12 +3255,16 @@ function subData() {
     if (!f) return;
     if (f.size > store.MAX_IMPORT_BYTES) { toast("Файл слишком большой"); return; }
     try {
-      const imported = store.importJSON(await f.text());
+      const textValue = await f.text();
+      const imported = store.importJSON(textValue);
+      const extras = store.readExtras(textValue);
       const ok = await confirmSheet({ title: "Загрузить копию?", message: "Данные на этом устройстве будут заменены данными из файла.", ok: "Заменить" });
       if (!ok) return;
       state = imported;
       planCache.key = "";
       persist();
+      if (extras.look) { look = L.sanitizeLook(extras.look); L.saveLook(look); }
+      if (Object.keys(extras.media).length) { media = extras.media; await store.saveMedia(media); setMediaUrls(); }
       applyGlass();
       refresh();
       toast("Данные восстановлены");
@@ -2877,6 +3321,8 @@ function subData() {
           dirty = false;
           store.wipe();
           state = store.defaultState();
+          look = L.defaultLook();
+          clearMedia();
           planCache.key = "";
           onb = null;
           onbStep = 0;
