@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -829,12 +829,11 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Персонализация: «Профиль» → «Персонализация» — меняйте приложение под себя",
-  "7 готовых стилей, 8 цветов и любой свой цвет — текст всегда остаётся читаемым",
-  "Фон на выбор или своё фото, 6 встроенных шрифтов, размер и жирность текста",
-  "Порядок блоков главного экрана и вкладок, стартовый экран, свой девиз",
-  "Аватар: фото или эмодзи; избранные тренировки — на главном экране",
-  "Цвет фигур и 3D-манекена, скорость схем, код стиля, чтобы поделиться с другом"
+  "Детальные фигуры в схемах: одежда, кроссовки, волосы, лицо и мягкие тени",
+  "Тон кожи и вид фигуры — детальная или силуэт — в «Персонализации»",
+  "Плавнее анимация: опорная стопа не скользит, шаги с подъёмом ноги",
+  "Исправлены движения рук «сквозь пол» в пуловере, «мёртвом жуке» и «открытой книге»",
+  "Аккуратнее на узких экранах: награды, плитки, кнопки и кольца не выходят за рамки"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1149,8 +1148,8 @@ function quickSheet(id) {
 }
 function favButton(id) {
   const label = () => (state.favs.includes(id) ? "В избранном" : "В избранное");
-  const text = h("span", { text: label() });
-  const btn = h("button", { class: "btn ghost", type: "button", "aria-pressed": state.favs.includes(id) ? "true" : "false" }, icon("star", 18), text);
+  const btn = h("button", { class: "btn ghost icon-only", type: "button", "aria-label": label(), title: label(), "aria-pressed": state.favs.includes(id) ? "true" : "false" }, icon("star", 20));
+  const text = { set textContent(v) { btn.setAttribute("aria-label", v); btn.title = v; } };
   btn.addEventListener("click", () => {
     if (state.favs.includes(id)) state.favs = state.favs.filter(x => x !== id);
     else if (state.favs.length < 12) state.favs = [...state.favs, id];
@@ -3129,7 +3128,13 @@ function lookScreens() {
 
 // ----- Схемы движений, 3D-манекен и эффекты -----
 function lookDemo() {
-  const figChips = choice({ label: "Цвет фигуры", value: look.figure, options: L.FIGURES.map(f => ({ value: f.id, label: f.name })), onChange: v => changeLook({ figure: v }) });
+  const detail = look.figstyle !== "flat";
+  const figChips = choice({ label: detail ? "Цвет одежды" : "Цвет фигуры", value: look.figure, options: L.FIGURES.map(f => ({ value: f.id, label: f.name })), onChange: v => changeLook({ figure: v }) });
+  const skins = L.SKINS.map(k => {
+    const b = h("button", { class: "swatch", type: "button", "aria-label": `Тон кожи: ${k.name.toLowerCase()}`, title: k.name, "aria-pressed": look.skin === k.id ? "true" : "false", onClick: () => changeLook({ skin: k.id }) });
+    b.style.background = k.c;
+    return b;
+  });
   const speed = choice({ className: "seg", label: "Скорость показа", value: look.speed, options: L.SPEEDS.map(v => ({ value: v, label: `${String(v).replace(".", ",")}×` })), onChange: v => changeLook({ speed: v }) });
   const bodies = L.BODIES.map(b => {
     const c = isDark() ? b.d : b.l;
@@ -3140,7 +3145,9 @@ function lookDemo() {
   return [
     lookCard("Фигура в схемах движений",
       h("div", { class: "look-demo" }, demoBox("squat")),
-      h("div", { class: "q" }, h("b", { text: "Цвет фигуры" }), figChips),
+      h("div", { class: "q" }, h("b", { text: "Вид" }), choice({ className: "seg", label: "Вид фигуры", value: look.figstyle, options: L.FIG_STYLES, onChange: v => changeLook({ figstyle: v }) })),
+      detail ? h("div", { class: "q" }, h("b", { text: "Тон кожи" }), h("div", { class: "swatches", role: "group", "aria-label": "Тон кожи" }, skins)) : null,
+      h("div", { class: "q" }, h("b", { text: detail ? "Цвет одежды" : "Цвет фигуры" }), figChips),
       h("div", { class: "q" }, h("b", { text: "Скорость показа" }), speed),
       h("div", { class: "list" }, toggle({ label: "Подсветка работающих мышц", desc: "Мышцы, которые нагружает упражнение, выделены цветом акцента", checked: look.muscles, onChange: v => changeLook({ muscles: v }) }))),
     lookCard("3D-манекен",

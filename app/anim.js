@@ -14,7 +14,8 @@ const add = (p, v, k = 1) => [p[0] + v[0] * k, p[1] + v[1] * k];
 const leg = (h = 0, k = 0, f = 90) => ({ h, k, f });
 const arm = (sA = 0, e = 0, w = 0) => ({ s: sA, e, w });
 const pose = (o = {}) => ({ t: 0, n: 0, sh: 0, air: 0, lift: 0, legs: [leg(), leg()], arms: [arm(6, 12), arm(-4, 12)], ...o });
-const fleg = (h = 4, k = 0) => ({ h, k });
+// lift — подъём стопы к зрителю (колено сгибается вперёд, а не вбок)
+const fleg = (h = 4, k = 0, lift = 0) => ({ h, k, lift });
 const farm = (sA = 10, e = 6) => ({ s: sA, e });
 const fpose = (o = {}) => ({ front: true, t: 0, n: 0, air: 0, lift: 0, legs: [fleg(), fleg()], arms: [farm(), farm()], ...o });
 
@@ -44,7 +45,7 @@ const P = {
   neckNod: { a: pose({ n: -12 }), b: pose({ n: 32 }), p: 3 },
   handsForward: { a: pose({ arms: [arm(55, 35, -35), arm(55, 35, -35)] }), b: pose({ arms: [arm(55, 35, 35), arm(55, 35, 35)] }), p: 1.8 },
   legSwings: { a: pose({ legs: [leg(-32, 8), leg(0, 0)], arms: [arm(10, 10), arm(70, 10)] }), b: pose({ legs: [leg(55, 5), leg(0, 0)], arms: [arm(10, 10), arm(70, 10)] }), p: 1.6, anchor: "far" },
-  inchworm: { a: pose({ t: 108, legs: [leg(-8, 0), leg(-8, 0)], arms: [arm(6, 0), arm(6, 0)] }), b: PLANK_HIGH, p: 3 },
+  inchworm: { a: pose({ t: 108, legs: [leg(-8, 0), leg(-8, 0)], arms: [arm(6, 0), arm(6, 0)] }), b: PLANK_HIGH, p: 3, anchor: "toes" },
   hinge: { a: pose({ arms: [arm(2, 0), arm(2, 0)] }), b: HINGE(), p: 2.8, w: "hands" },
   dislocate: { a: pose({ arms: [arm(60, 0), arm(60, 0)] }), b: pose({ arms: [arm(200, 0), arm(200, 0)] }), p: 2.6, props: ["band2"] },
   squat: { a: pose({ arms: [arm(8, 10), arm(8, 10)] }), b: SQUAT_LOW(), p: 2.6, w: "back" },
@@ -59,8 +60,8 @@ const P = {
   stepUp: { a: pose({ legs: [leg(60, 70), leg(0, 0)] }), b: pose({ lift: 0.24, legs: [leg(0, 0), leg(35, 70, 60)] }), p: 2.6, props: ["step"], w: "hands" },
   deadlift: { a: pose({ t: 62, legs: [leg(60, 80), leg(60, 80)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ arms: [arm(0, 0), arm(0, 0)] }), p: 2.8, w: "hands" },
   swing: { a: pose({ t: 62, legs: [leg(25, 32), leg(25, 32)], arms: [arm(-32, 0), arm(-32, 0)] }), b: pose({ t: -4, arms: [arm(86, 0), arm(86, 0)] }), p: 1.6, w: "hands" },
-  calfRaise: { a: STAND, b: pose({ legs: [leg(0, 0, 50), leg(0, 0, 50)] }), p: 2, w: "hands" },
-  calfHold: { a: pose({ legs: [leg(0, 0, 60), leg(0, 0, 60)] }) },
+  calfRaise: { a: STAND, b: pose({ legs: [leg(0, 0, 50), leg(0, 0, 50)] }), p: 2, w: "hands", anchor: "toes" },
+  calfHold: { a: pose({ legs: [leg(0, 0, 60), leg(0, 0, 60)] }), anchor: "toes" },
   wallSit: { a: pose({ legs: [leg(90, 90), leg(90, 90)], arms: [arm(6, 8), arm(6, 8)] }), props: ["wallBack"] },
   wallSitShort: { a: pose({ legs: [leg(40, 45), leg(40, 45)], arms: [arm(6, 8), arm(6, 8)] }), props: ["wallBack"] },
   squatHold: { a: pose({ t: 22, legs: [leg(55, 70), leg(55, 70)], arms: [arm(88, 0), arm(88, 0)] }) },
@@ -77,7 +78,7 @@ const P = {
   floorPress: { a: SUPINE({ arms: [arm(90, 90), arm(90, 90)] }), b: SUPINE({ arms: [arm(180, 0), arm(180, 0)] }), p: 2.4, anchor: "hip", w: "hands" },
   benchPress: { a: pose({ t: -90, legs: [leg(90, 90), leg(90, 90)], arms: [arm(20, 160), arm(20, 160)] }), b: pose({ t: -90, legs: [leg(90, 90), leg(90, 90)], arms: [arm(180, 0), arm(180, 0)] }), p: 2.4, anchor: "hip", props: ["bench"], w: "hands" },
   skull: { a: SUPINE({ arms: [arm(165, 120), arm(165, 120)] }), b: SUPINE({ arms: [arm(178, 2), arm(178, 2)] }), p: 2.2, anchor: "hip", w: "hands" },
-  pullover: { a: SUPINE({ arms: [arm(178, 4), arm(178, 4)] }), b: SUPINE({ arms: [arm(-78, 6), arm(-78, 6)] }), p: 2.8, anchor: "hip", w: "hands" },
+  pullover: { a: SUPINE({ arms: [arm(178, 4), arm(178, 4)] }), b: SUPINE({ arms: [arm(282, 6), arm(282, 6)] }), p: 2.8, anchor: "hip", w: "hands" },
   curl: { a: pose({ arms: [arm(2, 8), arm(2, 8)] }), b: pose({ arms: [arm(8, 140), arm(8, 140)] }), p: 2.2, w: "hands" },
   tricepsDown: { a: pose({ arms: [arm(-8, 120), arm(-8, 120)] }), b: pose({ arms: [arm(-6, 4), arm(-6, 4)] }), p: 2, props: ["bandUp"] },
   press: { a: pose({ arms: [arm(25, 155), arm(25, 155)] }), b: pose({ arms: [arm(176, 4), arm(176, 4)] }), p: 2.4, w: "hands" },
@@ -91,12 +92,12 @@ const P = {
   standRow: { a: pose({ legs: [leg(8, 12), leg(8, 12)], arms: [arm(88, 0), arm(88, 0)] }), b: pose({ legs: [leg(8, 12), leg(8, 12)], arms: [arm(-35, 125), arm(-35, 125)] }), p: 2.2, props: ["bandFront"] },
   row: { a: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)] }), b: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)], arms: [arm(-75, 75), arm(-75, 75)] }), p: 2.2, w: "hands" },
   reverseFly: { a: HINGE({ t: 72 }), b: HINGE({ t: 72, arms: [arm(-72, 6), arm(-72, 6)] }), p: 2.4, w: "hands" },
-  hang: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), hang: 1.98, props: ["bar"] },
-  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(-12, 186), arm(-12, 186)] }), p: 2.8, hang: 1.98, props: ["bar"] },
+  hang: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), hang: 2.24, props: ["bar"] },
+  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(-12, 186), arm(-12, 186)] }), p: 2.8, hang: 2.24, props: ["bar"] },
   shrug: { a: pose({ arms: [arm(2, 0), arm(2, 0)] }), b: pose({ sh: 0.05, arms: [arm(2, 0), arm(2, 0)] }), p: 1.8, w: "hands" },
   renegade: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(-71, 0, -5), leg(-71, 0, -5)], arms: [arm(-72, 82), arm(3, 0)] }), alt: true, p: 2.2, w: "hands" },
   doorRow: { a: pose({ t: -28, legs: [leg(28, 0), leg(28, 0)], arms: [arm(100, 0), arm(100, 0)] }), b: pose({ t: -12, legs: [leg(12, 0), leg(12, 0)], arms: [arm(-25, 115), arm(-25, 115)] }), p: 2.4, props: ["door"] },
-  deadBug: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), b: SUPINE({ legs: [leg(180, 90, 180), leg(100, 0, 100)], arms: [arm(-75, 0), arm(180, 0)] }), alt: true, p: 2.4, anchor: "hip", w: "hands" },
+  deadBug: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), b: SUPINE({ legs: [leg(180, 90, 180), leg(100, 0, 100)], arms: [arm(285, 0), arm(180, 0)] }), alt: true, p: 2.4, anchor: "hip", w: "hands" },
   deadBugHold: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), anchor: "hip" },
   birdDog: { a: QUAD(), b: QUAD({ legs: [leg(0, 90, -90), leg(-90, 0, -90)], arms: [arm(92, 0), arm(0, 0)] }), alt: true, p: 2.6, anchor: "hip" },
   catCow: { a: QUAD({ n: -28, t: 73 }), b: QUAD({ n: 45, t: 80 }), p: 3.2, anchor: "hip" },
@@ -106,8 +107,8 @@ const P = {
   sidePlank: { a: pose({ t: 78, legs: [leg(-78, 0, -12), leg(-78, 0, -12)], arms: [arm(0, 90), arm(180, 0)] }) },
   hollow: { a: pose({ t: -76, legs: [leg(105, 0, 105), leg(105, 0, 105)], arms: [arm(-108, 0), arm(-108, 0)] }), anchor: "hip" },
   crunch: { a: SUPINE({ arms: [arm(110, 60), arm(110, 60)] }), b: SUPINE({ t: -68, arms: [arm(100, 20), arm(100, 20)] }), p: 2.2, anchor: "hip" },
-  carry: { a: pose({ arms: [arm(0, 0), arm(0, 0)] }), b: pose({ legs: [leg(30, 35), leg(-12, 8)], arms: [arm(0, 0), arm(0, 0)] }), alt: true, p: 1.4, w: "hands" },
-  kbCarry: { a: pose({ arms: [arm(20, 140), arm(20, 140)] }), b: pose({ legs: [leg(30, 35), leg(-12, 8)], arms: [arm(20, 140), arm(20, 140)] }), alt: true, p: 1.4, w: "chest" },
+  carry: { a: pose({ arms: [arm(0, 0), arm(0, 0)] }), b: pose({ legs: [leg(42, 64), leg(0, 0)], arms: [arm(0, 0), arm(0, 0)] }), alt: true, p: 1.3, w: "hands" },
+  kbCarry: { a: pose({ arms: [arm(20, 140), arm(20, 140)] }), b: pose({ legs: [leg(42, 64), leg(0, 0)], arms: [arm(20, 140), arm(20, 140)] }), alt: true, p: 1.3, w: "chest" },
   twist: { a: pose({ t: -35, legs: [leg(70, 95), leg(70, 95)], arms: [arm(60, 70), arm(60, 70)] }), b: pose({ t: -35, legs: [leg(70, 95), leg(70, 95)], arms: [arm(40, 90), arm(80, 50)] }), alt: true, p: 1.8, anchor: "hip", w: "hands" },
   getUp: { a: SUPINE({ legs: [leg(130, 95), leg(90, 0, 90)], arms: [arm(180, 0), arm(135, 0)] }), b: SUPINE({ t: -62, legs: [leg(130, 95), leg(90, 0, 90)], arms: [arm(180, 0), arm(0, 90)] }), p: 3.2, anchor: "hip", w: "near" },
   seatedMarch: { a: SEATED(), b: SEATED({ legs: [leg(115, 95), leg(90, 90)], arms: [arm(-15, 80), arm(40, 80)] }), alt: true, p: 1.4, props: ["chairA"] },
@@ -115,18 +116,18 @@ const P = {
   seatedAnkle: { a: SEATED({ legs: [leg(80, 25, 70), leg(90, 90)] }), b: SEATED({ legs: [leg(80, 25, 125), leg(90, 90)] }), p: 2, props: ["chairA"] },
   sitIso: { a: SEATED({ arms: [arm(30, 80), arm(30, 80)] }), props: ["chairA"] },
   shadowBox: { a: pose({ t: 5, legs: [leg(12, 15), leg(-12, 15)], arms: [arm(25, 120), arm(25, 120)] }), b: pose({ t: 8, legs: [leg(12, 15), leg(-12, 15)], arms: [arm(88, 0), arm(25, 120)] }), alt: true, p: 1 },
-  mountain: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(32, 112, 0), leg(-71, 0, -5)], arms: [arm(3, 0), arm(3, 0)] }), alt: true, p: 0.9 },
+  mountain: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(60, 130, -80), leg(-71, 0, -5)], arms: [arm(3, 0), arm(3, 0)] }), alt: true, p: 0.9 },
   burpee: { a: pose({ t: 55, legs: [leg(100, 130), leg(100, 130)], arms: [arm(2, 0), arm(2, 0)] }), b: PLANK_HIGH, p: 2.4 },
   thruster: { a: SQUAT_LOW({ arms: [arm(25, 155), arm(25, 155)] }), b: pose({ arms: [arm(176, 4), arm(176, 4)] }), p: 2.4, w: "hands" },
   clean: { a: pose({ t: 62, legs: [leg(25, 32), leg(25, 32)], arms: [arm(-25, 0), arm(-25, 0)] }), b: pose({ arms: [arm(15, 150), arm(4, 0)] }), p: 2, w: "near" },
-  bear: { a: pose({ t: 80, legs: [leg(15, 100, -60), leg(15, 100, -60)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ t: 80, legs: [leg(15, 100, -60), leg(32, 100, -50)], arms: [arm(18, 0), arm(0, 0)] }), alt: true, p: 1.2 },
+  bear: { a: pose({ t: 80, legs: [leg(15, 100, -60), leg(15, 100, -60)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ t: 80, legs: [leg(15, 100, -60), leg(32, 100, -50)], arms: [arm(18, 0), arm(0, 0)] }), m: pose({ t: 80, legs: [leg(15, 100, -60), leg(30, 122, -36)], arms: [arm(9, 0), arm(0, 0)] }), alt: true, p: 1.2 },
   balance: { a: BALANCE({ t: -2 }), b: BALANCE({ t: 2 }), p: 3, anchor: "near" },
   starReach: { a: BALANCE(), b: pose({ t: -8, legs: [leg(15, 30), leg(55, 5, 80)], arms: [arm(40, 10), arm(40, 10)] }), p: 2.6, anchor: "near" },
   longSit: { a: pose({ t: -8, legs: [leg(90, 0, 175), leg(90, 0, 175)], arms: [arm(-25, 0), arm(-25, 0)] }), b: pose({ t: -8, legs: [leg(90, 0, 160), leg(90, 0, 160)], arms: [arm(-25, 0), arm(-25, 0)] }), p: 2.4, anchor: "hip" },
   lieIso: { a: SUPINE({ arms: [arm(100, 80), arm(90, 0)] }), b: SUPINE({ t: -89, arms: [arm(100, 80), arm(90, 0)] }), p: 4, anchor: "hip" },
   standIso: { a: pose({ arms: [arm(0, 90), arm(20, 90)] }), b: pose({ arms: [arm(0, 88), arm(20, 92)] }), p: 3 },
-  openBook: { a: pose({ t: -90, legs: [leg(130, 100), leg(130, 100)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -90, legs: [leg(130, 100), leg(130, 100)], arms: [arm(-80, 0), arm(178, 0)] }), p: 3, anchor: "hip" },
-  hipFlexor: { a: pose({ t: -4, legs: [leg(80, 80), leg(-15, 92, -120)], arms: [arm(10, 0), arm(10, 0)] }), b: pose({ t: -10, legs: [leg(90, 85), leg(-25, 92, -120)], arms: [arm(10, 0), arm(10, 0)] }), p: 3.2, anchor: "far" },
+  openBook: { a: pose({ t: -90, legs: [leg(130, 100), leg(130, 100)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -90, legs: [leg(130, 100), leg(130, 100)], arms: [arm(280, 0), arm(178, 0)] }), p: 3, anchor: "hip" },
+  hipFlexor: { a: pose({ t: -4, legs: [leg(80, 80), leg(-15, 92, -120)], arms: [arm(10, 0), arm(10, 0)] }), b: pose({ t: -10, legs: [leg(90, 85), leg(-25, 92, -120)], arms: [arm(10, 0), arm(10, 0)] }), p: 3.2, anchor: "near" },
   thoracicReach: { a: pose({ arms: [arm(150, 30), arm(150, 30)] }), b: pose({ arms: [arm(178, 5), arm(178, 5)] }), p: 2.6, props: ["wallFront"] },
   sphinx: { a: pose({ t: 58, legs: [leg(-90, 0, -90), leg(-90, 0, -90)], arms: [arm(0, 90), arm(0, 90)] }), anchor: "hip" },
   cobra: { a: pose({ t: 74, legs: [leg(-90, 0, -90), leg(-90, 0, -90)], arms: [arm(-60, 70), arm(-60, 70)] }), b: pose({ t: 52, legs: [leg(-90, 0, -90), leg(-90, 0, -90)], arms: [arm(10, 35), arm(10, 35)] }), p: 3.2, anchor: "hip" },
@@ -151,10 +152,10 @@ const P = {
   tandem: { a: pose({ legs: [leg(7, 2), leg(-7, 2)], arms: [arm(28, 12), arm(28, 12)] }), b: pose({ t: 2, legs: [leg(7, 2), leg(-7, 2)], arms: [arm(34, 12), arm(22, 12)] }), p: 3.2 },
   legBack: { a: pose({ arms: [arm(10, 10), arm(70, 10)] }), b: pose({ t: 7, legs: [leg(-28, 6), leg(0, 0)], arms: [arm(10, 10), arm(74, 10)] }), p: 2.4, anchor: "far", props: ["wallHands"] },
   kneeLift: { a: pose({ arms: HANDS_HIPS }), b: pose({ legs: [leg(84, 92), leg(0, 0)], arms: HANDS_HIPS }), p: 3.2, anchor: "far" },
-  toeRaise: { a: pose({ t: -8, legs: [leg(8, 0), leg(8, 0)] }), b: pose({ t: -8, legs: [leg(8, 0, 124), leg(8, 0, 124)] }), p: 2, props: ["wallBack"] },
+  toeRaise: { a: pose({ t: -8, legs: [leg(8, 0), leg(8, 0)] }), b: pose({ t: -8, legs: [leg(8, 0, 124), leg(8, 0, 124)] }), p: 2, props: ["wallBack"], anchor: "heels" },
   rock: { a: pose({ legs: [leg(0, 0, 118), leg(0, 0, 118)], arms: [arm(8, 14), arm(8, 14)] }), b: pose({ legs: [leg(0, 0, 55), leg(0, 0, 55)], arms: [arm(8, 14), arm(8, 14)] }), p: 2.2 },
   hop: { a: pose({ legs: [leg(4, 12, 84), leg(4, 12, 84)], arms: [arm(18, 72), arm(18, 72)] }), b: pose({ air: 0.07, legs: [leg(0, 2, 58), leg(0, 2, 58)], arms: [arm(14, 66), arm(14, 66)] }), p: 0.6 },
-  stepBackReach: { a: pose({ arms: [arm(10, 10), arm(10, 10)] }), b: pose({ legs: [leg(14, 12), leg(-26, 6, 62)], arms: [arm(168, 0), arm(168, 0)] }), alt: true, p: 1.6 },
+  stepBackReach: { a: pose({ arms: [arm(10, 10), arm(10, 10)] }), b: pose({ legs: [leg(14, 12), leg(-26, 6, 62)], arms: [arm(168, 0), arm(168, 0)] }), m: pose({ legs: [leg(8, 10), leg(-14, 34, 82)], arms: [arm(90, 10), arm(90, 10)] }), alt: true, p: 1.6 },
   chinTuck: { a: pose({ n: 22 }), b: pose({ n: -4 }), p: 2.6 },
   shoulderRoll: { a: pose({ arms: [arm(6, 10), arm(6, 10)] }), b: pose({ sh: 0.05, arms: [arm(-10, 10), arm(-10, 10)] }), p: 1.6 },
   handsBehind: { a: pose({ arms: [arm(-28, 4), arm(-28, 4)] }), b: pose({ n: -6, arms: [arm(-44, 4), arm(-44, 4)] }), p: 4 },
@@ -176,22 +177,22 @@ const P = {
 
   // ----- Анфас -----
   jacks: { a: fpose(), b: fpose({ air: 0.05, legs: [fleg(18), fleg(18)], arms: [farm(165, 8), farm(165, 8)] }), p: 1 },
-  stepJack: { a: fpose(), b: fpose({ legs: [fleg(20), fleg(3)], arms: [farm(150, 10), farm(150, 10)] }), alt: true, p: 1.4 },
+  stepJack: { a: fpose(), b: fpose({ legs: [fleg(20), fleg(3)], arms: [farm(150, 10), farm(150, 10)] }), m: fpose({ legs: [fleg(13, 6, 0.14), fleg(3)], arms: [farm(80, 10), farm(80, 10)] }), alt: true, p: 1.4 },
   armCircles: { a: fpose({ arms: [farm(82, 0), farm(82, 0)] }), b: fpose({ arms: [farm(102, 0), farm(102, 0)] }), p: 0.9 },
   lateralRaise: { a: fpose({ arms: [farm(12, 5), farm(12, 5)] }), b: fpose({ arms: [farm(86, 5), farm(86, 5)] }), p: 2.2, w: "hands" },
   pullApart: { a: fpose({ arms: [farm(38, 45), farm(38, 45)] }), b: fpose({ arms: [farm(90, 0), farm(90, 0)] }), p: 2, props: ["bandHands"] },
   wallAngel: { a: fpose({ arms: [farm(90, 90), farm(90, 90)] }), b: fpose({ arms: [farm(150, 20), farm(150, 20)] }), p: 2.6 },
-  sumo: { a: fpose({ legs: [fleg(22), fleg(22)], arms: [farm(4, 0), farm(4, 0)] }), b: fpose({ legs: [fleg(64, 88), fleg(64, 88)], arms: [farm(4, 0), farm(4, 0)] }), p: 2.6, w: "hands" },
-  sideLunge: { a: fpose({ legs: [fleg(30), fleg(30)], arms: [farm(10, 90), farm(10, 90)] }), b: fpose({ t: 4, legs: [fleg(66, 104), fleg(40)], arms: [farm(10, 90), farm(10, 90)] }), alt: true, p: 2.6 },
-  sideStep: { a: fpose({ legs: [fleg(4, 12), fleg(4, 12)] }), b: fpose({ legs: [fleg(18, 16), fleg(5, 16)], arms: [farm(30, 20), farm(14, 10)] }), alt: true, p: 1.4, props: ["bandKnees"] },
-  legSide: { a: fpose({ arms: [farm(10, 6), farm(70, 10)] }), b: fpose({ legs: [fleg(4), fleg(36)], arms: [farm(10, 6), farm(70, 10)] }), p: 2.2 },
-  stepSide: { a: fpose({ legs: [fleg(4, 12), fleg(4, 12)] }), b: fpose({ legs: [fleg(18, 16), fleg(5, 16)], arms: [farm(30, 20), farm(14, 10)] }), alt: true, p: 1.4 },
+  sumo: { a: fpose({ legs: [fleg(22), fleg(22)], arms: [farm(4, 0), farm(4, 0)] }), b: fpose({ legs: [fleg(64, 73), fleg(64, 73)], arms: [farm(4, 0), farm(4, 0)] }), p: 2.6, w: "hands" },
+  sideLunge: { a: fpose({ legs: [fleg(30), fleg(30)], arms: [farm(10, 90), farm(10, 90)] }), b: fpose({ t: 4, legs: [fleg(70, 110), fleg(57)], arms: [farm(10, 90), farm(10, 90)] }), alt: true, p: 2.6 },
+  sideStep: { a: fpose({ legs: [fleg(4, 12), fleg(4, 12)] }), b: fpose({ legs: [fleg(18, 16), fleg(5, 16)], arms: [farm(30, 20), farm(14, 10)] }), m: fpose({ legs: [fleg(12, 16, 0.12), fleg(5, 16)], arms: [farm(22, 15), farm(10, 10)] }), alt: true, p: 1.4, props: ["bandKnees"] },
+  legSide: { a: fpose({ arms: [farm(10, 6), farm(70, 10)] }), b: fpose({ legs: [fleg(4), fleg(36)], arms: [farm(10, 6), farm(70, 10)] }), p: 2.2, anchor: "near" },
+  stepSide: { a: fpose({ legs: [fleg(4, 12), fleg(4, 12)] }), b: fpose({ legs: [fleg(18, 16), fleg(5, 16)], arms: [farm(30, 20), farm(14, 10)] }), m: fpose({ legs: [fleg(12, 16, 0.12), fleg(5, 16)], arms: [farm(22, 15), farm(10, 10)] }), alt: true, p: 1.4 },
   weightShift: { a: fpose({ legs: [fleg(5), fleg(17)], arms: [farm(22, 12), farm(22, 12)] }), b: fpose({ legs: [fleg(17), fleg(5)], arms: [farm(22, 12), farm(22, 12)] }), p: 3 },
   sideBendWarm: { a: fpose({ arms: [farm(6, 4), farm(6, 4)] }), b: fpose({ t: 18, arms: [farm(150, 40), farm(2, 2)] }), alt: true, p: 2.6 },
   shuffle: { a: fpose({ legs: [fleg(14, 26), fleg(14, 26)], arms: [farm(18, -130), farm(18, -130)] }), b: fpose({ air: 0.03, legs: [fleg(24, 28), fleg(6, 18)], arms: [farm(18, -130), farm(18, -130)] }), alt: true, p: 0.9 },
   bandLateral: { a: fpose({ arms: [farm(12, 5), farm(12, 5)] }), b: fpose({ arms: [farm(86, 5), farm(86, 5)] }), p: 2.2, props: ["bandFeet"] },
   sideBend: { a: fpose({ arms: [farm(170, 10), farm(170, 10)] }), b: fpose({ t: 18, arms: [farm(158, 10), farm(180, 0)] }), p: 3.2 },
-  chop: { a: fpose({ t: -6, legs: [fleg(16, 20), fleg(16, 20)], arms: [farm(35, 0), farm(-25, 0)] }), b: fpose({ t: 8, legs: [fleg(16, 6), fleg(16, 6)], arms: [farm(-140, 0), farm(150, 0)] }), p: 2.2, w: "hands" },
+  chop: { a: fpose({ t: -6, legs: [fleg(16, 20), fleg(16, 20)], arms: [farm(35, 0), farm(-25, 0)] }), b: fpose({ t: 8, legs: [fleg(8, 4), fleg(8, 4)], arms: [farm(-140, 0), farm(150, 0)] }), p: 2.2, w: "hands" },
   neckTilt: { a: fpose(), b: fpose({ n: 24 }), p: 3.2 },
   halo: { a: fpose({ arms: [farm(150, 75), farm(150, 75)] }), b: fpose({ t: 5, arms: [farm(120, 110), farm(165, 50)] }), alt: true, p: 2.4, w: "chest" }
 };
@@ -277,9 +278,10 @@ function frontJoints(p) {
   const shs = [-1, 1].map(sg => add(chestTop, right, sg * 0.18));
   const legs = p.legs.map((L, i) => {
     const sg = i === 0 ? -1 : 1;
-    const knee = add(hips[i], [sg * Math.sin(L.h * D), -Math.cos(L.h * D)], LEN.thigh);
+    const lift = L.lift || 0;
+    const knee = add(add(hips[i], [sg * Math.sin(L.h * D), -Math.cos(L.h * D)], LEN.thigh), [0, lift * 0.5]);
     const a2 = L.h - L.k;
-    const ankle = add(knee, [sg * Math.sin(a2 * D), -Math.cos(a2 * D)], LEN.shank);
+    const ankle = add(add(knee, [sg * Math.sin(a2 * D), -Math.cos(a2 * D)], LEN.shank), [0, lift * 0.5]);
     const toe = add(ankle, [sg * 0.07, -0.02]);
     return { knee, ankle, toe, heel: ankle };
   });
@@ -319,6 +321,10 @@ const anchorX = (J, anchor) => {
     case "far": return J.legs[1].ankle[0];
     case "knees": return (J.legs[0].knee[0] + J.legs[1].knee[0]) / 2;
     case "hands": return (J.arms[0].hand[0] + J.arms[1].hand[0]) / 2;
+    case "toes": return (J.legs[0].toe[0] + J.legs[1].toe[0]) / 2;
+    case "heels": return (J.legs[0].heel[0] + J.legs[1].heel[0]) / 2;
+    case "leg0": return J.legs[0].ankle[0];
+    case "leg1": return J.legs[1].ankle[0];
     default: return (J.legs[0].ankle[0] + J.legs[1].ankle[0]) / 2;
   }
 };
@@ -388,13 +394,15 @@ function torsoAxes(J) {
   const u = [ax[0] / L, ax[1] / L];
   return { L, u, f: [u[1], -u[0]] }; // f — направление груди
 }
-function torsoSide(J) {
+function torsoSide(J, breath = 0) {
   const { L, u, f } = torsoAxes(J);
   const at = (k, off) => [J.hip[0] + u[0] * k * L + f[0] * off, J.hip[1] + u[1] * k * L + f[1] * off];
+  // Грудная клетка «дышит»: верх торса чуть расширяется на вдохе
+  const bw = k => 1 + breath * Math.max(0, Math.min(1, (k - 0.35) / 0.4));
   const pts = [at(-0.13, 0)];
-  for (const [k, w] of TORSO_FRONT) pts.push(at(k, w));
+  for (const [k, w] of TORSO_FRONT) pts.push(at(k, w * bw(k)));
   pts.push(at(1.06, 0));
-  for (const [k, w] of TORSO_BACK.slice().reverse()) pts.push(at(k, -w));
+  for (const [k, w] of TORSO_BACK.slice().reverse()) pts.push(at(k, -w * bw(k)));
   return smoothPath(pts.map(sv));
 }
 // Торс анфас: [высота от таза, полуширина] — плечи, подмышки, талия, бёдра
@@ -403,13 +411,14 @@ function frontAxes(J) {
   const u = unit2(sub2(J.chestTop, J.hip));
   return { u, r: [u[1], -u[0]] };
 }
-function torsoFront(J) {
+function torsoFront(J, breath = 0) {
   const { u, r } = frontAxes(J);
   const at = (y, x) => [J.hip[0] + u[0] * y + r[0] * x, J.hip[1] + u[1] * y + r[1] * x];
+  const bw = y => 1 + breath * Math.max(0, Math.min(1, (y - 0.2) / 0.2));
   const pts = [];
-  for (const [y, x] of TORSO_HALF) pts.push(at(y, x));
+  for (const [y, x] of TORSO_HALF) pts.push(at(y, x * bw(y)));
   pts.push(at(-0.075, 0));
-  for (const [y, x] of TORSO_HALF.slice().reverse()) pts.push(at(y, -x));
+  for (const [y, x] of TORSO_HALF.slice().reverse()) pts.push(at(y, -x * bw(y)));
   return smoothPath(pts.map(sv));
 }
 // Подсветка мышцы на сегменте: side 1 — передняя поверхность, -1 — задняя, 0 — весь сегмент
@@ -417,7 +426,7 @@ function musclePath(a, b, ra, rb, side, k0 = 0.06, k1 = 0.94) {
   const d = unit2(sub2(b, a)), ant = [-d[1], d[0]];
   const pa = lerp2(a, b, k0), pb = lerp2(a, b, k1);
   const r0 = ra + (rb - ra) * k0, r1 = ra + (rb - ra) * k1;
-  if (!side) return capsulePath(pa, pb, r0 * 0.84, r1 * 0.84);
+  if (!side) return capsulePath(pa, pb, r0 * 0.7, r1 * 0.7);
   return capsulePath([pa[0] + ant[0] * r0 * 0.38 * side, pa[1] + ant[1] * r0 * 0.38 * side], [pb[0] + ant[0] * r1 * 0.38 * side, pb[1] + ant[1] * r1 * 0.38 * side], r0 * 0.6, r1 * 0.6);
 }
 // Мышцы торса в профиль: [от, до, сдвиг к груди (+) или спине (−), радиусы]
@@ -445,118 +454,192 @@ const LOAD_PARTS = {
   hip: [["glute"]], chest: [["chest"]], abdomen: [["abs"]], upperBack: [["upperBack"]], lowerBack: [["lowerBack"]],
   shoulder: [["delt"]], elbow: [["upper", 0, 0.8]], wrist: [["fore", 0, 0.8]], neck: [["neck", 0, 0.8]]
 };
-const ALPHA = [0, 0.5, 0.72, 0.92];
+const ALPHA = [0, 0.42, 0.62, 0.8];
 function makePath(svg, cls, extra = {}) {
   const el = s("path", { class: cls, ...extra });
   svg.append(el);
   return el;
 }
+// Сборка фигуры: дальние рука и нога (бледнее), шея, торс в футболке, шорты, голова с волосами,
+// ухом и лицом, ближние нога и рука. Кожа, одежда и обувь — разными цветами, на руках и ногах
+// мягкая тень с теневой стороны. Мышцы, которые работают в упражнении, подсвечиваются поверх.
+const LIGHT = unit2([0.55, 0.85]); // свет сверху и спереди
+// Тень на сегменте: узкая капсула, сдвинутая к теневой стороне
+function shadePath(a, b, ra, rb) {
+  const d = unit2(sub2(b, a));
+  let n = [-d[1], d[0]];
+  if (n[0] * LIGHT[0] + n[1] * LIGHT[1] > 0) n = [-n[0], -n[1]];
+  const pa = lerp2(a, b, 0.12), pb = lerp2(a, b, 0.86);
+  const r0 = ra + (rb - ra) * 0.12, r1 = ra + (rb - ra) * 0.86;
+  return capsulePath([pa[0] + n[0] * r0 * 0.45, pa[1] + n[1] * r0 * 0.45], [pb[0] + n[0] * r1 * 0.45, pb[1] + n[1] * r1 * 0.45], r0 * 0.5, r1 * 0.5);
+}
+// Кроссовок в профиль: пятка, подошва, носок, подъём и голенище до щиколотки
+function shoeSide(L) {
+  const f = unit2(sub2(L.toe, L.heel));
+  let n = [-f[1], f[0]];
+  if (n[0] * (L.ankle[0] - L.heel[0]) + n[1] * (L.ankle[1] - L.heel[1]) < 0) n = [-n[0], -n[1]];
+  const at = (p, kf, kn) => [p[0] + f[0] * kf + n[0] * kn, p[1] + f[1] * kf + n[1] * kn];
+  const mid = lerp2(L.heel, L.toe, 0.62);
+  const pts = [at(L.heel, 0.002, -0.026), at(L.toe, 0.02, -0.026), at(L.toe, 0.028, 0.004), at(L.toe, -0.008, 0.034), at(mid, 0, 0.062), at(L.ankle, 0.04, 0.03), at(L.ankle, -0.036, 0.022), at(L.heel, -0.02, 0.026)];
+  return { shoe: smoothPath(pts.map(sv)), sole: capsulePath(at(L.heel, 0.004, -0.021), at(L.toe, 0.02, -0.021), 0.011, 0.011, 4) };
+}
+// Кисть: ладонь и большой палец со стороны груди
+function handParts(A, rad) {
+  const d = unit2(sub2(A.hand, A.wrist));
+  let p = [-d[1], d[0]];
+  if (p[0] < 0) p = [-p[0], -p[1]];
+  const at = (k, s) => [A.wrist[0] + d[0] * k + p[0] * s, A.wrist[1] + d[1] * k + p[1] * s];
+  return { palm: capsulePath(A.wrist, A.hand, rad[0], rad[1]), thumb: capsulePath(at(0.012, 0.016), at(0.046, 0.03), 0.011, 0.009, 4) };
+}
+// Волосы в профиль: шапочка от лба через макушку к затылку
+function hairSide(J) {
+  const hu = unit2(sub2(J.head, J.neck)), hf = [hu[1], -hu[0]];
+  const r = LEN.head;
+  const pt = (deg, k) => { const a = deg * D; return [J.head[0] + (hf[0] * Math.cos(a) + hu[0] * Math.sin(a)) * r * k, J.head[1] + (hf[1] * Math.cos(a) + hu[1] * Math.sin(a)) * r * k]; };
+  const pts = [];
+  for (let deg = 52; deg <= 232; deg += 18) pts.push(pt(deg, deg > 200 ? 1.02 : 1.08));
+  pts.push(pt(222, 0.72), pt(170, 0.34), pt(80, 0.62));
+  return smoothPath(pts.map(sv));
+}
+// Волосы анфас: чёлка и макушка
+function hairFront(J) {
+  const up = unit2(sub2(J.head, J.neck)), rt = [up[1], -up[0]];
+  const r = LEN.head;
+  const pt = (deg, k) => { const a = deg * D; return [J.head[0] + (rt[0] * Math.cos(a) + up[0] * Math.sin(a)) * r * k, J.head[1] + (rt[1] * Math.cos(a) + up[1] * Math.sin(a)) * r * k]; };
+  const pts = [];
+  for (let deg = 0; deg <= 180; deg += 20) pts.push(pt(deg, 1.07));
+  pts.push(pt(168, 0.78), pt(120, 0.58), pt(60, 0.58), pt(12, 0.78));
+  return smoothPath(pts.map(sv));
+}
+// Шорты в профиль: таз от низа до пояса, спереди и сзади чуть шире торса
+function shortsSide(J, breath) {
+  const { L, u, f } = torsoAxes(J);
+  const at = (k, off) => [J.hip[0] + u[0] * k * L + f[0] * off, J.hip[1] + u[1] * k * L + f[1] * off];
+  const w = 1.03 + breath;
+  return smoothPath([at(-0.14, 0), at(0, 0.088 * w), at(0.17, 0.097 * w), at(0.19, 0), at(0.17, -0.104 * w), at(0.07, -0.12 * w), at(-0.03, -0.098 * w)].map(sv));
+}
+function shortsFront(J) {
+  const { u, r } = frontAxes(J);
+  const at = (y, x) => [J.hip[0] + u[0] * y + r[0] * x, J.hip[1] + u[1] * y + r[1] * x];
+  return smoothPath([at(0.11, 0.148), at(0.06, 0.156), at(-0.04, 0.136), at(-0.08, 0), at(-0.04, -0.136), at(0.06, -0.156), at(0.11, -0.148), at(0.12, 0)].map(sv));
+}
 function buildRig(svg, front, load = {}) {
-  const R = { front, overlays: [] };
+  const R = { front, overlays: [], parts: [] };
   svg.append(s("line", { class: "d-ground", x1: -1.25, y1: 0.012, x2: 1.25, y2: 0.012, "stroke-width": 0.02 }));
   R.shadow = s("ellipse", { class: "d-shadow", cx: 0, cy: 0.004, rx: 0.3, ry: 0.032 });
   svg.append(R.shadow);
   R.props = s("g", { class: "d-props" });
   svg.append(R.props);
-  const parts = [];
-  for (const [key, lv] of Object.entries(load)) for (const [seg, side = 0, k = 1] of LOAD_PARTS[key] || []) parts.push({ seg, side, alpha: ALPHA[Math.min(3, lv)] * k });
-  const overlay = (svgEl, cls, alpha, path) => {
-    const el = makePath(svgEl, cls, { "fill-opacity": alpha.toFixed(2) });
-    R.overlays.push({ el, path });
-  };
+  const work = [];
+  for (const [key, lv] of Object.entries(load)) for (const [seg, side = 0, k = 1] of LOAD_PARTS[key] || []) work.push({ seg, side, alpha: ALPHA[Math.min(3, lv)] * k });
   const rad = front ? FRAD : RAD;
-  const limbOverlays = (i, segs, dim) => {
-    for (const p of parts) {
+  // part(группа, класс, функция пути) — элемент, который перерисовывается каждый кадр
+  const part = (g, cls, fn) => { const el = makePath(g, cls); R.parts.push({ el, fn }); return el; };
+  const overlay = (g, alpha, fn) => { const el = makePath(g, "d-work", { "fill-opacity": alpha.toFixed(2) }); R.overlays.push({ el, path: fn }); };
+  const limbWork = (g, i, segs) => {
+    for (const p of work) {
       if (!segs.includes(p.seg)) continue;
-      const alpha = p.alpha * dim;
-      if (p.seg === "delt") overlay(svg, "d-work", alpha, J => { const A = J.arms[i], sh = front ? A.sh : J.sh; return capsulePath(sh, lerp2(sh, A.elbow, 0.42), rad.upper[0] * 1.12, rad.upper[0] * 0.92); });
-      else if (p.seg === "thigh") overlay(svg, "d-work", alpha, J => musclePath(front ? J.hips[i] : J.hip, J.legs[i].knee, ...rad.thigh, front ? 0 : p.side));
-      else if (p.seg === "shank") overlay(svg, "d-work", alpha, J => musclePath(J.legs[i].knee, J.legs[i].ankle, ...rad.shank, front ? 0 : p.side, 0.06, 0.72));
-      else if (p.seg === "upper") overlay(svg, "d-work", alpha, J => musclePath(front ? J.arms[i].sh : J.sh, J.arms[i].elbow, ...rad.upper, 0));
-      else if (p.seg === "fore") overlay(svg, "d-work", alpha, J => musclePath(J.arms[i].elbow, J.arms[i].wrist, ...rad.fore, 0));
+      if (p.seg === "delt") overlay(g, p.alpha, J => { const A = J.arms[i], sh = front ? A.sh : J.sh; return capsulePath(sh, lerp2(sh, A.elbow, 0.42), rad.upper[0] * 1.12, rad.upper[0] * 0.92); });
+      else if (p.seg === "thigh") overlay(g, p.alpha, J => musclePath(front ? J.hips[i] : J.hip, J.legs[i].knee, ...rad.thigh, front ? 0 : p.side));
+      else if (p.seg === "shank") overlay(g, p.alpha, J => musclePath(J.legs[i].knee, J.legs[i].ankle, ...rad.shank, front ? 0 : p.side, 0.06, 0.72));
+      else if (p.seg === "upper") overlay(g, p.alpha, J => musclePath(front ? J.arms[i].sh : J.sh, J.arms[i].elbow, ...rad.upper, 0));
+      else if (p.seg === "fore") overlay(g, p.alpha, J => musclePath(J.arms[i].elbow, J.arms[i].wrist, ...rad.fore, 0));
     }
   };
-  const torsoOverlays = () => {
-    for (const p of parts) {
+  const hipOf = (J, i) => (front ? J.hips[i] : J.hip);
+  const shOf = (J, i) => (front ? J.arms[i].sh : J.sh);
+  const leg = (g, i) => {
+    part(g, "d-skin", J => capsulePath(hipOf(J, i), J.legs[i].knee, ...rad.thigh));
+    part(g, "d-skin", J => capsulePath(J.legs[i].knee, J.legs[i].ankle, ...rad.shank));
+    part(g, "d-shade", J => shadePath(hipOf(J, i), J.legs[i].knee, ...rad.thigh));
+    part(g, "d-shade", J => shadePath(J.legs[i].knee, J.legs[i].ankle, ...rad.shank));
+    if (front) part(g, "d-shoe", J => capsulePath([J.legs[i].ankle[0], J.legs[i].ankle[1] - 0.012], J.legs[i].toe, 0.04, 0.034));
+    else {
+      part(g, "d-shoe", J => shoeSide(J.legs[i]).shoe);
+      part(g, "d-sole", J => shoeSide(J.legs[i]).sole);
+    }
+    part(g, "d-shorts", J => capsulePath(hipOf(J, i), lerp2(hipOf(J, i), J.legs[i].knee, 0.44), rad.thigh[0] * 1.08, rad.thigh[0] * 1.03));
+    limbWork(g, i, ["thigh", "shank"]);
+  };
+  const arm = (g, i) => {
+    part(g, "d-skin", J => capsulePath(shOf(J, i), J.arms[i].elbow, ...rad.upper));
+    part(g, "d-skin", J => capsulePath(J.arms[i].elbow, J.arms[i].wrist, ...rad.fore));
+    part(g, "d-shade", J => shadePath(J.arms[i].elbow, J.arms[i].wrist, ...rad.fore));
+    part(g, "d-skin", J => handParts(J.arms[i], rad.hand).palm);
+    part(g, "d-skin", J => handParts(J.arms[i], rad.hand).thumb);
+    part(g, "d-shirt", J => capsulePath(shOf(J, i), lerp2(shOf(J, i), J.arms[i].elbow, 0.44), rad.upper[0] * (front ? 1.06 : 1.08), rad.upper[0] * 1.04));
+    limbWork(g, i, ["upper", "fore", "delt"]);
+  };
+  const torsoWork = g => {
+    for (const p of work) {
       if (!["chest", "abs", "upperBack", "lowerBack", "glute"].includes(p.seg)) continue;
       if (front && (p.seg === "upperBack" || p.seg === "lowerBack")) continue;
-      overlay(svg, "d-work", p.alpha, J => (front ? torsoPartFront(J, p.seg) : torsoPartSide(J, p.seg)));
+      overlay(g, p.alpha, J => (front ? torsoPartFront(J, p.seg) : torsoPartSide(J, p.seg)));
     }
   };
-  const limb = (cls, i, dim) => {
-    const L = { arm: {}, leg: {} };
-    return {
-      leg: () => {
-        L.leg = { thigh: makePath(svg, cls), shank: makePath(svg, cls), foot: makePath(svg, cls) };
-        limbOverlays(i, ["thigh", "shank"], dim);
-      },
-      arm: () => {
-        L.arm = { upper: makePath(svg, cls), fore: makePath(svg, cls), hand: makePath(svg, cls) };
-        limbOverlays(i, ["upper", "fore", "delt"], dim);
-      },
-      L
-    };
-  };
+  const fig = s("g", { class: "d-fig" });
+  svg.append(fig);
   if (front) {
-    const legs = [limb("d-skin", 0, 1), limb("d-skin", 1, 1)];
-    legs.forEach(l => l.leg());
-    R.torso = makePath(svg, "d-skin");
-    torsoOverlays();
-    R.neck = makePath(svg, "d-skin");
+    leg(fig, 0);
+    leg(fig, 1);
+    part(fig, "d-skin", J => capsulePath(J.chestTop, J.neck, ...rad.neck));
+    part(fig, "d-shirt", (J, b) => torsoFront(J, b));
+    part(fig, "d-shorts", J => shortsFront(J));
+    torsoWork(fig);
+    const ear = sg => J => { const { r } = frontAxes(J); return capsulePath([J.head[0] + r[0] * sg * 0.098, J.head[1] + r[1] * sg * 0.098 - 0.006], [J.head[0] + r[0] * sg * 0.1, J.head[1] + r[1] * sg * 0.1 - 0.02], 0.02, 0.016, 4); };
+    part(fig, "d-skin", ear(-1));
+    part(fig, "d-skin", ear(1));
     R.head = s("circle", { class: "d-skin", r: LEN.head });
-    svg.append(R.head);
-    R.eyes = [0, 1].map(() => { const e = s("circle", { class: "d-eye", r: 0.0115 }); svg.append(e); return e; });
-    const arms = [limb("d-skin", 0, 1), limb("d-skin", 1, 1)];
-    arms.forEach(l => l.arm());
-    R.limbs = [0, 1].map(i => ({ leg: legs[i].L.leg, arm: arms[i].L.arm }));
+    fig.append(R.head);
+    part(fig, "d-hair", J => hairFront(J));
+    R.eyes = [0, 1].map(() => { const e = s("circle", { class: "d-eye", r: 0.0115 }); fig.append(e); return e; });
+    R.mouth = s("line", { class: "d-mouth" });
+    fig.append(R.mouth);
+    arm(fig, 0);
+    arm(fig, 1);
   } else {
-    const far = limb("d-skin d-far", 1, 0.55), near = limb("d-skin", 0, 1);
-    far.arm();
-    far.leg();
-    R.torso = makePath(svg, "d-skin");
-    torsoOverlays();
-    R.neck = makePath(svg, "d-skin");
-    if (parts.some(p => p.seg === "neck")) overlay(svg, "d-work", parts.find(p => p.seg === "neck").alpha, J => capsulePath(J.sh, J.neck, RAD.neck[0] * 0.8, RAD.neck[1] * 0.8));
+    const far = s("g", { class: "d-far-g" });
+    fig.append(far);
+    arm(far, 1);
+    leg(far, 1);
+    part(fig, "d-skin", J => capsulePath(J.sh, J.neck, ...rad.neck));
+    part(fig, "d-shirt", (J, b) => torsoSide(J, b));
+    part(fig, "d-shorts", (J, b) => shortsSide(J, b));
+    torsoWork(fig);
+    if (work.some(p => p.seg === "neck")) overlay(fig, work.find(p => p.seg === "neck").alpha, J => capsulePath(J.sh, J.neck, RAD.neck[0] * 0.8, RAD.neck[1] * 0.8));
     R.head = s("circle", { class: "d-skin", r: LEN.head });
+    fig.append(R.head);
+    part(fig, "d-hair", J => hairSide(J));
+    R.ear = s("ellipse", { class: "d-ear", rx: 0.017, ry: 0.024 });
     R.nose = s("circle", { class: "d-skin", r: 0.02 });
     R.eye = s("circle", { class: "d-eye", r: 0.0125 });
-    svg.append(R.head, R.nose, R.eye);
-    near.leg();
-    near.arm();
-    R.limbs = [near.L, far.L];
+    R.mouth = s("line", { class: "d-mouth" });
+    fig.append(R.ear, R.nose, R.eye, R.mouth);
+    leg(fig, 0);
+    arm(fig, 0);
   }
   R.attached = [];
   return R;
 }
-function drawRig(R, J) {
-  const set = (el, d) => el.setAttribute("d", d);
-  const rad = R.front ? FRAD : RAD;
-  R.limbs.forEach((limb, i) => {
-    const L = J.legs[i], A = J.arms[i];
-    const hip = R.front ? J.hips[i] : J.hip, sh = R.front ? A.sh : J.sh;
-    set(limb.leg.thigh, capsulePath(hip, L.knee, ...rad.thigh));
-    set(limb.leg.shank, capsulePath(L.knee, L.ankle, ...rad.shank));
-    set(limb.leg.foot, R.front ? capsulePath(L.ankle, L.toe, ...rad.foot) : capsulePath(L.heel, L.toe, ...rad.foot));
-    set(limb.arm.upper, capsulePath(sh, A.elbow, ...rad.upper));
-    set(limb.arm.fore, capsulePath(A.elbow, A.wrist, ...rad.fore));
-    set(limb.arm.hand, capsulePath(A.wrist, A.hand, ...rad.hand));
-  });
+// breath — лёгкое «дыхание» торса (доля ширины)
+function drawRig(R, J, breath = 0) {
+  for (const p of R.parts) p.el.setAttribute("d", p.fn(J, breath));
+  setCircle(R.head, J.head);
+  const hu = unit2(sub2(J.head, J.neck));
   if (R.front) {
-    set(R.torso, torsoFront(J));
-    set(R.neck, capsulePath(J.chestTop, J.neck, ...rad.neck));
-    setCircle(R.head, J.head);
     const { r } = frontAxes(J);
-    const hu = unit2(sub2(J.head, J.neck));
-    R.eyes.forEach((e, k) => setCircle(e, [J.head[0] + r[0] * (k ? 0.036 : -0.036) + hu[0] * 0.012, J.head[1] + r[1] * (k ? 0.036 : -0.036) + hu[1] * 0.012]));
+    R.eyes.forEach((e, k) => setCircle(e, [J.head[0] + r[0] * (k ? 0.036 : -0.036) + hu[0] * 0.006, J.head[1] + r[1] * (k ? 0.036 : -0.036) + hu[1] * 0.006]));
+    setLine(R.mouth, [J.head[0] - r[0] * 0.022 - hu[0] * 0.05, J.head[1] - r[1] * 0.022 - hu[1] * 0.05], [J.head[0] + r[0] * 0.022 - hu[0] * 0.05, J.head[1] + r[1] * 0.022 - hu[1] * 0.05]);
   } else {
-    set(R.torso, torsoSide(J));
-    set(R.neck, capsulePath(J.sh, J.neck, ...rad.neck));
-    setCircle(R.head, J.head);
-    const hu = unit2(sub2(J.head, J.neck)), hf = [hu[1], -hu[0]];
-    setCircle(R.nose, [J.head[0] + hf[0] * 0.098 - hu[0] * 0.012, J.head[1] + hf[1] * 0.098 - hu[1] * 0.012]);
-    setCircle(R.eye, [J.head[0] + hf[0] * 0.056 + hu[0] * 0.022, J.head[1] + hf[1] * 0.056 + hu[1] * 0.022]);
+    const hf = [hu[1], -hu[0]];
+    const at = (kf, ku) => [J.head[0] + hf[0] * kf + hu[0] * ku, J.head[1] + hf[1] * kf + hu[1] * ku];
+    setCircle(R.nose, at(0.098, -0.012));
+    setCircle(R.eye, at(0.058, 0.02));
+    setCircle(R.ear, at(-0.012, -0.004));
+    R.ear.setAttribute("rx", "0.017");
+    setLine(R.mouth, at(0.084, -0.05), at(0.058, -0.054));
   }
-  for (const o of R.overlays) set(o.el, o.path(J));
+  for (const o of R.overlays) o.el.setAttribute("d", o.path(J));
   // Тень под точками опоры
   const pts = contactPoints(J).filter(([p, rr]) => p[1] - rr < 0.08).map(([p]) => p[0]);
   if (pts.length) {
@@ -742,7 +825,27 @@ function frameAt(pat, time) {
   else if (u < 0.5) k = ease((u - 0.15) / 0.35);
   else if (u < 0.65) k = 1;
   else k = 1 - ease((u - 0.65) / 0.35);
-  return { A: pat.a, B, k };
+  return { A: pat.a, B, k, second };
+}
+// Поза в долю k: если у узора есть промежуточная поза m, путь идёт A → m → B
+function poseAt(pat, B, k, second) {
+  if (!pat.m) return mix(pat.a, B, k);
+  const M = second ? mirror(pat.m) : pat.m;
+  return k < 0.5 ? mix(pat.a, M, ease(k * 2)) : mix(M, B, ease((k - 0.5) * 2));
+}
+// Для упражнений с чередованием ног опора — стоящая нога: так она не скользит, пока другая
+// шагает. Опорную ногу узнаём по тому, чья лодыжка меньше смещается от позы A к позе B
+function stanceLeg(pat) {
+  if (!pat.alt || !pat.b || pat.anchor || pat.a.front !== pat.b.front) return -1;
+  const { J: JA } = place(pat, pat.a), { J: JB } = place(pat, pat.b);
+  const move = i => Math.hypot(JB.legs[i].ankle[0] - JA.legs[i].ankle[0], JB.legs[i].ankle[1] - JA.legs[i].ankle[1]);
+  return move(0) <= move(1) ? 0 : 1;
+}
+// Сдвиг по горизонтали: опорная стопа остаётся там же, где стоит в позе A
+function placeShift(pat, J, target, anchor, stance, second, JA0) {
+  if (stance < 0) return target - anchorX(J, anchor);
+  const sl = second ? 1 - stance : stance;
+  return target - anchorX(JA0, anchor) - (J.legs[sl].ankle[0] - JA0.legs[sl].ankle[0]);
 }
 
 // Положение по горизонтали: опорная точка неподвижна, движение — по центру кадра
@@ -766,7 +869,7 @@ function layout(pat) {
   if (pat.b) {
     for (const k of [0.2, 0.35, 0.5, 0.65, 0.8]) {
       for (const B of pat.alt ? [pat.b, mirror(pat.b)] : [pat.b]) {
-        const { J, dy } = place(pat, mix(pat.a, B, k));
+        const { J, dy } = place(pat, poseAt(pat, B, k, B !== pat.b));
         for (const [p, r] of contactPoints(J)) top = Math.max(top, p[1] + dy + r);
       }
     }
@@ -801,7 +904,7 @@ function loop(now) {
       continue;
     }
     d.seen = true;
-    d.update(clock / 1000);
+    d.update((clock - d.start) / 1000);
   }
   if (active.size) raf = requestAnimationFrame(loop);
   else lastNow = 0;
@@ -810,34 +913,39 @@ function loop(now) {
 const reduced = () => { if (opts.still) return true; try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
 // Демонстрация техники: SVG-фигура, которая повторяет движение упражнения
-export function exerciseDemo(id, { label } = {}) {
+export function exerciseDemo(id, { label, paused = false } = {}) {
   const pid = patternOf(id);
   const pat = P[pid] || P.stand;
   const front = !!pat.a.front;
   const { anchor, target, top } = layout(pat);
+  const stance = stanceLeg(pat);
+  const JA0 = place(pat, pat.a).J;
   const svg = s("svg", { class: "demo-svg", viewBox: viewBoxFor(top), role: "img", "aria-label": label || `Схема движения: ${(EX[id] || { name: "" }).name}` });
   const R = buildRig(svg, front, (EX[id] || {}).load || {});
-  const placeAt = Pz => {
+  const placeAt = (Pz, second = false) => {
     const { J, dy } = place(pat, Pz);
-    return shiftJ(J, target - anchorX(J, anchor), dy);
+    return shiftJ(J, placeShift(pat, J, target, anchor, stance, second, JA0), dy);
   };
   const JA = placeAt(pat.a), JB = placeAt(pat.b || pat.a);
   addStaticProps(R, pat, JA, JB);
   addWeights(R, weightKind(id), id === "bbSquat" ? "back" : pat.w, front);
   const still = reduced();
   const update = time => {
-    let Pz;
+    let Pz, second = false;
     if (still) Pz = pat.b || pat.a;
-    else if (!pat.b) Pz = mix(pat.a, { ...pat.a, t: pat.a.t + (front ? 0 : 1.2) }, (Math.sin(time * Math.PI / 2) + 1) / 2);
+    else if (!pat.b) Pz = mix(pat.a, { ...pat.a, t: pat.a.t + (front ? 0 : 1.2) }, (1 - Math.cos(time * Math.PI / 2)) / 2);
     else {
-      const { A, B, k } = frameAt(pat, time);
-      Pz = mix(A, B, k);
+      const f = frameAt(pat, time);
+      Pz = poseAt(pat, f.B, f.k, f.second);
+      second = f.second;
     }
-    drawRig(R, placeAt(Pz));
+    // Спокойное дыхание: грудная клетка чуть расширяется раз в 3,6 секунды
+    drawRig(R, placeAt(Pz, second), still ? 0 : 0.014 * Math.sin(time * 2 * Math.PI / 3.6));
   };
   update(0);
-  if (!still) {
-    active.add({ svg, update, born: performance.now(), seen: false });
+  svg.lpFrame = update; // для проверки: кадр в заданное время
+  if (!still && !paused) {
+    active.add({ svg, update, born: performance.now(), seen: false, start: clock });
     if (!raf) raf = requestAnimationFrame(loop);
   }
   return svg;
@@ -858,3 +966,14 @@ export function patternFrame(pid, k = 0) {
   return svg;
 }
 export const PATTERN_IDS = Object.keys(P);
+export const patternDef = pid => P[pid];
+// Для проверки: суставы фигуры в кадре k (0 — поза A, 1 — поза B; mirrored — вторая сторона)
+export function patternJoints(pid, k = 0, mirrored = false) {
+  const pat = P[pid];
+  if (mirrored && !pat.alt) return null;
+  const { anchor, target } = layout(pat);
+  const stance = stanceLeg(pat);
+  const B = pat.b ? (mirrored ? mirror(pat.b) : pat.b) : pat.a;
+  const { J, dy } = place(pat, pat.b ? poseAt(pat, B, k, mirrored) : pat.a);
+  return shiftJ(J, placeShift(pat, J, target, anchor, stance, mirrored, place(pat, pat.a).J), dy);
+}

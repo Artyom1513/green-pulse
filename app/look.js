@@ -74,6 +74,15 @@ export const BODIES = [
   { id: "slate", name: "Графит", l: [0.74, 0.77, 0.81], d: [0.44, 0.47, 0.52] }
 ];
 export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
+// Тон кожи фигур в схемах движений и цвет волос к нему
+export const SKINS = [
+  { id: "light", name: "Светлый", c: "#f2d1b3", hair: "#6b4a2f" },
+  { id: "medium", name: "Средний", c: "#e2b08a", hair: "#3b2a20" },
+  { id: "tan", name: "Смуглый", c: "#c58b5f", hair: "#2a1d16" },
+  { id: "brown", name: "Тёмный", c: "#8f5c3a", hair: "#1c1410" },
+  { id: "deep", name: "Очень тёмный", c: "#5e3c27", hair: "#14100d" }
+];
+export const FIG_STYLES = [{ value: "detail", label: "Детальная" }, { value: "flat", label: "Силуэт" }];
 export const EMOJI = ["🌿", "🍃", "🌳", "🌸", "🍀", "🌞", "🌙", "⭐", "🔥", "⚡", "💪", "🏃", "🧘", "🚴", "🏊", "🎯", "🏔️", "🌊", "🦊", "🐻", "🐼", "🦁", "🐯", "🐨"];
 
 // Готовые стили: один нажатием меняют сразу цвет, фон, шрифты и форму
@@ -95,7 +104,8 @@ export const defaultLook = () => ({
   tabs: [...TAB_IDS], labels: true, start: "today",
   home: HOME_IDS.map(id => [id, true]),
   avatar: "letter", emoji: "🌿",
-  figure: "auto", muscles: true, speed: 1, body: "mint", still: false, fx: true
+  figure: "auto", muscles: true, speed: 1, body: "mint", still: false, fx: true,
+  skin: "medium", figstyle: "detail"
 });
 
 // ----- Проверка сохранённых значений -----
@@ -146,6 +156,8 @@ export function sanitizeLook(raw) {
   d.body = oneOf(raw.body, BODIES.map(b => b.id), d.body);
   d.still = bool(raw.still, d.still);
   d.fx = bool(raw.fx, d.fx);
+  d.skin = oneOf(raw.skin, SKINS.map(x => x.id), d.skin);
+  d.figstyle = oneOf(raw.figstyle, FIG_STYLES.map(x => x.value), d.figstyle);
   return d;
 }
 
@@ -242,8 +254,8 @@ export function seedOf(look) {
 }
 
 // ----- Применение -----
-const VARS = ["accent", "accent-text", "accent-ink", "accent-soft", "bg", "bg2", "blob-a", "blob-b", "blob-c", "demo-body", "demo-far"];
-const ROOT_CLASSES = ["less-glass", "bg-photo", "r-calm", "r-sharp", "d-airy", "d-compact", "bold-text", "read-ease", "head-hand", "tabs-icons", "no-muscles", "no-fx", "still"];
+const VARS = ["accent", "accent-text", "accent-ink", "accent-soft", "bg", "bg2", "blob-a", "blob-b", "blob-c", "demo-body", "demo-far", "demo-shorts", "demo-skin", "demo-hair"];
+const ROOT_CLASSES = ["less-glass", "bg-photo", "r-calm", "r-sharp", "d-airy", "d-compact", "bold-text", "read-ease", "head-hand", "tabs-icons", "no-muscles", "no-fx", "still", "demo-flat"];
 
 // photoUrl — адрес blob: картинки фона, если она есть
 export function applyLook(look, { photoUrl = "" } = {}) {
@@ -271,16 +283,26 @@ export function applyLook(look, { photoUrl = "" } = {}) {
     set("blob-b", bg.l[3], bg.d[3]);
     set("blob-c", bg.l[4], bg.d[4]);
   }
-  // Цвет фигуры в схемах движений
+  // Цвет фигуры (в детальном виде — цвет одежды; шорты темнее футболки)
   const fig = FIGURES.find(f => f.id === look.figure);
+  let shirt = null;
   if (fig && fig.l) {
-    set("demo-body", fig.l[0], fig.d[0]);
+    shirt = [fig.l[0], fig.d[0]];
     set("demo-far", fig.l[1], fig.d[1]);
   } else if (look.figure === "accent") {
     const c = accentSet(seedOf(look));
     const a = hexToRgb(c.accent), ad = hexToRgb(c.accentDk);
-    set("demo-body", toHex(mixRgb(a, [0, 0, 0], 0.15)), toHex(mixRgb(ad, WHITE, 0.15)));
+    shirt = [toHex(mixRgb(a, [0, 0, 0], 0.15)), toHex(mixRgb(ad, WHITE, 0.15))];
     set("demo-far", toHex(mixRgb(a, WHITE, 0.6)), toHex(mixRgb(ad, DARK_BG, 0.55)));
+  }
+  if (shirt) {
+    set("demo-body", shirt[0], shirt[1]);
+    set("demo-shorts", toHex(mixRgb(hexToRgb(shirt[0]), [0, 0, 0], 0.42)), toHex(mixRgb(hexToRgb(shirt[1]), DARK_BG, 0.35)));
+  }
+  const skin = SKINS.find(x => x.id === look.skin);
+  if (skin && skin.id !== "medium") {
+    set("demo-skin", skin.c, skin.c);
+    set("demo-hair", skin.hair, skin.hair);
   }
   // Шрифты и размер текста
   const font = FONTS.find(f => f.id === look.font) || FONTS[0];
@@ -311,6 +333,7 @@ export function applyLook(look, { photoUrl = "" } = {}) {
   if (!look.muscles) want.add("no-muscles");
   if (!look.fx) want.add("no-fx");
   if (look.still) want.add("still");
+  if (look.figstyle === "flat") want.add("demo-flat");
   for (const c of ROOT_CLASSES) root.classList.toggle(c, want.has(c));
   // Цвет строки состояния телефона — в тон фону
   const metas = document.querySelectorAll('meta[name="theme-color"]');

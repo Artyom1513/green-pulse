@@ -234,7 +234,7 @@ export function ring(value, max, { size = 120, stroke = 12, label, sub } = {}) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const part = Math.max(0, Math.min(1, max ? value / max : 0));
-  return h("div", { class: "ring", style: { width: `${size}px`, height: `${size}px` } },
+  return h("div", { class: "ring", style: { width: `min(${size}px, 23vw)`, height: `min(${size}px, 23vw)` } },
     s("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}`, "aria-hidden": "true" },
       s("circle", { class: "ring-track", cx: size / 2, cy: size / 2, r, "stroke-width": stroke, fill: "none" }),
       part > 0 ? s("circle", { class: "ring-value", cx: size / 2, cy: size / 2, r, "stroke-width": stroke, fill: "none", "stroke-linecap": "round", "stroke-dasharray": `${c * part} ${c}`, transform: `rotate(-90 ${size / 2} ${size / 2})` }) : null
