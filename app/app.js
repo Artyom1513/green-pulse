@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "1.7.0";
+const VERSION = "1.7.1";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -833,7 +833,7 @@ const WHATS_NEW = [
   "Тон кожи и вид фигуры — детальная или силуэт — в «Персонализации»",
   "Плавнее анимация: опорная стопа не скользит, шаги с подъёмом ноги",
   "Исправлены движения рук «сквозь пол» в пуловере, «мёртвом жуке» и «открытой книге»",
-  "Аккуратнее на узких экранах: награды, плитки, кнопки и кольца не выходят за рамки"
+  "Аккуратнее на узких экранах: вкладки, награды, плитки, кнопки и кольца не выходят за рамки и не обрезаются"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
