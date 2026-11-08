@@ -57,6 +57,8 @@ export const HEAD_FONTS = [
 const FONT_IDS = FONTS.map(f => f.id);
 const HEAD_IDS = HEAD_FONTS.map(f => f.id);
 
+// Тело на 3D-модели и фигуры в схемах: как в профиле, мужское или женское
+export const SEXES = [{ value: "auto", label: "Как в профиле" }, { value: "m", label: "Мужское" }, { value: "f", label: "Женское" }];
 export const RADII = [{ value: "soft", label: "Мягкие" }, { value: "calm", label: "Сдержанные" }, { value: "sharp", label: "Прямые" }];
 export const DENSITY = [{ value: "airy", label: "Просторно" }, { value: "normal", label: "Обычно" }, { value: "compact", label: "Компактно" }];
 export const FIGURES = [
@@ -105,7 +107,7 @@ export const defaultLook = () => ({
   home: HOME_IDS.map(id => [id, true]),
   avatar: "letter", emoji: "🌿",
   figure: "auto", muscles: true, speed: 1, body: "mint", still: false, fx: true,
-  skin: "medium", figstyle: "detail"
+  skin: "medium", figstyle: "detail", sex: "auto"
 });
 
 // ----- Проверка сохранённых значений -----
@@ -158,6 +160,7 @@ export function sanitizeLook(raw) {
   d.fx = bool(raw.fx, d.fx);
   d.skin = oneOf(raw.skin, SKINS.map(x => x.id), d.skin);
   d.figstyle = oneOf(raw.figstyle, FIG_STYLES.map(x => x.value), d.figstyle);
+  d.sex = oneOf(raw.sex, SEXES.map(x => x.value), d.sex);
   return d;
 }
 

@@ -746,13 +746,21 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .demo-svg .d-shade { fill: var(--demo-shade); }
 .demo-svg .d-eye { fill: var(--demo-feature); }
 .demo-svg .d-mouth { fill: none; stroke: var(--demo-feature); stroke-width: .009; stroke-linecap: round; opacity: .55; }
+/* Швы одежды: ворот, рукав, пояс, край леггинсов — чуть темнее ткани под ними */
+.demo-svg .d-hem { fill: rgba(0, 0, 0, .2); }
+.demo-svg .d-lace { fill: var(--demo-sole); opacity: .7; }
+.demo-svg .d-brow { fill: none; stroke: var(--demo-feature); stroke-width: .009; stroke-linecap: round; opacity: .7; }
+.demo-svg .d-nose { stroke-width: .007; opacity: .35; }
+/* Подсказка траектории у круговых движений */
+.demo-svg .d-guide { fill: none; stroke: var(--accent); stroke-width: .012; stroke-dasharray: .035 .03; stroke-linecap: round; opacity: .5; }
+.demo-svg .d-guide-dot { fill: var(--accent); }
 .demo-svg .d-far-g { opacity: .5; }
 .demo-svg .d-work { fill: var(--accent); stroke: none; }
 /* Вид «Силуэт»: одна заливка, как раньше */
 :root.demo-flat .demo-svg :is(.d-skin, .d-ear, .d-shirt, .d-shorts, .d-shoe, .d-sole, .d-hair) { fill: var(--demo-body); stroke: none; }
 :root.demo-flat .demo-svg .d-far-g { opacity: 1; }
 :root.demo-flat .demo-svg .d-far-g :is(.d-skin, .d-shirt, .d-shorts, .d-shoe, .d-sole) { fill: var(--demo-far); }
-:root.demo-flat .demo-svg :is(.d-shade, .d-mouth) { display: none; }
+:root.demo-flat .demo-svg :is(.d-shade, .d-mouth, .d-hem, .d-lace, .d-brow) { display: none; }
 :root.demo-flat .demo-svg .d-eye { fill: var(--demo-eye); }
 .demo-svg .d-shadow { fill: var(--demo-shadow); }
 .demo-svg .d-prop { stroke: var(--muted); fill: none; }

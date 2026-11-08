@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -48,7 +48,7 @@ function loadAnim() {
   if (animMod) return Promise.resolve(animMod);
   animLoading = animLoading || import("./anim.js").then(m => {
     animMod = m;
-    if (m.setOptions) m.setOptions({ speed: look.speed, still: look.still });
+    if (m.setOptions) m.setOptions({ speed: look.speed, still: look.still, sex: figureSex() });
     return m;
   }).catch(() => null);
   return animLoading;
@@ -67,6 +67,8 @@ function demoBox(id) {
   }
   return box;
 }
+// Тело на модели и в схемах: выбрано в персонализации или по полу в профиле
+const figureSex = () => (look.sex === "f" || look.sex === "m" ? look.sex : state && state.profile.sex === "f" ? "f" : "m");
 // undefined — модуль ещё грузится, null — 3D недоступна
 function getFigure() {
   if (figure || figureFailed) return figure;
@@ -77,7 +79,8 @@ function getFigure() {
       regions: REGIONS.map(r => r.id),
       label: "3D-модель человека. Касание выбирает зону, режим «Обвести» выделяет область",
       onTap: (id, side) => regionSheet(id, side),
-      onLasso: result => onLasso(result)
+      onLasso: result => onLasso(result),
+      sex: figureSex()
     });
   } catch (e) {
     figureFailed = true;
@@ -105,7 +108,8 @@ function paintFigure() {
   if (!figure || !state) return;
   const dark = isDark();
   const tone = L.bodyColors(look, dark);
-  figure.setTheme({ rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4 });
+  if (figure.setSex) figure.setSex(figureSex());
+  figure.setTheme({ rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4, hair: dark ? [0.28, 0.245, 0.235] : [0.26, 0.21, 0.18] });
   const base = tone.base;
   if (bodyLayer === "load") {
     const f = E.muscleFatigue(state);
@@ -209,7 +213,7 @@ function setMediaUrls() {
 }
 function applyLookNow() {
   L.applyLook(look, { photoUrl: mediaUrls.bg });
-  if (animMod && animMod.setOptions) animMod.setOptions({ speed: look.speed, still: look.still });
+  if (animMod && animMod.setOptions) animMod.setOptions({ speed: look.speed, still: look.still, sex: figureSex() });
   paintFigure();
 }
 async function loadMediaNow() {
@@ -868,11 +872,11 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Возраст — точным числом, например 25 или 67, а не диапазоном: в знакомстве, профиле и отчёте для врача",
-  "Исправлены стопы в схемах: кроссовок больше не переворачивается подошвой вверх",
-  "Опорные стопы и ладони стоят на месте — не скользят и не отрываются от пола в выпадах, мостах, отжиманиях",
-  "Точнее позы: в мосте голова лежит на полу, на коленях голень лежит на полу, планка — на предплечьях",
-  "Заголовки больше не переносятся по слогам"
+  "Женское тело — на 3D-модели и в схемах упражнений: переключатель «Мужское / Женское» на вкладке «Тело» и в «Персонализации», по умолчанию — по полу из профиля",
+  "3D-модель подробнее: лицо с носом, губами и ушами, волосы, надколенники, косточки лодыжек, пальцы ног и мягкий объёмный свет",
+  "Человечки в упражнениях прорисованы детальнее: лицо и брови, кулаки, одежда с вырезом и поясом, кроссовки со шнурками",
+  "Вращения показаны вращением, а не наклонами: повороты корпуса, круги тазом, руками, плечами, кистями и стопами — с пунктирной траекторией",
+  "Переделаны анимации 21 упражнения, которые показывали движение неточно: «Дровосек», «Гало» и передача гири вокруг корпуса, повороты сидя, ходьба «пятка к носку», опускания пяток со ступеньки, скрёстный шаг, «Конькобежец» и другие"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1429,6 +1433,8 @@ const STAGE_HINT = {
 };
 const STAGE_VIEWS = [["front", "Спереди"], ["back", "Сзади"], ["side", "Сбоку"]];
 
+// layers — переключатель «Зоны боли / Нагрузка мышц» и выбор тела; в знакомстве их нет, чтобы модель
+// целиком помещалась на экране над кнопками
 function bodyStage({ layers = true } = {}) {
   const fig = getFigure();
   if (!layers) bodyLayer = "pain";
@@ -1464,11 +1470,17 @@ function bodyStage({ layers = true } = {}) {
     options: [{ value: "rotate", label: "Вращать" }, { value: "lasso", label: "✎ Обвести" }],
     onChange: v => { figureMode = v; fig.setMode(v); hint.textContent = STAGE_HINT[v]; }
   });
+  const sexSeg = layers && choice({
+    className: "seg stage-sex", label: "Тело на модели", value: figureSex(),
+    options: [{ value: "m", label: "Мужское" }, { value: "f", label: "Женское" }],
+    onChange: v => { changeLook({ sex: v }, { rerender: false }); paintFigure(); }
+  });
   const tool = (ic, label, fn) => h("button", { class: "icon-btn", type: "button", "aria-label": label, title: label, onClick: fn }, icon(ic, 18));
   postRender.push(() => { fig.resize(); paintFigure(); fig.intro(); });
   return h("div", { class: "stage" },
     layers ? layer : null,
     mode,
+    sexSeg || null,
     h("div", { class: "stage-box" },
       fig.el,
       h("div", { class: "stage-tools" },
@@ -2845,7 +2857,7 @@ function subProfile() {
     h("section", { class: "card glass" },
       h("h2", { text: "Для калькуляторов" }),
       h("p", { class: "muted small", text: "Необязательно. Нужно только для расчёта ИМТ, калорий и пульсовых зон — остаётся на устройстве." }),
-      h("div", { class: "q" }, h("b", { text: "Пол" }), choice({ className: "seg", label: "Пол", value: p.sex, options: [{ value: "", label: "Не указан" }, { value: "f", label: "Женский" }, { value: "m", label: "Мужской" }], onChange: v => { p.sex = v; persist(); } })),
+      h("div", { class: "q" }, h("b", { text: "Пол" }), choice({ className: "seg", label: "Пол", value: p.sex, options: [{ value: "", label: "Не указан" }, { value: "f", label: "Женский" }, { value: "m", label: "Мужской" }], onChange: v => { p.sex = v; persist(); applyLookNow(); } })),
       heightField()),
     h("section", { class: "card glass" },
       h("h2", { text: "Мой план" }),
@@ -3184,6 +3196,7 @@ function lookDemo() {
   return [
     lookCard("Фигура в схемах движений",
       h("div", { class: "look-demo" }, demoBox("squat")),
+      h("div", { class: "q" }, h("b", { text: "Тело" }), choice({ className: "seg", label: "Тело в схемах и на 3D-модели", value: look.sex, options: L.SEXES, onChange: v => changeLook({ sex: v }) })),
       h("div", { class: "q" }, h("b", { text: "Вид" }), choice({ className: "seg", label: "Вид фигуры", value: look.figstyle, options: L.FIG_STYLES, onChange: v => changeLook({ figstyle: v }) })),
       detail ? h("div", { class: "q" }, h("b", { text: "Тон кожи" }), h("div", { class: "swatches", role: "group", "aria-label": "Тон кожи" }, skins)) : null,
       h("div", { class: "q" }, h("b", { text: detail ? "Цвет одежды" : "Цвет фигуры" }), figChips),
