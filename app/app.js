@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "1.9.0";
+const VERSION = "2.0.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -53,15 +53,36 @@ function loadAnim() {
   }).catch(() => null);
   return animLoading;
 }
+// Объёмные схемы (demo3d.js): тот же WebGL, что у 3D-модели; без WebGL — рисунок из anim.js
+let demo3d = null;
+let demo3dLoading = null;
+const demo3dOptions = () => ({ speed: look.speed, still: look.still, sex: figureSex(), dark: isDark(), muscles: look.muscles });
+function loadDemo3d() {
+  if (demo3d !== null || demo3dLoading) return demo3dLoading || Promise.resolve(demo3d);
+  demo3dLoading = import("./demo3d.js").then(m => {
+    if (!m.supported()) { demo3d = false; return false; }
+    m.setOptions(demo3dOptions());
+    demo3d = m;
+    return m;
+  }).catch(() => { demo3d = false; return false; });
+  return demo3dLoading;
+}
+const want3d = () => look.figstyle === "3d" && demo3d !== false;
 // Блок со схемой движения: пока модуль грузится, место под схему уже занято
 function demoBox(id) {
   const box = h("div", { class: "demo" });
-  if (animMod) box.append(animMod.exerciseDemo(id));
+  const make = () => {
+    if (want3d() && demo3d) {
+      try { return demo3d.createDemo(id, { sex: figureSex() }); } catch (e) { demo3d = false; }
+    }
+    return animMod.exerciseDemo(id);
+  };
+  if (animMod && (!want3d() || demo3d)) box.append(make());
   else {
     box.classList.add("is-loading");
-    loadAnim().then(m => {
+    Promise.all([loadAnim(), want3d() ? loadDemo3d() : null]).then(([m]) => {
       box.classList.remove("is-loading");
-      if (m) box.replaceChildren(m.exerciseDemo(id));
+      if (m) box.replaceChildren(make());
       else box.remove();
     });
   }
@@ -214,6 +235,7 @@ function setMediaUrls() {
 function applyLookNow() {
   L.applyLook(look, { photoUrl: mediaUrls.bg });
   if (animMod && animMod.setOptions) animMod.setOptions({ speed: look.speed, still: look.still, sex: figureSex() });
+  if (demo3d) demo3d.setOptions(demo3dOptions());
   paintFigure();
 }
 async function loadMediaNow() {
@@ -299,7 +321,7 @@ function startApp() {
       persist();
     }
     const idle = window.requestIdleCallback || (fn => setTimeout(fn, 1500));
-    idle(() => { loadAnim(); loadBody3d(); });
+    idle(() => { loadAnim(); loadBody3d(); if (look.figstyle === "3d") loadDemo3d().then(m => { if (m) idle(() => m.warm(figureSex())); }); });
   }
   render();
 }
@@ -872,11 +894,12 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Женское тело — на 3D-модели и в схемах упражнений: переключатель «Мужское / Женское» на вкладке «Тело» и в «Персонализации», по умолчанию — по полу из профиля",
-  "3D-модель подробнее: лицо с носом, губами и ушами, волосы, надколенники, косточки лодыжек, пальцы ног и мягкий объёмный свет",
-  "Человечки в упражнениях прорисованы детальнее: лицо и брови, кулаки, одежда с вырезом и поясом, кроссовки со шнурками",
-  "Вращения показаны вращением, а не наклонами: повороты корпуса, круги тазом, руками, плечами, кистями и стопами — с пунктирной траекторией",
-  "Переделаны анимации 21 упражнения, которые показывали движение неточно: «Дровосек», «Гало» и передача гири вокруг корпуса, повороты сидя, ходьба «пятка к носку», опускания пяток со ступеньки, скрёстный шаг, «Конькобежец» и другие"
+  "Объёмные схемы упражнений: фигура — та же 3D-модель, что на вкладке «Тело», в спортивной форме, с тенью на полу, гантелями, гирей, ковриком, стулом и скамьёй — как в профессиональных библиотеках упражнений",
+  "Подсвечены мышцы, которые работают, — ярче в рабочей фазе движения",
+  "Фигуру можно повернуть пальцем или кнопкой ракурса: три четверти, сбоку, спереди, сзади; кнопка паузы останавливает показ",
+  "Темп как у тренера: опускание медленнее подъёма, короткие паузы в крайних точках, ладони в упоре лежат на полу",
+  "Точнее упражнения лёжа на боку, боковые планки, «бабочка», «дерево», разведение рук в наклоне и «раскрытая книга»",
+  "Рисованные схемы остались: «Персонализация» → «Схемы» → «Вид» → «Рисунок» или «Силуэт»"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -3201,7 +3224,7 @@ function lookDemo() {
       detail ? h("div", { class: "q" }, h("b", { text: "Тон кожи" }), h("div", { class: "swatches", role: "group", "aria-label": "Тон кожи" }, skins)) : null,
       h("div", { class: "q" }, h("b", { text: detail ? "Цвет одежды" : "Цвет фигуры" }), figChips),
       h("div", { class: "q" }, h("b", { text: "Скорость показа" }), speed),
-      h("div", { class: "list" }, toggle({ label: "Подсветка работающих мышц", desc: "Мышцы, которые нагружает упражнение, выделены цветом акцента", checked: look.muscles, onChange: v => changeLook({ muscles: v }) }))),
+      h("div", { class: "list" }, toggle({ label: "Подсветка работающих мышц", desc: "Мышцы, которые нагружает упражнение, выделены цветом", checked: look.muscles, onChange: v => changeLook({ muscles: v }) }))),
     lookCard("3D-манекен",
       h("div", { class: "swatches", role: "group", "aria-label": "Цвет манекена" }, bodies),
       lookHint(`Сейчас: ${(L.BODIES.find(b => b.id === look.body) || L.BODIES[0]).name.toLowerCase()}. Манекен — во вкладке «Тело».`)),

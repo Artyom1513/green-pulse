@@ -84,7 +84,8 @@ export const SKINS = [
   { id: "brown", name: "Тёмный", c: "#8f5c3a", hair: "#1c1410" },
   { id: "deep", name: "Очень тёмный", c: "#5e3c27", hair: "#14100d" }
 ];
-export const FIG_STYLES = [{ value: "detail", label: "Детальная" }, { value: "flat", label: "Силуэт" }];
+// Вид фигуры в схемах: объёмная (3D, как в профессиональных библиотеках упражнений), рисунок или силуэт
+export const FIG_STYLES = [{ value: "3d", label: "Объёмная" }, { value: "detail", label: "Рисунок" }, { value: "flat", label: "Силуэт" }];
 export const EMOJI = ["🌿", "🍃", "🌳", "🌸", "🍀", "🌞", "🌙", "⭐", "🔥", "⚡", "💪", "🏃", "🧘", "🚴", "🏊", "🎯", "🏔️", "🌊", "🦊", "🐻", "🐼", "🦁", "🐯", "🐨"];
 
 // Готовые стили: один нажатием меняют сразу цвет, фон, шрифты и форму
@@ -100,14 +101,14 @@ export const PRESETS = [
 const PRESET_IDS = PRESETS.map(p => p.id);
 
 export const defaultLook = () => ({
-  v: 1, preset: "classic", accent: "forest", custom: "", bg: "soft", blur: 6, dim: 45,
+  v: 2, preset: "classic", accent: "forest", custom: "", bg: "soft", blur: 6, dim: 45,
   font: "system", head: "same", scale: 100, bold: false, reading: false,
   radius: "soft", density: "normal", glass: true,
   tabs: [...TAB_IDS], labels: true, start: "today",
   home: HOME_IDS.map(id => [id, true]),
   avatar: "letter", emoji: "🌿",
   figure: "auto", muscles: true, speed: 1, body: "mint", still: false, fx: true,
-  skin: "medium", figstyle: "detail", sex: "auto"
+  skin: "medium", figstyle: "3d", sex: "auto"
 });
 
 // ----- Проверка сохранённых значений -----
@@ -160,6 +161,8 @@ export function sanitizeLook(raw) {
   d.fx = bool(raw.fx, d.fx);
   d.skin = oneOf(raw.skin, SKINS.map(x => x.id), d.skin);
   d.figstyle = oneOf(raw.figstyle, FIG_STYLES.map(x => x.value), d.figstyle);
+  // до версии 2 «Детальная» была видом по умолчанию — теперь по умолчанию объёмная фигура
+  if (!(Number(raw.v) >= 2) && raw.figstyle === "detail") d.figstyle = "3d";
   d.sex = oneOf(raw.sex, SEXES.map(x => x.value), d.sex);
   return d;
 }

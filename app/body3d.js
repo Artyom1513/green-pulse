@@ -305,9 +305,10 @@ const BODY = {
 // sex: "m" — мужское тело, "f" — женское. mat: 0 — кожа, 1 — волосы, 2 — резинка для волос
 function buildFigure(regionIndex, sex = "m") {
   const B = BODY[sex] || BODY.m;
-  const pos = [], nor = [], reg = [], sid = [], mat = [], idx = [];
+  const pos = [], nor = [], reg = [], sid = [], mat = [], prt = [], idx = [];
+  // part — часть тела для скелета схем упражнений (PART): какая кость двигает вершину
   const mesh = {
-    idx, material: 0,
+    idx, material: 0, part: PART.torso,
     get count() { return pos.length / 3; },
     push(p, n, region, side) {
       pos.push(p[0], p[1], p[2]);
@@ -315,6 +316,7 @@ function buildFigure(regionIndex, sex = "m") {
       reg.push(regionIndex(region));
       sid.push(side);
       mat.push(this.material);
+      prt.push(this.part);
     }
   };
   const sideOf = x => (x < -0.012 ? 1 : x > 0.012 ? 2 : 0);
@@ -396,6 +398,7 @@ function buildFigure(regionIndex, sex = "m") {
   });
 
   // ----- Шея и голова -----
+  mesh.part = PART.neck;
   sweep(mesh, {
     pts: [[0, 1.452, -0.012], [0, 1.53, -0.004], [0, 1.6, 0.008]], rings: 12, segs: 32, capStart: false, capEnd: false,
     shape: (u, ct, st) => ellipse(B.neck[0] - 0.004 * u, B.neck[1] - 0.006 * u, ct, st,
@@ -404,6 +407,7 @@ function buildFigure(regionIndex, sex = "m") {
     classify: () => C("neck")
   });
   const J = B.jaw;
+  mesh.part = PART.head;
   const headRows = [
     [1.545, 0, 0, 0, 0.055], [1.549, 0.02 * J, 0.016, 0.014, 0.052], [1.556, 0.034 * J, 0.028, 0.022, 0.050], [1.565, 0.048 * J, 0.040, 0.040, 0.040],
     [1.585, 0.060 * J, 0.052, 0.062, 0.025], [1.610, 0.068, 0.062, 0.080, 0.014], [1.640, 0.074, 0.074, 0.090, 0.006],
@@ -431,8 +435,8 @@ function buildFigure(regionIndex, sex = "m") {
       const L = F.lips, mouth = bell(ax, 0, 0.017), q = (ax / 0.02) ** 2;
       return nose(ax, y)
         - 0.0042 * bell(ax, 0.031, 0.016) * bell(y, 1.668, 0.012) // глазницы
-        + 0.0026 * bell(ax, 0.031, 0.0095) * bell(y, 1.6672, 0.0052) // глазные яблоки
-        + 0.0022 * bell(ax, 0.031, 0.012) * bell(y, 1.672, 0.004) // веки
+        + 0.0016 * bell(ax, 0.031, 0.0095) * bell(y, 1.6672, 0.0052) // глазные яблоки
+        + 0.0015 * bell(ax, 0.031, 0.012) * bell(y, 1.672, 0.004) // веки
         + 0.004 * F.brow * bell(y, 1.689, 0.007) * (1 - smooth(0.05, 0.07, ax)) // надбровья
         + 0.004 * F.cheek * bell(y, 1.645, 0.012) * bell(ax, 0.056, 0.014) // скулы
         - 0.0008 * bell(ax, 0, 0.0035) * bell(y, 1.616, 0.005) // желобок над губой
@@ -448,12 +452,14 @@ function buildFigure(regionIndex, sex = "m") {
   // ----- Волосы: шапочка по форме головы от линии роста волос; у женского тела — зачёсанные
   // назад пряди и хвост на резинке -----
   mesh.material = 1;
+  mesh.part = PART.hair;
   const long = B.hair === "long";
   hairShell(mesh, headRows, long
     ? [[0, 1.711], [25, 1.708], [45, 1.699], [62, 1.684], [78, 1.666], [93, 1.676], [112, 1.634], [140, 1.606], [180, 1.598]]
     : [[0, 1.709], [30, 1.707], [60, 1.697], [80, 1.672], [95, 1.69], [110, 1.658], [140, 1.625], [180, 1.615]],
   long ? 0.012 : 0.007, () => C("head"), long ? { back: 1.35, part: 0.6 } : {});
   if (long) {
+    mesh.part = PART.pony;
     sweep(mesh, {
       pts: [[0, 1.714, -0.096], [0, 1.702, -0.122], [0, 1.66, -0.138], [0, 1.6, -0.137], [0, 1.545, -0.124]], rings: 34, segs: 40,
       shape: (u, ct, st) => {
@@ -465,6 +471,7 @@ function buildFigure(regionIndex, sex = "m") {
       classify: () => C("head")
     });
     mesh.material = 2; // резинка
+    mesh.part = PART.tie;
     sweep(mesh, {
       pts: [[0, 1.7085, -0.108], [0, 1.705, -0.1155]], rings: 4, segs: 32, capRings: 3,
       shape: (u, ct, st) => ellipse(0.0185, 0.0205, ct, st),
@@ -474,6 +481,8 @@ function buildFigure(regionIndex, sex = "m") {
   mesh.material = 0;
 
   for (const s of [-1, 1]) {
+    const si = s < 0 ? 0 : 1; // 0 — правая сторона (x < 0), 1 — левая
+    mesh.part = PART.arm[si];
     // ----- Рука: плечо → локоть → запястье -----
     const armPts = B.arm.map(([x, y, z]) => [s * x, y, z]);
     const ak = B.armK;
@@ -509,6 +518,7 @@ function buildFigure(regionIndex, sex = "m") {
     });
 
     // ----- Кисть: ладонь, четыре пальца и большой палец (от запястья) -----
+    mesh.part = PART.hand[si];
     const [wx, wy, wz] = armPts[armPts.length - 1], hk = B.handK;
     const at = (dx, dy, dz) => [wx + s * dx * hk, wy + dy * hk, wz + dz * hk];
     sweep(mesh, {
@@ -539,6 +549,7 @@ function buildFigure(regionIndex, sex = "m") {
     });
 
     // ----- Нога: тазобедренный сустав → колено → лодыжка -----
+    mesh.part = PART.leg[si];
     const legPts = B.leg.map(([x, y, z]) => [s * x, y, z]);
     const thigh = B.thigh, shank = B.shank;
     sweep(mesh, {
@@ -583,12 +594,15 @@ function buildFigure(regionIndex, sex = "m") {
     });
     // Надколенник и косточки лодыжки
     const knee = legPts[3];
+    mesh.part = PART.kneecap[si];
     ellipsoid(mesh, [knee[0], knee[1] + 0.006, knee[2] + (sex === "f" ? 0.04 : 0.043)], 0.024, 0.03, 0.012, p => R("knee", p), 10, 14);
+    mesh.part = PART.malleolus[si];
     const ank = legPts[5];
     ellipsoid(mesh, [ank[0] + s * 0.024, ank[1] + 0.004, ank[2] - 0.004], 0.009, 0.013, 0.012, p => R("ankle", p), 8, 10);
     ellipsoid(mesh, [ank[0] - s * 0.027, ank[1] - 0.004, ank[2] - 0.008], 0.009, 0.013, 0.012, p => R("ankle", p), 8, 10);
 
     // ----- Стопа: пятка → свод → пальцы -----
+    mesh.part = PART.foot[si];
     const fx = B.footX, fk = B.footK;
     sweep(mesh, {
       pts: [[s * fx, 0.04, -0.062 * fk], [s * fx, 0.05, -0.02 * fk], [s * (fx + 0.002), 0.042, 0.04 * fk], [s * (fx + 0.004), 0.028, 0.11 * fk], [s * (fx + 0.006), 0.018, 0.15 * fk]],
@@ -621,10 +635,47 @@ function buildFigure(regionIndex, sex = "m") {
 
   const geo = {
     pos: new Float32Array(pos), nor: new Float32Array(nor),
-    reg: new Uint8Array(reg), sid: new Uint8Array(sid), mat: new Uint8Array(mat), idx: new Uint16Array(idx)
+    reg: new Uint8Array(reg), sid: new Uint8Array(sid), mat: new Uint8Array(mat), part: new Uint8Array(prt), idx: new Uint16Array(idx)
   };
   geo.shade = bakeShade(geo);
+  geo.bind = bindJoints(B);
   return geo;
+}
+
+// Части тела для скелета: у парных — [правая, левая]
+export const PART = {
+  torso: 0, neck: 1, head: 2, hair: 3, tie: 4, pony: 17,
+  arm: [5, 11], hand: [6, 12], leg: [7, 13], kneecap: [8, 14], malleolus: [9, 15], foot: [10, 16]
+};
+
+// Суставы тела в исходной позе (стоя, руки вдоль тела) — кости скелета для схем упражнений.
+// У парных суставов — [правый (x < 0), левый]
+function bindJoints(B) {
+  const side = f => [-1, 1].map(f);
+  const a0 = B.arm[0], el = B.arm[3], wr = B.arm[5], hk = B.handK;
+  const l0 = B.leg[0], kn = B.leg[3], an = B.leg[5], fk = B.footK;
+  return {
+    pelvis: [0, 0.93, -0.008], spine: [0, 1.03, -0.006], chest: [0, 1.2, 0.004], neck: [0, 1.45, -0.012],
+    head: [0, 1.585, -0.004], top: [0, 1.77, -0.012],
+    clav: side(s => [s * 0.022, 1.432, 0.012]),
+    shoulder: side(s => [s * (a0[0] - 0.006), a0[1] - 0.014, a0[2] - 0.004]),
+    elbow: side(s => [s * el[0], el[1], el[2]]),
+    wrist: side(s => [s * wr[0], wr[1], wr[2]]),
+    knuckle: side(s => [s * (wr[0] + 0.008 * hk), wr[1] - 0.096 * hk, wr[2] + 0.01 * hk]),
+    finger: side(s => [s * (wr[0] + 0.004 * hk), wr[1] - 0.17 * hk, wr[2] + 0.012 * hk]),
+    hip: side(s => [s * l0[0], l0[1] - 0.045, l0[2] + 0.004]),
+    knee: side(s => [s * kn[0], kn[1], kn[2]]),
+    ankle: side(s => [s * an[0], an[1] - 0.005, an[2]]),
+    ball: side(s => [s * (B.footX + 0.004), 0.02, 0.112 * fk]),
+    toe: side(s => [s * (B.footX + 0.006), 0.012, 0.17 * fk]),
+    heel: side(s => [s * B.footX, 0.0, -0.07 * fk]),
+    pony: [0, 1.706, -0.114], ponyTip: [0, 1.545, -0.124]
+  };
+}
+
+// Модель тела для схем упражнений: та же геометрия, что на вкладке «Тело», плюс части и суставы
+export function buildBody(regions, sex = "m") {
+  return buildFigure(id => regions.indexOf(id) + 1, sex);
 }
 
 // Запечённое затенение: впадины и складки темнее, выпуклости светлее, плюс тонкие швы между зонами —
@@ -669,7 +720,7 @@ function bakeShade(geo) {
     const ax = sum[g * 3] / cnt[g] - px, ay = sum[g * 3 + 1] / cnt[g] - py, az = sum[g * 3 + 2] / cnt[g] - pz;
     const mean = dist[g] / cnt[g] || 1;
     const curv = (ax * nx + ay * ny + az * nz) / mean;
-    let s = 1 - Math.max(-0.05, Math.min(0.16, curv * 1.6));
+    let s = 1 - Math.max(py > 1.6 && py < 1.72 && pz > 0.03 ? -0.015 : -0.05, Math.min(0.16, curv * 1.6));
     // Мягкая тень в складках: подмышки, пах и внутренняя сторона бёдер, под подбородком, подошвы
     const sx = Math.sign(px) || 1, inward = -nx * sx;
     const axp = Math.abs(px);

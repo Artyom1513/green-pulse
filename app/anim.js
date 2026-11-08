@@ -147,7 +147,7 @@ const P = {
   butterfly: { a: pose({ t: -5, legs: [leg(118, 150, 90), leg(118, 150, 90)], arms: [arm(40, 20), arm(40, 20)] }), b: pose({ t: 12, legs: [leg(112, 150, 90), leg(112, 150, 90)], arms: [arm(50, 15), arm(50, 15)] }), p: 3.2, anchor: "hip" },
   seatedFold: { a: pose({ t: -6, legs: [leg(89, 0, 175), leg(89, 0, 175)], arms: [arm(170, 0), arm(170, 0)] }), b: pose({ t: 58, legs: [leg(89, 0, 170), leg(89, 0, 170)], arms: [arm(82, 0), arm(82, 0)] }), p: 3.6, anchor: "hip" },
   reachUp: { a: pose({ arms: [arm(4, 6), arm(4, 6)] }), b: pose({ legs: [leg(0, 0, 70), leg(0, 0, 70)], arms: [arm(178, 0), arm(178, 0)] }), p: 3, anchor: "toes" },
-  warrior: { a: pose({ t: -4, legs: [leg(72, 72), leg(-28, 0, 70)], arms: [arm(176, 0), arm(176, 0)] }) },
+  warrior: { a: pose({ t: -4, legs: [leg(72, 72), leg(-47, 0, 78)], arms: [arm(176, 0), arm(176, 0)] }) },
   tree: { a: pose({ legs: [leg(0, 0), leg(30, 125, 30)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: 2, legs: [leg(0, 0), leg(30, 125, 30)], arms: [arm(178, 0), arm(178, 0)] }), p: 3, anchor: "near" },
   sunFlow: { a: pose({ arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: 100, legs: [leg(-6, 0), leg(-6, 0)], arms: [arm(2, 0), arm(2, 0)] }), p: 4 },
   // v1.5: равновесие, осанка, эспандер, корпус. Позы с опорой подобраны так, чтобы кисти
@@ -310,6 +310,14 @@ function sideJoints(p) {
   });
   return { hip, sh, shArm: sha, neck, head, legs, arms, shL: sh, shR: sh, hipL: hip, hipR: hip, curve: p.curve || 0 };
 }
+// Для объёмной схемы: глубина бедра, колена и стопы анфас — нога, которая в проекции короче своей
+// длины, смотрит на зрителя (голень на полу при стоянии на коленях уходит назад); lz — шаг вперёд-назад
+const legDepth3 = (hip, knee, ankle, L) => {
+  const deep = (a, b, len) => Math.sqrt(Math.max(0, len * len - (b[0] - a[0]) ** 2 - (b[1] - a[1]) ** 2));
+  const z0 = (L.lz || 0) * 0.1;
+  const zk = z0 + deep(hip, knee, LEN.thigh);
+  return [z0, zk, zk + (knee[1] < 0.16 && ankle[1] > knee[1] - 0.05 ? -1 : 1) * deep(knee, ankle, LEN.shank)];
+};
 function frontJoints(p) {
   const pelvis = [0, 1];
   const right = [Math.cos(p.t * D), -Math.sin(p.t * D)];
@@ -338,7 +346,7 @@ function frontJoints(p) {
     const a2 = L.h - L.k;
     const ankle = add(add(knee, [sg * Math.sin(a2 * D), -Math.cos(a2 * D)], LEN.shank * fs), [0, lift * 0.5 + dz * 0.5]);
     const toe = add(ankle, [sg * 0.03, -0.02]);
-    return { knee, ankle, toe, heel: ankle };
+    return { knee, ankle, toe, heel: ankle, z3: legDepth3(hips[i], knee, ankle, L) };
   });
   const arms = p.arms.map((A0, i) => {
     const sg = i === 0 ? -1 : 1;
@@ -356,7 +364,8 @@ function frontJoints(p) {
     const wrist = add(elbow, d2, LEN.fore);
     const hand = add(wrist, d2, LEN.hand);
     const z = shz[i] + d1[2] * LEN.upper + d2[2] * (LEN.fore + LEN.hand) * 0.6;
-    return { elbow, wrist, hand, sh: shs[i], z, zh: shz[i] + d1[2] * LEN.upper + d2[2] * (LEN.fore + LEN.hand) };
+    const ze = shz[i] + d1[2] * LEN.upper, zw = ze + d2[2] * LEN.fore;
+    return { elbow, wrist, hand, sh: shs[i], z, zh: shz[i] + d1[2] * LEN.upper + d2[2] * (LEN.fore + LEN.hand), z3: [shz[i], ze, zw, zw + d2[2] * LEN.hand] };
   });
   // lz — нога ближе (+) или дальше (−) от зрителя: при скрёстном шаге задняя нога уходит за переднюю
   legs.forEach((L, i) => { L.z = p.legs[i].lz || 0; });
@@ -1071,6 +1080,20 @@ function addStaticProps(R, pat, JA, JB) {
 
 // ----- Время -----
 const ease = x => x * x * (3 - 2 * x);
+// Темп повторения: опускание (уступающая фаза) медленнее подъёма — как советуют ACE и ACSM
+// (подъём 1–3 с, опускание 2–4 с). Какая фаза опускает вес, узнаём по позам: если в позе B
+// гантели (или таз, если снаряда нет) ниже, чем в позе A, то A → B — опускание
+function tempoOf(pat) {
+  if (pat._tempo !== undefined) return pat._tempo;
+  let t = 0;
+  if (pat.b && !pat.alt && (pat.p || 2.6) >= 1.8 && !pat.a.front === !pat.b.front) {
+    const load = J => (pat.w && pat.w !== "back" && pat.w !== "hip" ? (J.arms[0].hand[1] + J.arms[1].hand[1]) / 2 : J.hip[1]);
+    const dA = load(place(pat, pat.a).J), dB = load(place(pat, pat.b).J);
+    t = dB < dA - 0.05 ? 1 : dB > dA + 0.05 ? -1 : 0;
+  }
+  pat._tempo = t;
+  return t;
+}
 function frameAt(pat, time) {
   if (!pat.b) return { A: pat.a, B: pat.a, k: 0 };
   const per = pat.p || 2.6;
@@ -1079,11 +1102,15 @@ function frameAt(pat, time) {
   const second = u >= 1;
   u -= Math.floor(u);
   const B = second ? mirrorOf(pat)(pat.b) : pat.b;
+  // доли цикла: пауза в A, путь A → B, пауза в B, путь B → A
+  const tp = tempoOf(pat);
+  const go = tp > 0 ? 0.42 : tp < 0 ? 0.3 : 0.35, back = tp > 0 ? 0.3 : tp < 0 ? 0.42 : 0.35;
+  const h1 = (1 - go - back) / 2;
   let k;
-  if (u < 0.15) k = 0;
-  else if (u < 0.5) k = ease((u - 0.15) / 0.35);
-  else if (u < 0.65) k = 1;
-  else k = 1 - ease((u - 0.65) / 0.35);
+  if (u < h1) k = 0;
+  else if (u < h1 + go) k = ease((u - h1) / go);
+  else if (u < h1 * 2 + go) k = 1;
+  else k = 1 - ease((u - h1 * 2 - go) / back);
   return { A: pat.a, B, k, second };
 }
 // Узор по кругу: seq — ключевые позы цикла, между ними плавный сплайн без остановок (круги
@@ -1204,6 +1231,7 @@ function lockLimbs(J0, Pz, locks, k, front, dx) {
         ? reachLeg(J.hips[g.i], ankle, g.bend, sx, LEN.thigh * (Lg.ft || 1), LEN.shank * (Lg.fs || 1))
         : reachLeg(J.hip, ankle, g.bend, sx);
       outLegs[g.i] = footAt(r.knee, r.ankle, front, g.i, f);
+      if (front) outLegs[g.i].z3 = legDepth3(J.hips[g.i], r.knee, r.ankle, Lg);
     } else {
       // Ладонь на опоре: руку дотягиваем до точки, кисть сохраняет угол из позы
       const A = Pz.arms[g.i], ha = A.s + A.e + (A.w || 0);
@@ -1425,6 +1453,27 @@ export function exerciseDemo(id, { label, paused = false } = {}) {
   }
   return svg;
 }
+
+// Для объёмной схемы (demo3d.js): то же движение, что у рисунка, — суставы в каждый момент времени,
+// фаза цикла, снаряды и опоры узора
+export function motionOf(id) {
+  const pid = patternOf(id);
+  const pat = P[pid] || P.stand;
+  const S = solver(pat);
+  const keys = pat.seq ? pat.seq.length : pat.b ? 2 : 1;
+  return {
+    pid, pat, front: S.front, period: pat.p || 2.6, cycle: (pat.p || 2.6) * (pat.alt ? 2 : 1),
+    weight: weightKind(id) || pat.hold || null, where: id === "bbSquat" ? "back" : pat.w || null,
+    props: pat.props || [], hang: pat.hang || 0, legsFront: !!pat.legsFront, keys,
+    frame(time, still = false) {
+      const f = still ? { Pz: keyPose(pat, 1), k: keyK(pat, 1), second: false, phase: 0.25 } : cycleFrame(pat, time);
+      return { J: S.at(f.Pz, f.k, f.second), Pz: f.Pz, phase: f.phase, k: f.k, second: f.second };
+    },
+    key(i) { return S.at(keyPose(pat, i), keyK(pat, i)); },
+    keyPz(i) { return keyPose(pat, i); }
+  };
+}
+export const LEN2D = LEN;
 
 // Для проверки: статичный кадр узора (0 — поза A, 1 — поза B)
 export function patternFrame(pid, k = 0) {
