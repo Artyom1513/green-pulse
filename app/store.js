@@ -3,7 +3,7 @@
 // По желанию пользователя всё шифруется паролем: AES-GCM 256 бит, ключ — PBKDF2-SHA-256, 600 000 итераций.
 // Любые загруженные данные (из памяти браузера или из файла) проходят строгую проверку и пересобираются
 // по известной схеме: лишние поля отбрасываются, значения ограничиваются по типу и длине.
-import { REGIONS, CONDITIONS, AGE_GROUPS, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX, CHALLENGES, RUN_DAYS } from "./data.js";
+import { REGIONS, CONDITIONS, AGE_GROUPS, AGE_MIN, AGE_MAX, ageGroupOf, GOALS, EQUIPMENT, EX, QUICK, BADGES, SYMPTOMS, ONSET, TRIGGERS, PROGRAMS, RECORD_EX, CHALLENGES, RUN_DAYS } from "./data.js";
 import { GUIDE } from "./guide.js";
 
 const KEY = "lpapp-v1";
@@ -37,7 +37,7 @@ const hhmm = v => (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) 
 export const defaultState = () => ({
   v: 1,
   profile: {
-    onboarded: false, ack: false, name: "", ageGroup: "adult", goal: "health", level: 1,
+    onboarded: false, ack: false, name: "", age: 0, ageGroup: "adult", goal: "health", level: 1,
     equipment: ["chair"], minutes: 20, days: [1, 3, 5], conditions: [], screening: [],
     sex: "", height: 0, screenedAt: "", planTime: "", planPlace: "", planCue: ""
   },
@@ -91,7 +91,9 @@ export function sanitize(raw) {
       onboarded: bool(p.onboarded, false),
       ack: bool(p.ack, false),
       name: str(p.name, 40),
-      ageGroup: oneOf(p.ageGroup, AGE_IDS, "adult"),
+      // Точный возраст (0 — ещё не указан: в старых копиях была только группа)
+      age: int(p.age, AGE_MIN, AGE_MAX, 0),
+      ageGroup: Number.isInteger(p.age) && p.age >= AGE_MIN && p.age <= AGE_MAX ? ageGroupOf(p.age) : oneOf(p.ageGroup, AGE_IDS, "adult"),
       goal: oneOf(p.goal, GOAL_IDS, "health"),
       level: int(p.level, 1, 3, 1),
       equipment: ids(p.equipment, EQUIP_IDS, 10),

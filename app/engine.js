@@ -136,7 +136,7 @@ export function restrictions(state, day = dayKey()) {
   const age = AGE_GROUPS.find(a => a.id === p.ageGroup);
   if (age) {
     apply(age);
-    if (age.ban || age.balance || age.maxLevel) r.reasons.push(`возраст ${age.name}`);
+    if (age.ban || age.balance || age.maxLevel) r.reasons.push(p.age ? `возраст ${p.age} ${plural(p.age, "год", "года", "лет")}` : `возраст ${age.name}`);
   }
   return r;
 }

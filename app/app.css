@@ -211,7 +211,7 @@ img, svg { display: block; }
 /* Панели поверх прокручиваемого содержимого: плотнее стекла, чтобы подписи читались над любым фоном */
 .topbar.glass-clear, .tabbar.glass-clear { background: var(--bar-glass); }
 .view { display: block; }
-.page-title { margin: 2px 0 6px; font-size: clamp(1.5rem, 7.5vw, 1.85rem); font-weight: 750; letter-spacing: -.025em; overflow-wrap: break-word; hyphens: auto; }
+.page-title { margin: 2px 0 6px; font-size: clamp(1.5rem, 7.5vw, 1.85rem); font-weight: 750; letter-spacing: -.025em; overflow-wrap: anywhere; }
 .lead { margin: 0 0 16px; color: var(--muted); }
 .section-title { margin: 22px 4px 10px; font-size: 1.1rem; }
 .back-link { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 6px; padding: 6px 10px 6px 4px; border-radius: 12px; color: var(--muted); font-weight: 600; text-decoration: none; }
@@ -224,7 +224,7 @@ img, svg { display: block; }
 .card.alert h2 { color: var(--danger); }
 .card.warn { border-color: rgba(245, 158, 11, .4); }
 .card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
-.card-head > :first-child { flex: 1 1 140px; overflow-wrap: anywhere; hyphens: auto; }
+.card-head > :first-child { flex: 1 1 140px; overflow-wrap: anywhere; }
 .split { display: flex; align-items: center; gap: 16px; }
 .split > :last-child { flex: 1; min-width: 0; }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -363,8 +363,10 @@ input.switch:checked::after { transform: translateX(20px); }
 .list > li:last-child .row, .list > .row:last-child { border-bottom: 0; }
 .row-text { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .row-text b { font-weight: 650; }
-/* Длинные слова при крупном тексте переносятся, а не вылезают из строки */
-.row-text > *, h1, h2, h3, .preset b, .preset .small, .stat, .ring-label, .note-box, .lead { overflow-wrap: anywhere; hyphens: auto; }
+/* Длинное слово при крупном тексте переносится, а не вылезает из строки. Заголовки и вводный текст —
+   без переносов по слогам (только если слово целиком не помещается), мелкий текст — с переносами */
+.row-text > *, h1, h2, h3, .preset b, .stat, .ring-label, .lead { overflow-wrap: anywhere; }
+.preset .small, .note-box { overflow-wrap: anywhere; hyphens: auto; }
 .row-btn { width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .toggle-row { cursor: pointer; }
 .bullets { margin: 0; padding-left: 1.2em; }
@@ -918,7 +920,7 @@ button.cal-cell { cursor: pointer; }
 .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .tile { display: grid; align-content: start; gap: 6px; min-height: 128px; padding: 16px 14px; border-radius: 22px; color: var(--text); text-decoration: none; }
 .tile .fi { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--accent-soft); color: var(--accent-text); }
-.tile b { font-size: .98rem; line-height: 1.25; overflow-wrap: anywhere; hyphens: auto; }
+.tile b { font-size: .98rem; line-height: 1.25; overflow-wrap: anywhere; }
 .tile .small { overflow-wrap: anywhere; hyphens: auto; }
 .tile .small { line-height: 1.35; }
 /* ----- Профиль: сгруппированные списки ----- */
@@ -1021,6 +1023,10 @@ input.range.neutral::-moz-range-track { background: linear-gradient(90deg, var(-
 .motto-line { margin: 0 6px 16px; color: var(--accent-text); font-family: var(--font-head); font-size: 1.08rem; font-weight: 700; line-height: 1.4; }
 .code-box { margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8rem; word-break: break-all; user-select: all; }
 .look-note { margin-top: 8px; }
+/* Возраст: короткое поле для числа и подсказка, что меняет возраст */
+.age-field { margin: 4px 0 10px; }
+.age-input { max-width: 160px; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.age-hint { margin: -2px 2px 0; }
 .look-demo .demo { max-width: 230px; margin: 0 auto 12px; }
 
 /* ----- Широкие экраны ----- */

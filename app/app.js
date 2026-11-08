@@ -3,14 +3,14 @@
 import { h, s, icon, toast, sheet, confirmSheet, choice, toggle, ring, unlockAudio, beep, buzz, speak, keepAwake, confetti, download, mmss, fmtDate } from "./ui.js";
 import * as store from "./store.js";
 import {
-  REGIONS, REGION_GROUPS, SIDES, HOTSPOTS, SEVERITY, SYMPTOMS, ONSET, TRIGGERS, CONDITIONS, AGE_GROUPS, GOALS, LEVELS,
+  REGIONS, REGION_GROUPS, SIDES, HOTSPOTS, SEVERITY, SYMPTOMS, ONSET, TRIGGERS, CONDITIONS, AGE_GROUPS, AGE_MIN, AGE_MAX, ageGroupOf, GOALS, LEVELS,
   EQUIPMENT, WEIGHT_EQUIP, GROUPS, EXERCISES, EX, QUICK, PROGRAMS, RECORD_EX, BADGES, TIPS, RED_FLAGS, SCREENING, CHALLENGES, RUN_DAYS
 } from "./data.js";
 import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "1.7.1";
+const VERSION = "1.8.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -453,6 +453,45 @@ const dayIndex = () => {
 };
 const say = t => { if (state && state.settings.voice) speak(t); };
 const stat = (v, label) => h("div", { class: "stat" }, h("b", { text: String(v) }), h("span", { text: label }));
+// ----- Возраст: точное число полных лет -----
+// По нему выбираются ограничения нагрузки (до 18 и после 65 лет) и недельные ориентиры ВОЗ
+const ageWord = n => `${n} ${E.plural(n, "год", "года", "лет")}`;
+const AGE_NOTE = {
+  teen: "До 18 лет — без тяжёлых весов; ориентир ВОЗ — в среднем 60 минут движения в день.",
+  adult: "Ориентир ВОЗ для взрослых: 150–300 минут движения и 2 силовые тренировки в неделю.",
+  mature: "Ориентир ВОЗ для взрослых: 150–300 минут движения и 2 силовые тренировки в неделю.",
+  senior: "После 65 лет в тренировки добавлено равновесие, а прыжков и тяжёлых весов нет."
+};
+let ageFieldN = 0;
+// onSave(возраст) — когда введено допустимое число; onDone — когда поле покинули (можно перерисовать экран)
+function ageField({ value = 0, label = "Возраст, полных лет", hintEmpty = "", onSave, onDone }) {
+  const id = `age-hint-${(ageFieldN += 1)}`;
+  const hint = h("p", { class: "muted small age-hint", id, "aria-live": "polite" });
+  const inp = h("input", { class: "input age-input", type: "number", inputmode: "numeric", min: AGE_MIN, max: AGE_MAX, step: 1, placeholder: "например, 25", autocomplete: "off", "aria-describedby": id, value: value || "" });
+  const read = () => { const v = Number(String(inp.value).trim()); return Number.isInteger(v) && v >= AGE_MIN && v <= AGE_MAX ? v : 0; };
+  const show = () => {
+    const raw = String(inp.value).trim(), v = Number(raw);
+    if (!raw) hint.textContent = hintEmpty || `Целым числом, от ${AGE_MIN} до ${AGE_MAX}.`;
+    else if (!Number.isInteger(v)) hint.textContent = "Укажите полных лет — целым числом.";
+    else if (v < AGE_MIN) hint.textContent = `Листопульс рассчитан на возраст от ${AGE_MIN} лет.`;
+    else if (v > AGE_MAX) hint.textContent = "Проверьте возраст — похоже на опечатку.";
+    else hint.textContent = (v < 14 ? "До 14 лет — вместе с родителями. " : "") + AGE_NOTE[ageGroupOf(v)];
+  };
+  inp.addEventListener("input", () => { show(); onSave(read(), inp.value); });
+  if (onDone) inp.addEventListener("change", () => { if (read()) onDone(); });
+  show();
+  return h("div", { class: "age-field" }, h("label", { class: "field" }, h("span", { text: label }), inp), hint);
+}
+// Профиль: возраст сохраняется сразу, группа для правил нагрузки вычисляется из него
+function profileAgeField() {
+  const p = state.profile;
+  return ageField({
+    value: p.age,
+    hintEmpty: p.age ? "" : `Сейчас указана группа «${nameIn(AGE_GROUPS, p.ageGroup)}» — введите точный возраст.`,
+    onSave: v => { if (!v || v === p.age) return; p.age = v; p.ageGroup = ageGroupOf(v); persist(); },
+    onDone: () => refresh()
+  });
+}
 const feature = (ic, title, textValue) => h("div", { class: "feature" }, h("span", { class: "fi" }, icon(ic, 20)),
   h("span", {}, h("b", { text: title }), h("br"), h("span", { class: "muted small", text: textValue })));
 const equipName = id => (EQUIPMENT.find(e => e.id === id) || { name: id }).name;
@@ -829,11 +868,11 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Детальные фигуры в схемах: одежда, кроссовки, волосы, лицо и мягкие тени",
-  "Тон кожи и вид фигуры — детальная или силуэт — в «Персонализации»",
-  "Плавнее анимация: опорная стопа не скользит, шаги с подъёмом ноги",
-  "Исправлены движения рук «сквозь пол» в пуловере, «мёртвом жуке» и «открытой книге»",
-  "Аккуратнее на узких экранах: вкладки, награды, плитки, кнопки и кольца не выходят за рамки и не обрезаются"
+  "Возраст — точным числом, например 25 или 67, а не диапазоном: в знакомстве, профиле и отчёте для врача",
+  "Исправлены стопы в схемах: кроссовок больше не переворачивается подошвой вверх",
+  "Опорные стопы и ладони стоят на месте — не скользят и не отрываются от пола в выпадах, мостах, отжиманиях",
+  "Точнее позы: в мосте голова лежит на полу, на коленях голень лежит на полу, планка — на предплечьях",
+  "Заголовки больше не переносятся по слогам"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1520,8 +1559,7 @@ function bodyHealth(r) {
           }
         })) : null,
       notes.length ? h("ul", { class: "adapt", style: { marginTop: "14px" } }, notes.map(n => h("li", { class: "note", text: n }))) : null,
-      h("div", { class: "q" }, h("b", { text: "Возраст" }),
-        choice({ label: "Возраст", value: state.profile.ageGroup, options: AGE_GROUPS.map(a => ({ value: a.id, label: a.name })), onChange: v => { state.profile.ageGroup = v; persist(); refresh(); } }))),
+      h("div", { class: "q" }, profileAgeField())),
     h("section", { class: "card glass alert" },
       h("h2", { text: "Когда сразу остановиться" }),
       h("ul", { class: "bullets" }, RED_FLAGS.map(t => h("li", { text: t }))),
@@ -2798,6 +2836,7 @@ function subProfile() {
     h("h1", { class: "page-title", text: "Профиль и цели" }),
     h("section", { class: "card glass" },
       h("label", { class: "field" }, h("span", { text: "Имя (необязательно)" }), name),
+      profileAgeField(),
       h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); } })),
       h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "seg", label: "Уровень", value: p.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { p.level = v; persist(); } })),
       h("div", { class: "q" }, h("b", { text: "Инвентарь" }), choice({ multiple: true, label: "Инвентарь", value: p.equipment, options: EQUIPMENT.map(e => ({ value: e.id, label: e.name })), onChange: v => { p.equipment = v; persist(); } })),
@@ -3403,7 +3442,7 @@ function subAbout() {
 
 // ===== Калькуляторы =====
 const AGE_DEFAULT = { teen: 15, adult: 30, mature: 50, senior: 68 };
-const calcDraft = { age: 0, kg: 0, waist: 0, act: 1.375, lift: 0, reps: 5 };
+const calcDraft = { age: 0, ageSrc: 0, kg: 0, waist: 0, act: 1.375, lift: 0, reps: 5 };
 const fmtInt = v => Math.round(v).toLocaleString("ru-RU");
 function heightField(onChange) {
   const p = state.profile;
@@ -3428,6 +3467,8 @@ function subCalc() {
   const pregnant = p.conditions.includes("pregnancy");
   const heart = p.conditions.includes("heart") || p.conditions.includes("hypertension");
   const lastW = state.bodyWeight.length ? state.bodyWeight[state.bodyWeight.length - 1][1] : 0;
+  // Возраст из профиля; если его поменяли в профиле — калькулятор берёт новый
+  if (p.age && calcDraft.ageSrc !== p.age) { calcDraft.age = p.age; calcDraft.ageSrc = p.age; }
   if (!calcDraft.age) calcDraft.age = AGE_DEFAULT[p.ageGroup] || 30;
   if (!calcDraft.kg) calcDraft.kg = lastW;
   const out = {};
@@ -3583,7 +3624,7 @@ function reportData(from, today) {
   const conds = p.conditions.map(id => nameIn(CONDITIONS, id).toLowerCase());
   const general = [
     p.name ? `Имя: ${p.name}` : null,
-    `Возраст: ${nameIn(AGE_GROUPS, p.ageGroup)}`,
+    `Возраст: ${p.age ? ageWord(p.age) : nameIn(AGE_GROUPS, p.ageGroup)}`,
     p.sex ? `Пол: ${p.sex === "f" ? "женский" : "мужской"}` : null,
     p.height ? `Рост: ${p.height} см` : null,
     lastW ? `Вес: ${fmtNum(lastW[1])} кг (${fmtFull(lastW[0])})` : null,
@@ -4287,7 +4328,7 @@ function renderOnboarding() {
   if (!onb) {
     const p = state.profile;
     onb = {
-      name: p.name, ageGroup: p.ack ? p.ageGroup : "", ack: false, screening: p.screening.slice(),
+      name: p.name, age: p.ack ? p.age : 0, ageRaw: "", ack: false, screening: p.screening.slice(),
       goal: p.goal, level: p.level, equipment: p.equipment.slice(), minutes: p.minutes, days: p.days.slice(),
       conditions: p.conditions.filter(c => c !== "caution")
     };
@@ -4334,9 +4375,7 @@ function onbWelcome() {
         feature("shield", "Данные только у вас", "Без регистрации, серверов и рекламы. По желанию — пароль и шифрование.")),
       h("section", { class: "card glass" },
         h("label", { class: "field" }, h("span", { text: "Как к вам обращаться? (необязательно)" }), name),
-        h("div", { class: "q" }, h("b", { text: "Ваш возраст" }),
-          choice({ label: "Возраст", value: onb.ageGroup, options: AGE_GROUPS.map(a => ({ value: a.id, label: a.name })), onChange: v => { onb.ageGroup = v; } })),
-        h("p", { class: "muted small", text: "Приложение рассчитано на возраст от 12 лет; до 14 лет — вместе с родителями." })),
+        ageField({ value: onb.age, label: "Ваш возраст, полных лет", hintEmpty: "Приложение рассчитано на возраст от 12 лет; до 14 лет — вместе с родителями.", onSave: (v, raw) => { onb.age = v; onb.ageRaw = raw; } })),
       h("section", { class: "card glass warn" },
         h("p", {}, h("b", { text: "Важно. " }), "Листопульс не заменяет врача и не является медицинским изделием. Советы общие и строятся по тому, что вы укажете сами. При заболеваниях, после травм и операций посоветуйтесь с врачом."),
         h("label", { class: "check-row" }, ack,
@@ -4344,7 +4383,14 @@ function onbWelcome() {
             h("a", { href: "terms.html", target: "_blank", rel: "noopener", text: "условия использования" }), " и ",
             h("a", { href: "privacy.html", target: "_blank", rel: "noopener", text: "политику конфиденциальности" }), ".")))
     ],
-    check: () => (!onb.ageGroup ? "Выберите возраст" : !onb.ack ? "Отметьте, что принимаете условия" : null)
+    check: () => {
+      if (!onb.age) {
+        const v = Number(String(onb.ageRaw).trim());
+        if (String(onb.ageRaw).trim() && Number.isFinite(v) && v < AGE_MIN) return `Листопульс рассчитан на возраст от ${AGE_MIN} лет`;
+        return String(onb.ageRaw).trim() ? `Укажите возраст целым числом от ${AGE_MIN} до ${AGE_MAX}` : "Укажите возраст — например, 25";
+      }
+      return !onb.ack ? "Отметьте, что принимаете условия" : null;
+    }
   };
 }
 
@@ -4420,7 +4466,8 @@ function finishOnboarding() {
   p.onboarded = true;
   p.ack = true;
   p.name = clean(onb.name, 40);
-  p.ageGroup = onb.ageGroup;
+  p.age = onb.age;
+  p.ageGroup = ageGroupOf(onb.age);
   p.screening = onb.screening.slice();
   p.goal = onb.goal;
   p.level = onb.level;

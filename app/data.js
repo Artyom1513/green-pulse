@@ -235,6 +235,9 @@ export const CONDITIONS = [
     "Когда врач разрешит тренировки, снимите эту отметку."] }
 ];
 
+// Возраст хранится точным числом; группа нужна для ограничений нагрузки и ориентиров ВОЗ
+export const AGE_MIN = 12, AGE_MAX = 100;
+export const ageGroupOf = age => (age < 18 ? "teen" : age < 40 ? "adult" : age < 65 ? "mature" : "senior");
 export const AGE_GROUPS = [
   { id: "teen", name: "12–17 лет", maxLevel: 2, ban: ["heavy"], notes: ["Без тяжёлых весов. Лучше всего заниматься в секции под присмотром тренера."] },
   { id: "adult", name: "18–39 лет" },
