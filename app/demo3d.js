@@ -417,6 +417,29 @@ function rollBody(P, axis, o, ang) {
   }
 }
 const LEG = ["knee", "ankle", "toe"], ARM = ["elbow", "wrist", "knuckle"];
+// Расстояние от точки o до отрезка AB
+const segDist = (A, B, o) => { const ab = sub(B, A), t = clamp(dot(sub(o, A), ab) / Math.max(dot(ab, ab), 1e-9), 0, 1); return len(sub(o, madd(A, ab, t))); };
+// Локоть для заданных плеча и кисти: из всех положений на окружности возможных локтей выбираем
+// естественное — в сторону prefer, и чтобы плечо и предплечье не проходили сквозь голову и шею
+function elbowFor(S, W, l1, l2, prefer, avoid) {
+  const v = sub(W, S), d = clamp(len(v), Math.abs(l1 - l2) + 1e-3, l1 + l2 - 1e-3);
+  const ax = norm(v);
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  const c = madd(S, ax, a);
+  let e1 = perp(prefer, ax);
+  if (len(e1) < 1e-3) e1 = perp(Math.abs(ax[1]) < 0.9 ? Y : X, ax);
+  e1 = norm(e1);
+  const e2 = cross(ax, e1);
+  let best = null, bestCost = Infinity;
+  for (let k = 0; k < 48; k++) {
+    const t = (k / 48) * Math.PI * 2;
+    const E = add(c, add(mul(e1, Math.cos(t) * h), mul(e2, Math.sin(t) * h)));
+    let cost = (1 - Math.cos(t)) * 0.5;
+    for (const [o, r] of avoid) cost += 12 * Math.max(0, r - segDist(S, E, o)) + 12 * Math.max(0, r - segDist(E, W, o));
+    if (cost < bestCost) { bestCost = cost; best = E; }
+  }
+  return { elbow: best, wrist: madd(S, ax, d) };
+}
 const HOOKS = {
   butterfly(P) {
     for (const i of [0, 1]) turnChain(P, LEG, i, P.hip[i], norm([P.fwd[0], 0, P.fwd[2]]), (i ? -1 : 1) * 62 * D);
@@ -465,6 +488,169 @@ HOOKS.sidePlankKnee = P => {
     const d = norm(add(mul(P.fwd, -1), mul(th, 0.15)));
     P.ankle[i] = madd(P.knee[i], d, L);
     P.toe[i] = madd(P.ankle[i], norm(add(d, mul(th, 0.2))), F);
+  }
+};
+// «Гало» с гирей: гиря за «рога» дном вверх, по кругу вокруг головы — перед подбородком, у уха,
+// за головой на уровне основания черепа, у другого уха. Корпус и голова неподвижны, локти согнуты:
+// спереди смотрят вниз, за головой — вперёд и вверх, руки обходят голову, а не проходят сквозь неё
+HOOKS.halo = (P, f) => {
+  const U = P.up, Lt = P.latC, Fw = P.fwd;
+  const head = madd(P.head, P.hdir, 0.085);
+  const ph = (f.phase || 0) * Math.PI * 2;
+  const cf = Math.cos(ph), sf = Math.sin(ph);
+  const front = Math.max(0, cf) ** 2, back = Math.max(0, -cf) ** 2, side = sf * sf;
+  const R = 0.24 * front + 0.2 * side + 0.19 * back;
+  const radial = norm(add(mul(Fw, cf), mul(Lt, sf)));
+  const grip = add(madd(head, radial, R), mul(U, -0.2 * front - 0.08 * side - 0.12 * back));
+  // линия между кистями: спереди и сзади — поперёк тела, у уха — вдоль (одна рука впереди)
+  const v = norm(add(mul(Lt, Math.abs(cf)), mul(Fw, -sf)));
+  const hand = [madd(grip, v, -0.055), madd(grip, v, 0.055)];
+  const hdir = norm(add(mul(U, 0.85), mul(radial, 0.15)));
+  const neck = lerp3(P.neck, P.head, 0.5);
+  const avoid = [[head, 0.15], [neck, 0.1], [P.chest, 0.1]];
+  for (const i of [0, 1]) {
+    const s = i ? 1 : -1;
+    const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+    const out = mul(Lt, s);
+    const prefer = norm(add(add(mul(Fw, 0.45 + 0.35 * back), mul(U, -0.8 * front + 0.55 * back - 0.1 * side)), mul(out, 0.45)));
+    const r = elbowFor(P.shoulder[i], madd(hand[i], hdir, -0.055), l1, l2, prefer, avoid);
+    P.elbow[i] = r.elbow;
+    P.wrist[i] = r.wrist;
+    P.knuckle[i] = madd(r.wrist, hdir, 0.09);
+  }
+  // гиря дном вверх: шар над кистями, ручка внизу
+  P.kb = { c: madd(grip, U, 0.12), y: mul(U, -1), x: v };
+};
+// ----- Касания: кисть приходит в нужную точку (на стопу, на локоть, в замок за спиной) -----
+// palm — где должна быть середина ладони, dir — куда смотрят пальцы, prefer — куда естественно
+// смотрит локоть; голова, шея и корпус — препятствия, сквозь которые рука не проходит
+function bodyAvoid(P) {
+  const head = madd(P.head, P.hdir, 0.085);
+  return [[head, 0.14], [lerp3(P.neck, P.head, 0.5), 0.09], [P.chest, 0.16], [P.spine, 0.15], [madd(P.pelvis, P.up, 0.02), 0.16]];
+}
+function reachHand(P, i, palm, dir, prefer, avoid) {
+  const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+  const d = norm(dir);
+  const r = elbowFor(P.shoulder[i], madd(palm, d, -0.055), l1, l2, norm(prefer), avoid || bodyAvoid(P));
+  P.elbow[i] = r.elbow;
+  P.wrist[i] = r.wrist;
+  P.knuckle[i] = madd(r.wrist, d, 0.09);
+}
+const outward = (P, i) => mul(P.latC, i ? 1 : -1);
+// Передача гири вокруг пояса: гиря идёт по кругу у пояса, переходит из руки в руку спереди и за
+// спиной. Рука с гирей несёт её по своей стороне, свободная зеркально идёт по другой стороне
+// навстречу следующей передаче — корпус и таз неподвижны
+HOOKS.around = (P, f) => {
+  const U = P.up, Lt = P.latC, Fw = P.fwd;
+  const ph = ((f.phase || 0) % 1) * Math.PI * 2;
+  const at = psi => add(add(madd(P.pelvis, U, 0.1), mul(Lt, 0.31 * Math.sin(psi))), mul(Fw, 0.25 * Math.cos(psi)));
+  const first = ph <= Math.PI; // пока гиря идёт слева, её несёт левая рука
+  const psiL = first ? ph : 2 * Math.PI - ph, psiR = first ? -ph : ph;
+  // у передачи (спереди и за спиной) обе руки на ручке
+  const pass = Math.max(bellAt(ph, 0), bellAt(ph, Math.PI), bellAt(ph, 2 * Math.PI));
+  const grip = at(ph);
+  const tang = norm(add(mul(Lt, Math.cos(ph)), mul(Fw, -Math.sin(ph))));
+  const handL = lerp3(at(psiL), madd(grip, tang, 0.035), pass), handR = lerp3(at(psiR), madd(grip, tang, -0.035), pass);
+  const avoid = bodyAvoid(P);
+  for (const i of [0, 1]) {
+    const h = i ? handL : handR;
+    const prefer = add(add(outward(P, i), mul(Fw, -0.4)), mul(U, -0.3));
+    reachHand(P, i, h, mul(U, -1), prefer, avoid);
+  }
+  P.kb = { c: madd(grip, U, -0.115), y: U, x: tang };
+};
+const bellAt = (x, c) => Math.exp(-(((x - c) / 0.32) ** 2));
+// Растяжка трицепса: ладонь за головой тянется к лопатке, локоть смотрит вверх; другая рука
+// поверх головы мягко тянет локоть
+HOOKS.tricepsStretch = P => {
+  const U = P.up, Fw = P.fwd, avoid = bodyAvoid(P);
+  const back = madd(madd(lerp3(P.neck, P.chest, 0.35), Fw, -0.13), outward(P, 1), 0.02);
+  reachHand(P, 0, back, add(mul(U, -1), mul(Fw, -0.3)), add(U, mul(Fw, 0.15)), avoid);
+  const el = P.elbow[0];
+  reachHand(P, 1, madd(madd(el, U, 0.03), Fw, 0.03), add(outward(P, 0), mul(U, 0.2)), add(add(Fw, mul(U, 0.2)), outward(P, 1)), avoid.slice(0, 2));
+};
+// Растяжка груди с руками за спиной: пальцы в замке за спиной, руки отведены назад
+HOOKS.handsBehind = (P, f) => {
+  const U = P.up, Fw = P.fwd, avoid = bodyAvoid(P);
+  const k = typeof f.k === "number" ? f.k : 0;
+  const c = add(add(madd(P.pelvis, Fw, -0.2 - 0.12 * k), mul(U, -0.02 + 0.1 * k)), [0, 0, 0]);
+  for (const i of [0, 1]) reachHand(P, i, madd(c, outward(P, i), 0.03), add(mul(U, -0.6), outward(P, 1 - i)), add(add(outward(P, i), mul(Fw, -0.6)), mul(U, -0.2)), avoid);
+};
+// Растяжка передней поверхности бедра: рука держит стопу у ягодицы, колени рядом, другая рука —
+// на стене для равновесия
+HOOKS.quadStretch = P => {
+  const U = P.up, Fw = P.fwd;
+  const instep = madd(lerp3(P.ankle[0], P.toe[0], 0.35), U, 0.01);
+  reachHand(P, 0, madd(instep, outward(P, 0), 0.04), add(mul(U, -0.3), Fw), add(add(outward(P, 0), mul(Fw, -0.5)), mul(U, -0.3)));
+  // ладонь на стене сбоку (стена — в опорах схемы, на том же расстоянии)
+  const wall = madd(madd(P.shoulder[1], outward(P, 1), WALL_SIDE - 0.03), U, -0.22);
+  reachHand(P, 1, wall, add(U, mul(Fw, 0.2)), add(outward(P, 1), mul(U, -0.5)));
+};
+// «Счастливый ребёнок»: колени широко к подмышкам, стопы смотрят в потолок, руки держат стопы
+HOOKS.happyBaby = P => {
+  for (const i of [0, 1]) turnChain(P, LEG, i, P.hip[i], norm([P.up[0], 0, P.up[2]]).map(x => x * (i ? 1 : -1)), 30 * D);
+  for (const i of [0, 1]) {
+    const sole = lerp3(P.ankle[i], P.toe[i], 0.45);
+    reachHand(P, i, madd(sole, outward(P, i), 0.035), add(P.fwd, mul(outward(P, i), -0.3)), add(outward(P, i), mul(P.fwd, 0.4)));
+  }
+};
+const WALL_SIDE = 0.4;
+// Колени к груди: руки обхватывают голени под коленями; «четвёрка»: лодыжка на колене другой ноги
+HOOKS.kneesToChest = (P, f, M) => {
+  if (M && M.id === "figure4") {
+    // опорная нога (левая): бедро к груди, голень горизонтально; правая лодыжка — на её колене
+    const kn = P.knee[1], shinOut = norm(sub(P.ankle[1], P.knee[1]));
+    const target = madd(madd(kn, shinOut, 0.05), P.fwd, 0.06);
+    const l1 = len(sub(P.knee[0], P.hip[0])), l2 = len(sub(P.ankle[0], P.knee[0]));
+    const r = elbowFor(P.hip[0], target, l1, l2, add(outward(P, 0), mul(P.fwd, 0.6)), []);
+    const fv = sub(P.toe[0], P.ankle[0]);
+    P.knee[0] = r.elbow; P.ankle[0] = r.wrist; P.toe[0] = madd(r.wrist, norm(add(outward(P, 1), mul(norm(fv), 0.4))), len(fv));
+    // руки держат опорное бедро сзади (со стороны голени)
+    const th = lerp3(P.hip[1], P.knee[1], 0.7), td = norm(sub(P.knee[1], P.hip[1]));
+    const back = norm(perp(sub(P.ankle[1], P.knee[1]), td));
+    for (const i of [0, 1]) reachHand(P, i, madd(madd(th, back, 0.075), outward(P, i), 0.02), add(outward(P, 1 - i), mul(td, -0.3)), add(outward(P, i), mul(P.fwd, 0.5)));
+    return;
+  }
+  for (const i of [0, 1]) {
+    const shin = lerp3(P.knee[i], P.ankle[i], 0.28);
+    reachHand(P, i, madd(madd(shin, P.fwd, 0.05), outward(P, i), 0.01), add(outward(P, 1 - i), mul(P.fwd, -0.2)), add(outward(P, i), mul(P.fwd, 0.5)));
+  }
+};
+// «Бабочка»: руки держат стопы
+{
+  const knees = HOOKS.butterfly;
+  HOOKS.butterfly = (P, f) => {
+    knees(P, f);
+    const feet = lerp3(lerp3(P.ankle[0], P.toe[0], 0.5), lerp3(P.ankle[1], P.toe[1], 0.5), 0.5);
+    for (const i of [0, 1]) reachHand(P, i, madd(madd(feet, outward(P, i), 0.05), P.up, 0.03), add(mul(P.up, -0.4), P.fwd), add(outward(P, i), mul(P.up, -0.3)));
+  };
+}
+// Растяжка груди в дверном проёме: плечи отведены в стороны, локти чуть ниже плеч, предплечья
+// вертикально на косяках
+HOOKS.chestStretch = (P, f) => {
+  const U = P.up, Fw = P.fwd;
+  const k = typeof f.k === "number" ? f.k : 0;
+  P._door = [];
+  for (const i of [0, 1]) {
+    const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+    const up1 = norm(add(add(outward(P, i), mul(U, -0.18)), mul(Fw, -0.22 - 0.15 * k)));
+    P.elbow[i] = madd(P.shoulder[i], up1, l1);
+    P.wrist[i] = madd(P.elbow[i], norm(add(U, mul(Fw, -0.1))), l2);
+    P.knuckle[i] = madd(P.wrist[i], U, 0.09);
+    P._door.push(P.elbow[i]);
+  }
+};
+// «Прокрутка» с лентой: широкий хват, прямые руки идут от бёдер через голову за спину
+HOOKS.dislocate = P => {
+  for (const i of [0, 1]) {
+    const L = len(sub(P.knuckle[i], P.shoulder[i]));
+    const d = norm(sub(P.wrist[i], P.shoulder[i]));
+    const spread = norm(add(mul(d, Math.cos(42 * D)), mul(outward(P, i), Math.sin(42 * D))));
+    const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+    P.elbow[i] = madd(P.shoulder[i], spread, l1);
+    P.wrist[i] = madd(P.elbow[i], spread, l2);
+    P.knuckle[i] = madd(P.wrist[i], spread, 0.09);
+    void L;
   }
 };
 const FRONTAL = new Set(["sideLying", "sidePlank", "sidePlankKnee"]);
@@ -909,9 +1095,11 @@ function cameraFor(M, demo) {
   }
   // запас на объём тела вокруг суставов и на тень
   x0 -= 0.16; x1 += 0.16; y0 -= 0.1; y1 += 0.16;
-  const target = add(c, add(mul(right, (x0 + x1) / 2), mul(up, (y0 + y1) / 2)));
+  let target = add(c, add(mul(right, (x0 + x1) / 2), mul(up, (y0 + y1) / 2)));
   const fov = 24 * D, aspect = demo.w / demo.h;
-  const hh = Math.max((y1 - y0) / 2, (x1 - x0) / 2 / aspect) * 1.04;
+  let hh = Math.max((y1 - y0) / 2, (x1 - x0) / 2 / aspect) * 1.04;
+  // для проверки: крупный план (zoom) с точкой интереса на высоте focusY
+  if (demo.zoom) { hh /= demo.zoom; if (demo.focusY !== undefined) target = [target[0], demo.focusY, target[2]]; }
   const dist = hh / Math.tan(fov / 2) + 0.6;
   const eye = madd(target, dir, dist);
   const view = m4.lookAt(eye, target, Y);
@@ -925,7 +1113,7 @@ function solvePose(M, C, f, demo) {
   const grip = gripOf(M);
   const P = M.front ? liftFront(J, j, grip, f.Pz) : liftSide(J, j, grip, f.Pz, FRONTAL.has(M.pid));
   if (f.lag) P.lag = f.lag;
-  if (HOOKS[M.pid] && f.Pz) HOOKS[M.pid](P, f);
+  if (HOOKS[M.pid] && f.Pz) HOOKS[M.pid](P, f, M);
   // кисти на полу (упор лёжа, планка, «кошка») — ладонью вниз
   const pron = [0, 1].map(i => J.arms[i].hand[1] < 0.075 && J.arms[i].wrist[1] < 0.12);
   const breath = demo && !reduced() ? 0.012 * Math.sin(demo.t * 2 * Math.PI / 3.6) : 0;
@@ -945,6 +1133,7 @@ function solvePose(M, C, f, demo) {
       const v = P[key];
       if (Array.isArray(v) && v.length === 3 && typeof v[0] === "number" && !DIRS.includes(key)) P[key] = [v[0], v[1] + dy, v[2]];
       else if (Array.isArray(v) && Array.isArray(v[0])) P[key] = v.map(q => [q[0], q[1] + dy, q[2]]);
+      else if (key === "kb" && v) P.kb = { ...v, c: [v.c[0], v.c[1] + dy, v.c[2]] };
     }
     ({ mats, frames } = poseBones(C, P, pron, breath));
   }
@@ -1052,6 +1241,10 @@ function propList(M, P, demo, frames) {
       place("dbHead", T(madd(c, y, 0.095), x, y, z), dark);
       place("dbHead", T(madd(c, y, -0.095), x, y, z), dark);
     }
+  } else if (kind === "kb" && P.kb) {
+    const y = P.kb.y, x = norm(perp(P.kb.x, y)), z = cross(x, y);
+    place("kbBody", T(P.kb.c, x, y, z), dark);
+    place("kbHandle", T(P.kb.c, x, y, z), dark);
   } else if ((kind === "db" || kind === "kb") && (M.where === "chest" || M.where === "obj")) {
     const c = lerp3(palmC(0), palmC(1), 0.5);
     const up = norm(sub(P.neck, P.pelvis));
@@ -1164,6 +1357,17 @@ function staticProps(M, C) {
       anchor = [0, 2.05, A.neck[2] + 0.3];
       box([0, 2.08, anchor[2]], 0.3, 0.04, 0.3, metal);
     }
+  }
+  if (M.pid === "quadStretch") {
+    // стена сбоку: рука опирается для равновесия
+    const x = A.shoulder[1][0] + WALL_SIDE + 0.03;
+    box([x, 1.0, A.pelvis[2]], 0.06, 2.0, 1.2, [0.8, 0.79, 0.76]);
+  }
+  if (M.pid === "chestStretch" && A._door) {
+    // дверной проём: предплечья на косяках
+    const z = (A.wrist[0][2] + A.wrist[1][2]) / 2 + 0.07;
+    for (const i of [0, 1]) box([A.wrist[i][0] + (i ? 0.05 : -0.05), 1.03, z], 0.1, 2.06, 0.14, [0.86, 0.84, 0.8]);
+    box([0, 2.08, z], Math.abs(A.wrist[1][0] - A.wrist[0][0]) + 0.2, 0.1, 0.14, [0.86, 0.84, 0.8]);
   }
   // коврик под упражнениями на полу: по всем кадрам цикла, а не только по ключевым позам
   const frames = sampledPoses(M, C);
@@ -1427,5 +1631,6 @@ export function createDemo(id, { label, paused = false, sex } = {}) {
   el.lpPeriod = M.cycle;
   el.lpView = (az, elv) => { if (typeof az === "number") d.orbit = az - d.az; if (typeof elv === "number") d.elev = elv; d.dirty = true; };
   el.lpDemo = d;
+  el.lpZoom = (k, y) => { d.zoom = k; d.focusY = y; d.dirty = true; };
   return el;
 }

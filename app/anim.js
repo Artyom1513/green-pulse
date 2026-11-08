@@ -1462,7 +1462,7 @@ export function motionOf(id) {
   const S = solver(pat);
   const keys = pat.seq ? pat.seq.length : pat.b ? 2 : 1;
   return {
-    pid, pat, front: S.front, period: pat.p || 2.6, cycle: (pat.p || 2.6) * (pat.alt ? 2 : 1),
+    id, pid, pat, front: S.front, period: pat.p || 2.6, cycle: (pat.p || 2.6) * (pat.alt ? 2 : 1),
     weight: weightKind(id) || pat.hold || null, where: id === "bbSquat" ? "back" : pat.w || null,
     props: pat.props || [], hang: pat.hang || 0, legsFront: !!pat.legsFront, keys,
     frame(time, still = false) {
