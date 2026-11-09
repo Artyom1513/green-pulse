@@ -653,6 +653,109 @@ HOOKS.dislocate = P => {
     void L;
   }
 };
+// ----- Снаряды и опоры отдельных упражнений -----
+// Кисти вместе на одном снаряде: точку хвата берём из рисунка, локти считаем заново (в стороны,
+// не сквозь голову и корпус)
+function gripTogether(P) {
+  let c = lerp3(P.wrist[0], P.wrist[1], 0.5);
+  // кисти не могут сойтись внутри корпуса: точку хвата выносим вперёд, к животу
+  {
+    const a = P.pelvis, b = P.neck, ab = sub(b, a), t = clamp(dot(sub(c, a), ab) / dot(ab, ab), 0, 1);
+    const onAxis = madd(a, ab, t), off = sub(c, onAxis);
+    const fwdOff = dot(off, P.fwd);
+    if (t > 0.02 && t < 0.98 && len(off) < 0.2) c = madd(c, P.fwd, 0.2 - Math.max(0, fwdOff));
+  }
+  const hand = [0, 1].map(i => norm(sub(P.knuckle[i], P.wrist[i])));
+  const d = norm(add(hand[0], hand[1]));
+  const palm = madd(c, d, 0.055);
+  const avoid = bodyAvoid(P).slice(0, 2);
+  for (const i of [0, 1]) {
+    const prefer = add(outward(P, i), mul(norm(sub(P.elbow[i], P.shoulder[i])), 0.8));
+    reachHand(P, i, madd(palm, P.latC, (i ? 1 : -1) * 0.045), d, prefer, avoid);
+  }
+}
+// Свободная рука при работе одной рукой: опущена вдоль тела
+function relaxArm(P, i) {
+  const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+  const down = norm(add([0, -1, 0], mul(outward(P, i), 0.12)));
+  P.elbow[i] = madd(P.shoulder[i], down, l1);
+  P.wrist[i] = madd(P.elbow[i], norm(add(down, mul(P.fwd, 0.08))), l2);
+  P.knuckle[i] = madd(P.wrist[i], down, 0.09);
+}
+const BY_ID = {
+  // тяги одной рукой с опорой: свободная ладонь на скамье перед собой
+  dbRow: P => supportHand(P),
+  kbRow: P => supportHand(P),
+  kbPress: P => relaxArm(P, 1),
+  suitcaseCarry: P => relaxArm(P, 1),
+  // разведение гантелей лёжа: руки идут в стороны по дуге, локти чуть согнуты
+  dbFly(P, f) {
+    const k = typeof f.k === "number" ? f.k : 0;
+    const up = P.fwd; // лёжа на спине живот смотрит вверх
+    for (const i of [0, 1]) {
+      const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
+      const a = (1 - k) * 72 * D;
+      const d = norm(add(mul(up, Math.cos(a)), mul(outward(P, i), Math.sin(a))));
+      P.elbow[i] = madd(P.shoulder[i], d, l1);
+      const fd = norm(add(d, mul(outward(P, i), -0.28)));
+      P.wrist[i] = madd(P.elbow[i], fd, l2);
+      P.knuckle[i] = madd(P.wrist[i], fd, 0.09);
+    }
+  },
+  // наклонная скамья: корпус поднят на 35°, жим идёт перпендикулярно корпусу
+  dbIncline(P) {
+    const o = P.pelvis, axis = P.lat;
+    const ang = 35 * D;
+    for (const k of ["spine", "chest", "neck", "head", "top"]) P[k] = add(o, rot(sub(P[k], o), axis, ang));
+    for (const k of ["clav", "shoulder", "elbow", "wrist", "knuckle"]) P[k] = P[k].map(q => add(o, rot(sub(q, o), axis, ang)));
+    for (const k of ["up", "fwd", "hdir"]) P[k] = rot(P[k], axis, ang);
+    P.incline = ang;
+  },
+  // болгарские выпады: задняя стопа подъёмом на скамье позади
+  bulgarian(P) {
+    const i = 1, back = mul(norm([P.fwd[0], 0, P.fwd[2]]), -1);
+    const base = P._bench || (P._bench = madd([P.hip[i][0], 0, P.ankle[0][2]], back, 0.82));
+    const ankle = [base[0], 0.5, base[2]];
+    const l1 = len(sub(P.knee[i], P.hip[i])), l2 = len(sub(P.ankle[i], P.knee[i]));
+    const r = elbowFor(P.hip[i], ankle, l1, l2, add([0, -1, 0], mul(back, -0.3)), []);
+    P.knee[i] = r.elbow; P.ankle[i] = r.wrist;
+    P.toe[i] = madd(madd(r.wrist, back, 0.16), [0, -1, 0], 0.05);
+    P.benchAt = [base[0], 0.44, base[2] + back[2] * 0.05];
+  }
+};
+function supportHand(P) {
+  const i = 1, sh = P.shoulder[i];
+  const palm = [sh[0] + 0.02, Math.max(0.42, sh[1] - 0.6), sh[2] + 0.08];
+  reachHand(P, i, palm, norm([P.fwd[0], 0, P.fwd[2]]), add(outward(P, i), mul(P.fwd, -0.3)));
+  P.supportAt = palm;
+}
+// руки на поясе: ладони на тазовых костях, локти в стороны
+const handsOnHips = P => {
+  for (const i of [0, 1]) {
+    const palm = madd(madd(madd(P.pelvis, outward(P, i), 0.155), P.up, 0.09), P.fwd, 0.01);
+    reachHand(P, i, palm, add(mul(P.up, -0.6), P.fwd), add(outward(P, i), mul(P.fwd, -0.3)), []);
+  }
+};
+HOOKS.kneeLift = handsOnHips;
+HOOKS.hipCircle = handsOnHips;
+// ягодичный мост с весом: гантель или штанга поперёк таза, кисти держат её по краям
+const hipLoad = P => {
+  const c = madd(madd(P.pelvis, P.fwd, 0.15), P.up, -0.02);
+  P.hipLoad = { c, x: P.lat };
+  for (const i of [0, 1]) reachHand(P, i, madd(c, outward(P, i), 0.13), mul(P.up, 1), add(outward(P, i), mul(P.up, -0.5)), []);
+};
+// «Нитка в иголку»: грудной отдел поворачивается вслед за рукой — рука вверх раскрывает грудь,
+// рука под корпусом закрывает; опорная ладонь остаётся на месте
+HOOKS.thread = (P, f) => {
+  const s0 = f.Pz ? f.Pz.arms[0].s : 150;
+  const tau = -clamp((s0 - 20) / 130, -1, 1) * 38 * D;
+  const palm1 = madd(P.wrist[1], norm(sub(P.knuckle[1], P.wrist[1])), 0.055);
+  const o = P.chest, axis = norm(sub(P.neck, P.pelvis));
+  for (const k of ["neck", "head", "top"]) P[k] = add(o, rot(sub(P[k], o), axis, tau));
+  for (const k of ["clav", "shoulder", "elbow", "wrist", "knuckle"]) P[k] = P[k].map(q => add(o, rot(sub(q, o), axis, tau)));
+  for (const k of ["latC", "latH", "hdir"]) P[k] = rot(P[k], axis, tau);
+  reachHand(P, 1, palm1, norm([P.fwd[0], 0, P.fwd[2]]), add(outward(P, 1), mul(P.fwd, -0.4)), []);
+};
 const FRONTAL = new Set(["sideLying", "sidePlank", "sidePlankKnee"]);
 
 // ----- Позы костей -----
@@ -1050,10 +1153,16 @@ function paletteOf(el) {
 }
 
 // Где кисти держат снаряд: гантели — в каждой руке, гиря или гантель у груди — в обеих
+// Один снаряд в двух руках: махи и становая с гирей, сумо, махи и сумо с гантелью, французский жим,
+// пуловер — кисти вместе на ручке (гиря) или под верхним диском (гантель)
+const TWO_HANDS = new Set(["kbSwing", "kbDeadlift", "kbSumo", "dbSwing", "dbSumo", "ohTriceps", "dbPullover"]);
+// Одной рукой: жим гири, тяги с опорой, прогулка с гантелью в одной руке
+const ONE_ARM = new Set(["kbPress", "kbRow", "dbRow", "suitcaseCarry"]);
 function gripOf(M) {
-  if (M.where === "chest" || (M.where === "obj" && M.weight)) return "together";
+  if (M.where === "chest" || (M.where === "obj" && M.weight) || TWO_HANDS.has(M.id)) return "together";
   return "";
 }
+const whereOf = M => (ONE_ARM.has(M.id) ? "near" : M.where);
 
 // Позы за весь цикл (для рамки кадра и коврика), считаются один раз на схему
 function sampledPoses(M, C) {
@@ -1114,6 +1223,9 @@ function solvePose(M, C, f, demo) {
   const P = M.front ? liftFront(J, j, grip, f.Pz) : liftSide(J, j, grip, f.Pz, FRONTAL.has(M.pid));
   if (f.lag) P.lag = f.lag;
   if (HOOKS[M.pid] && f.Pz) HOOKS[M.pid](P, f, M);
+  if (TWO_HANDS.has(M.id)) gripTogether(P);
+  if (BY_ID[M.id]) BY_ID[M.id](P, f, M);
+  if (M.weight && M.where === "hip") hipLoad(P);
   // кисти на полу (упор лёжа, планка, «кошка») — ладонью вниз
   const pron = [0, 1].map(i => J.arms[i].hand[1] < 0.075 && J.arms[i].wrist[1] < 0.12);
   const breath = demo && !reduced() ? 0.012 * Math.sin(demo.t * 2 * Math.PI / 3.6) : 0;
@@ -1134,6 +1246,7 @@ function solvePose(M, C, f, demo) {
       if (Array.isArray(v) && v.length === 3 && typeof v[0] === "number" && !DIRS.includes(key)) P[key] = [v[0], v[1] + dy, v[2]];
       else if (Array.isArray(v) && Array.isArray(v[0])) P[key] = v.map(q => [q[0], q[1] + dy, q[2]]);
       else if (key === "kb" && v) P.kb = { ...v, c: [v.c[0], v.c[1] + dy, v.c[2]] };
+      else if (key === "hipLoad" && v) P.hipLoad = { ...v, c: [v.c[0], v.c[1] + dy, v.c[2]] };
     }
     ({ mats, frames } = poseBones(C, P, pron, breath));
   }
@@ -1230,9 +1343,35 @@ function propList(M, P, demo, frames) {
     const f = handFrame(i);
     return madd(madd(P.wrist[i], f.y, 0.055), f.z, 0.0);
   };
-  const kind = M.weight;
-  if (kind === "db" && (M.where === "hands" || M.where === "near" || !M.where)) {
-    for (const i of M.where === "near" ? [0] : [0, 1]) {
+  const kind = M.weight, where = whereOf(M);
+  const grip2 = () => lerp3(palmC(0), palmC(1), 0.5);
+  if (TWO_HANDS.has(M.id) && (kind === "db" || kind === "kb")) {
+    // один снаряд в двух руках висит под кистями; в махах летит по линии рук
+    const c = grip2();
+    const hang = M.pid === "swing" ? norm(sub(c, lerp3(P.shoulder[0], P.shoulder[1], 0.5))) : [0, -1, 0];
+    const y = mul(hang, -1), x = norm(perp(sub(P.wrist[1], P.wrist[0]), y)), z = cross(x, y);
+    if (kind === "kb") {
+      place("kbBody", T(madd(c, hang, 0.115), x, y, z), dark);
+      place("kbHandle", T(madd(c, hang, 0.115), x, y, z), dark);
+    } else {
+      place("dbHandle", T(madd(c, hang, 0.095), x, y, z), metal);
+      place("dbHead", T(c, x, y, z), dark);
+      place("dbHead", T(madd(c, hang, 0.19), x, y, z), dark);
+    }
+  } else if (where === "hip" && P.hipLoad) {
+    // ягодичный мост: снаряд лежит поперёк таза, руки держат его по краям
+    const { c, x } = P.hipLoad, y = norm(perp(P.fwd, x)), z = cross(x, y);
+    if (kind === "bb") {
+      place("bar", T(c, y, x, mul(z, -1)), metal);
+      place("plate", T(madd(c, x, 0.62), y, x, mul(z, -1)), dark);
+      place("plate", T(madd(c, x, -0.62), y, x, mul(z, -1)), dark);
+    } else {
+      place("dbHandle", T(c, y, x, mul(z, -1)), metal);
+      place("dbHead", T(madd(c, x, 0.095), y, x, mul(z, -1)), dark);
+      place("dbHead", T(madd(c, x, -0.095), y, x, mul(z, -1)), dark);
+    }
+  } else if (kind === "db" && (where === "hands" || where === "near" || !where)) {
+    for (const i of where === "near" ? [0] : [0, 1]) {
       const f = handFrame(i), c = palmC(i);
       // ручка гантели — поперёк ладони
       const ax = norm(cross(f.y, f.x));
@@ -1258,7 +1397,7 @@ function propList(M, P, demo, frames) {
       place("dbHead", T(madd(c, y, 0.095), x, y, z), dark);
       place("dbHead", T(madd(c, y, -0.095), x, y, z), dark);
     }
-  } else if (kind === "kb" && M.where === "near") {
+  } else if (kind === "kb" && where === "near") {
     // гиря в одной руке: внизу висит под ладонью, в стойке и над головой лежит на тыльной стороне предплечья
     const f = handFrame(0), c = palmC(0);
     const back = mul(f.x, 1); // правая рука: ладонь смотрит в −x рамки, тыл — в +x
@@ -1272,7 +1411,7 @@ function propList(M, P, demo, frames) {
     const x = norm(sub(P.wrist[1], P.wrist[0])), y = norm(perp(sub(P.wrist[0], P.elbow[0]), x)), z = cross(x, y);
     place("kbBody", T(madd(c, y, 0.1), x, mul(y, -1), mul(z, -1)), dark);
     place("kbHandle", T(madd(c, y, 0.1), x, mul(y, -1), mul(z, -1)), dark);
-  } else if (kind === "bb") {
+  } else if (kind === "bb" && where !== "hip") {
     let c, x;
     if (M.where === "back") { c = madd(madd(P.neck, norm(sub(P.pelvis, P.neck)), 0.06), P.fwd, -0.075); x = P.latC; }
     else { c = lerp3(palmC(0), palmC(1), 0.5); x = norm(sub(P.wrist[1], P.wrist[0])); }
@@ -1357,6 +1496,38 @@ function staticProps(M, C) {
       anchor = [0, 2.05, A.neck[2] + 0.3];
       box([0, 2.08, anchor[2]], 0.3, 0.04, 0.3, metal);
     }
+  }
+  const obox = (c, ax, ay, az, w, h, d, col) => {
+    out.push({ shape: "cube", model: m4.frame(mul(ax, w), mul(ay, h), mul(az, d), c), color: col });
+    for (const sx of [-0.5, 0.5]) for (const sy of [-0.5, 0.5]) pts.push(add(add(c, mul(ax, w * sx)), mul(ay, h * sy)));
+  };
+  if (A.supportAt) {
+    // скамья под опорной рукой (тяга одной рукой)
+    const top = A.supportAt[1] - 0.035;
+    box([A.supportAt[0], top / 2, A.supportAt[2] + 0.05], 0.4, top, 0.5, [0.24, 0.26, 0.3]);
+  }
+  if (A.benchAt) {
+    // скамья позади: задняя стопа подъёмом на ней (болгарские выпады)
+    const b = A.benchAt;
+    box([0, b[1] / 2, b[2] - 0.12], 0.5, b[1], 0.5, [0.24, 0.26, 0.3]);
+  }
+  if (M.id === "dbIncline") {
+    // наклонная скамья: сиденье под тазом и спинка вдоль корпуса
+    const ax = A.lat, along = norm(sub(A.neck, A.pelvis)), nrm = norm(cross(ax, along));
+    const back = dot(nrm, A.fwd) > 0 ? mul(nrm, -1) : nrm;
+    const seatTop = Math.max(0.3, A.pelvis[1] - 0.13);
+    box([0, seatTop - 0.04, A.pelvis[2] + 0.12], 0.3, 0.08, 0.36, [0.24, 0.26, 0.3]);
+    obox(add(madd(A.pelvis, along, 0.34), mul(back, 0.15)), ax, back, along, 0.3, 0.07, 0.72, [0.24, 0.26, 0.3]);
+    box([0, (seatTop - 0.08) / 2, A.pelvis[2] + 0.05], 0.08, seatTop - 0.08, 0.4, metal);
+  }
+  if (M.id === "chestRow") {
+    // упор грудью на наклонную скамью
+    const ax = A.lat, along = norm(sub(A.neck, A.pelvis)), belly = norm(A.fwd);
+    const c = add(madd(A.pelvis, along, 0.28), mul(belly, 0.16));
+    obox(c, ax, belly, along, 0.3, 0.07, 0.7, [0.24, 0.26, 0.3]);
+    const foot = [c[0], 0, c[2]];
+    box([0, c[1] / 2 - 0.05, foot[2]], 0.08, Math.max(0.1, c[1] - 0.15), 0.08, metal);
+    box([0, 0.02, foot[2]], 0.5, 0.04, 0.5, metal);
   }
   if (M.pid === "quadStretch") {
     // стена сбоку: рука опирается для равновесия
