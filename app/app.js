@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.0.2";
+const VERSION = "2.1.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -69,11 +69,11 @@ function loadDemo3d() {
 }
 const want3d = () => look.figstyle === "3d" && demo3d !== false;
 // Блок со схемой движения: пока модуль грузится, место под схему уже занято
-function demoBox(id) {
+function demoBox(id, { mini = false, onExpand = null } = {}) {
   const box = h("div", { class: "demo" });
   const make = () => {
     if (want3d() && demo3d) {
-      try { return demo3d.createDemo(id, { sex: figureSex() }); } catch (e) { demo3d = false; }
+      try { return demo3d.createDemo(id, { sex: figureSex(), controls: mini ? "mini" : "full", onExpand }); } catch (e) { demo3d = false; }
     }
     return animMod.exerciseDemo(id);
   };
@@ -894,12 +894,12 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Объёмные схемы упражнений: та же 3D-модель, что на вкладке «Тело», в спортивной форме, с тенью, снарядами и подсветкой работающих мышц; фигуру можно повернуть, показ — остановить",
-  "«Гало» с гирей как у тренеров: гиря дном вверх идёт вокруг головы, руки обходят голову, а не проходят сквозь неё; передача гири вокруг пояса — из руки в руку",
-  "Снаряды как у людей: один снаряд в двух руках в махах, становой, сумо, французском жиме и пуловере; жим гири и тяга с опорой — одной рукой, свободная ладонь на скамье",
-  "Точнее упражнения: разведение лёжа идёт в стороны, жим на наклонной скамье, болгарские выпады с ногой на скамье, тяга лёжа грудью на скамье, вес на тазе в ягодичном мосту",
-  "Растяжки с касаниями: рука держит стопу или локоть, пальцы в замке за спиной, руки на поясе, в дверном проёме предплечья на косяках",
-  "Рисованные схемы остались: «Персонализация» → «Схемы» → «Вид» → «Рисунок» или «Силуэт»"
+  "Кисти как у людей: пальцы обхватывают гантель, гирю, гриф и перекладину, в боксе — кулак; ладонь на полу, стене или стуле лежит плашмя",
+  "Стопа перекатывается через носок, а в отжиманиях, «кобре», тяге у двери и отжиманиях от стены ладони и носки больше не скользят",
+  "Живее тело: плечо поднимается вслед за рукой, спина округляется в скручиваниях и прогибается в «кобре»; ровные края одежды, глаза, брови и губы",
+  "Под схемой — пауза, ползунок (остановите движение в любой точке), замедление ½× и смена ракурса; в плеере схему можно открыть крупно",
+  "Плеер: кнопка «назад» к предыдущему упражнению, на отдыхе видно следующее упражнение, вес можно ввести числом",
+  "Кнопка «Начать тренировку» видна сразу, а на вкладке «Тело» модель — сразу под переключателем"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1129,12 +1129,16 @@ function planView() {
     out.push(h("p", { class: "muted small center", text: "Вес подбирайте так, чтобы последние 2–3 повтора давались тяжело, но без потери техники. В плеере его можно записать." }));
   }
 
-  out.push(h("div", { class: "btn-row" },
-    h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), plan.blocked ? "Начать дыхание" : "Начать тренировку"),
-    plan.blocked ? null : h("button", {
-      class: "btn ghost", type: "button",
+  // кнопка запуска «плывёт» над нижним меню, пока список упражнений не докручен до неё:
+  // начать можно с любого места страницы
+  out.push(h("div", { class: "btn-row plan-cta" },
+    h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), plan.blocked ? "Начать дыхание" : "Начать тренировку")));
+  if (!plan.blocked) {
+    out.push(h("div", { class: "btn-row" }, h("button", {
+      class: "btn ghost block", type: "button",
       onClick: () => { state.planVariant = { d, n: variant() + 1 }; persist(); refresh(); toast("Собрали другой вариант"); }
     }, icon("refresh", 18), "Другой вариант")));
+  }
   out.push(h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#workout/ready", text: "Готовые тренировки, в том числе с весами →" })));
   return out;
 }
@@ -1500,22 +1504,24 @@ function bodyStage({ layers = true } = {}) {
   });
   const tool = (ic, label, fn) => h("button", { class: "icon-btn", type: "button", "aria-label": label, title: label, onClick: fn }, icon(ic, 18));
   postRender.push(() => { fig.resize(); paintFigure(); fig.intro(); });
+  // Над моделью — только выбор слоя: сама модель видна сразу, без прокрутки. Режим (вращать или
+  // обвести) и ракурсы — прямо под ней, выбор тела — в конце (его меняют редко)
   return h("div", { class: "stage" },
     layers ? layer : null,
-    mode,
-    sexSeg || null,
     h("div", { class: "stage-box" },
       fig.el,
       h("div", { class: "stage-tools" },
         tool("plus", "Приблизить", () => fig.zoomBy(1.25)),
         tool("minus", "Отдалить", () => fig.zoomBy(0.8)),
         tool("refresh", "Исходный вид", () => fig.reset()))),
+    mode,
     h("div", { class: "chips stage-views", role: "group", "aria-label": "Ракурс" },
       STAGE_VIEWS.map(([id, label]) => h("button", { class: "chip", type: "button", onClick: () => fig.setView(id) }, label))),
     hint,
     painLegend,
     loadLegend,
-    h("p", { class: "muted small center", text: "Модель стоит к вам лицом: её правая сторона — слева от вас." }));
+    h("p", { class: "muted small center", text: "Модель стоит к вам лицом: её правая сторона — слева от вас." }),
+    sexSeg || null);
 }
 
 // Восстановление мышц по последним тренировкам (как у силовых приложений, но с учётом боли)
@@ -4557,7 +4563,36 @@ function startCountdown(sec) {
 function completeStep(st) {
   const P = player;
   P.done += 1;
+  if (st) st.wasDone = true;
   if (st && st.type === "ex") P.exDone[st.item.id] = (P.exDone[st.item.id] || 0) + 1;
+}
+// Назад к предыдущему упражнению: случайно пропустили или нажали «Готово» раньше времени.
+// Шаг снова считается невыполненным, записанный подход с весом запишется заново
+function prevStep() {
+  const P = player;
+  let j = P.i - 1;
+  while (j > 0 && P.steps[j].type === "rest") j--;
+  if (j < 0 || P.steps[j].type === "rest") return;
+  const st = P.steps[j];
+  if (st.wasDone) {
+    st.wasDone = false;
+    P.done = Math.max(0, P.done - 1);
+    if (st.type === "ex") {
+      const id = st.item.id;
+      if ((P.exDone[id] || 0) > 1) P.exDone[id] -= 1;
+      else delete P.exDone[id];
+      if (st.logged && P.sets[id] && P.sets[id].length) {
+        P.sets[id].pop();
+        if (!P.sets[id].length) delete P.sets[id];
+        // рекорд, поставленный отменённым подходом, больше не считается
+        const prev = state.weights[id];
+        const still = prev && prev.e1rm > 0 && (P.sets[id] || []).some(([kg, reps]) => E.e1rm(kg, reps) > prev.e1rm);
+        if (!still) P.prs = P.prs.filter(x => x !== id);
+      }
+      st.logged = false;
+    }
+  }
+  enterStep(j);
 }
 
 function enterStep(i) {
@@ -4708,6 +4743,7 @@ function renderPlayer() {
   const sound = state.settings.sound, voice = state.settings.voice;
   const top = h("div", { class: "player-top" },
     h("button", { class: "icon-btn", type: "button", "aria-label": "Завершить тренировку", onClick: askExit }, icon("close", 20)),
+    P.i > 0 ? h("button", { class: "icon-btn", type: "button", "aria-label": "Вернуться к предыдущему упражнению", onClick: prevStep }, icon("prev", 20)) : null,
     h("div", { class: "progress", role: "progressbar", "aria-label": "Прогресс тренировки", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct }, h("i", { style: { width: `${pct}%` } })),
     h("button", { class: "icon-btn", type: "button", "aria-label": sound ? "Выключить звук" : "Включить звук", onClick: () => { state.settings.sound = !sound; persist(); renderPlayer(); } }, icon(sound ? "sound" : "mute", 20)),
     h("button", {
@@ -4724,9 +4760,17 @@ function renderPlayer() {
   let card, controls;
 
   if (st.type === "rest") {
+    // во время отдыха видно, что дальше: схема движения и доза — можно приготовиться заранее
+    const nx = P.steps.slice(P.i + 1).find(x => x.type !== "rest");
+    const nextEx = nx && nx.type === "ex" ? EX[nx.item.id] : null;
     card = h("section", { class: "player-card glass is-rest" },
       h("p", { class: "player-block", text: st.label || "Отдых" }), timerNode(),
-      h("p", { class: "player-dose", text: st.cue || "Дышите спокойно, можно попить воды" }));
+      h("p", { class: "player-dose", text: st.cue || "Дышите спокойно, можно попить воды" }),
+      nextEx ? h("div", { class: "rest-next" },
+        h("p", { class: "rest-next-label", text: "Дальше" }),
+        demoBox(nextEx.id, { mini: true, onExpand: () => bigDemo(nextEx) }),
+        h("b", { text: nextEx.name }),
+        h("span", { class: "muted small", text: `${nx.sets ? `подход ${nx.set} из ${nx.sets} · ` : ""}${E.doseText(nx.item)}` })) : null);
     controls = h("div", { class: "player-controls" },
       h("button", { class: "btn ghost", type: "button", onClick: () => { P.remaining += 15; if (P.deadline !== null) P.deadline += 15000; if (P.timerEl) P.timerEl.textContent = mmss(P.remaining); } }, "+15 с"),
       h("button", { class: "btn primary", type: "button", text: "Пропустить", onClick: () => enterStep(P.i + 1) }),
@@ -4744,7 +4788,7 @@ function renderPlayer() {
   } else {
     const ex = EX[st.item.id];
     const blockInfo = `${st.block}${st.sets ? ` · подход ${st.set} из ${st.sets}` : st.rounds > 1 ? ` · круг ${st.round} из ${st.rounds}` : ""}`;
-    const demo = demoBox(ex.id);
+    const demo = demoBox(ex.id, { mini: true, onExpand: () => bigDemo(ex) });
     const swapBtn = h("button", { class: "swap-btn", type: "button", onClick: swapSheet }, icon("swap", 15), "Заменить");
     if (isHold(st)) {
       const H = P.hold || { rep: 1, side: 1, phase: "prep" };
@@ -4779,7 +4823,7 @@ function renderPlayer() {
         ? h("button", {
           class: "btn primary", type: "button",
           onClick: () => {
-            if (ex.weighted && P.kg[ex.id] !== null && P.kg[ex.id] !== undefined) logSet(ex, P.kg[ex.id], P.curReps || st.item.reps);
+            if (ex.weighted && P.kg[ex.id] !== null && P.kg[ex.id] !== undefined) { logSet(ex, P.kg[ex.id], P.curReps || st.item.reps); st.logged = true; }
             completeStep(st);
             if (state.settings.sound) beep(880, 0.2);
             enterStep(P.i + 1);
@@ -4789,7 +4833,7 @@ function renderPlayer() {
       controls = h("div", { class: "player-controls" }, painBtn(), primary, skipBtn());
     }
   }
-  const next = nextName(P.i);
+  const next = st.type === "rest" && card.querySelector(".rest-next") ? "" : nextName(P.i);
   P.el.replaceChildren(top,
     h("div", { class: "player-main" }, card, next ? h("p", { class: "next-up", text: `Далее: ${next}` }) : null),
     controls);
@@ -4818,11 +4862,13 @@ function weightControl(ex, st) {
   const sug = E.suggestWeight(state, ex.id, target);
   if (P.kg[ex.id] === undefined) P.kg[ex.id] = sug ? sug.kg : null;
   if (P.curReps === null) P.curReps = target;
-  const val = h("b", { class: "w-val", "aria-live": "polite", text: fmtKg(P.kg[ex.id]) });
+  const kgLabel = () => `Вес: ${P.kg[ex.id] === null ? "не указан" : fmtKg(P.kg[ex.id])}. Нажмите, чтобы ввести числом`;
+  const val = h("button", { class: "w-val w-edit", type: "button", "aria-live": "polite", "aria-label": kgLabel(), text: fmtKg(P.kg[ex.id]), onClick: () => weightEntry(ex, P.kg[ex.id], kg => setKg(kg)) });
   const repVal = h("b", { class: "w-val", "aria-live": "polite", text: String(P.curReps) });
   const setKg = kg => {
     P.kg[ex.id] = E.roundWeight(kg);
     val.textContent = fmtKg(P.kg[ex.id]);
+    val.setAttribute("aria-label", kgLabel());
   };
   const setReps = n => {
     P.curReps = E.clamp(n, 1, 50);
@@ -4849,6 +4895,39 @@ function weightControl(ex, st) {
       stepper("Сделано повторов", repVal, () => setReps(P.curReps - 1), () => setReps(P.curReps + 1), "Меньше повторов", "Больше повторов")),
     today.length ? h("span", { class: "small", text: `Сегодня: ${setsText(today)} кг` }) : null,
     h("span", { class: `small${sug && sug.up ? " up-hint" : " muted"}`, text: hint }));
+}
+
+// Крупный показ движения из плеера: можно повернуть фигуру, замедлить, остановить в любой фазе.
+// Тренировка на паузе, пока лист открыт
+function bigDemo(ex) {
+  const P = player;
+  const wasPaused = P.paused;
+  setPaused(true);
+  renderPlayer();
+  const close = sheet({
+    title: ex.name,
+    body: [demoBox(ex.id), h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c })))],
+    actions: [h("button", { class: "btn primary", type: "button", text: "Вернуться к тренировке", onClick: () => close() })],
+    onClose: () => { if (player && player.paused && !wasPaused) { setPaused(false); renderPlayer(); } }
+  });
+}
+// Вес числом: быстрее, чем нажимать «+» много раз
+function weightEntry(ex, current, apply) {
+  const inp = h("input", { class: "input", type: "number", inputmode: "decimal", min: 0.5, max: 500, step: 0.5, value: current === null || current === undefined ? "" : current, placeholder: "например, 12,5", autocomplete: "off" });
+  const err = h("p", { class: "error", role: "alert" });
+  const save = () => {
+    const v = Number(String(inp.value).replace(",", "."));
+    if (!Number.isFinite(v) || v < 0.5 || v > 500) { err.textContent = "Укажите вес от 0,5 до 500 кг"; return; }
+    close();
+    apply(v);
+  };
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+  const close = sheet({
+    title: "Вес снаряда",
+    body: [h("label", { class: "field" }, h("span", { text: `${ex.name} — ${E.weightUnit(ex)}` }), inp), err],
+    actions: [h("button", { class: "btn primary", type: "button", text: "Готово", onClick: save })]
+  });
+  setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) { /* поле уже закрыто */ } }, 60);
 }
 
 // Заменить упражнение вручную: нет инвентаря, не нравится, занято место

@@ -73,16 +73,19 @@ const P = {
   singleHinge: { a: pose({ legs: [leg(0, 0), leg(-10, 15, 80)] }), b: pose({ t: 82, legs: [leg(12, 18), leg(-86, 0, 2)], arms: [arm(0, 0), arm(0, 0)] }), p: 3, anchor: "near", w: "hands" },
   nordic: { a: pose({ legs: KNEEL, arms: [arm(20, 110), arm(20, 110)] }), b: pose({ t: 32, legs: [leg(-32, 55, -88), leg(-32, 55, -88)], arms: [arm(55, 20), arm(55, 20)] }), p: 3, anchor: "knees" },
   sideLying: { a: pose({ t: -90, legs: [leg(86, 0, 90), leg(86, 0, 90)], arms: [arm(90, 0), arm(-90, 0)] }), b: pose({ t: -90, legs: [leg(122, 0, 122), leg(86, 0, 90)], arms: [arm(90, 0), arm(-90, 0)] }), p: 2.4, anchor: "hip" },
-  wallPush: { a: pose({ t: 22, legs: [leg(-14, 0), leg(-14, 0)], arms: [arm(75, 0), arm(75, 0)] }), b: pose({ t: 30, legs: [leg(-20, 0), leg(-20, 0)], arms: [arm(40, 50), arm(40, 50)] }), p: 2.4, props: ["wallHands"] },
-  kneePush: { a: pose({ t: 52, legs: [leg(-52, 90, -150), leg(-52, 90, -150)], arms: [arm(3, 0), arm(3, 0)] }), b: pose({ t: 72, legs: [leg(-72, 90, -170), leg(-72, 90, -170)], arms: [arm(-80, 80), arm(-80, 80)] }), p: 2.4 },
-  pushUp: { a: PLANK_HIGH, b: pose({ t: 84, legs: [leg(-84, 0, -5), leg(-84, 0, -5)], arms: [arm(-80, 80), arm(-80, 80)] }), p: 2.4 },
+  // Кисти на опоре (стена, стул, косяк) стоят на одном месте: углы поз подобраны под это
+  wallPush: { a: pose({ t: 16, legs: [leg(-16, 0), leg(-16, 0)], arms: [arm(78, 0, 12), arm(78, 0, 12)] }), b: pose({ t: 28, legs: [leg(-28, 0), leg(-28, 0)], arms: [arm(33.4, 120, -63.4), arm(33.4, 120, -63.4)] }), p: 2.4, props: ["wallHands"] },
+  // Ладони стоят на одном месте весь повтор: корпус поворачивается вокруг коленей или носков,
+  // локти сгибаются назад — углы поз подобраны так, чтобы кисти и опоры ног не сдвигались
+  kneePush: { a: pose({ t: 50.7, legs: [leg(-50.7, 90, -150), leg(-50.7, 90, -150)], arms: [arm(3, 0), arm(3, 0)] }), b: pose({ t: 71, legs: [leg(-71, 90, -170), leg(-71, 90, -170)], arms: [arm(-80, 116, -36), arm(-80, 116, -36)] }), p: 2.4, anchor: "knees" },
+  pushUp: { a: PLANK_HIGH, b: pose({ t: 83.6, legs: [leg(-83.6, 0, -5), leg(-83.6, 0, -5)], arms: [arm(-63, 123, -60), arm(-63, 123, -60)] }), p: 2.4 },
   pikePush: { a: pose({ t: 132, legs: [leg(-38, 0, 58), leg(-38, 0, 58)], arms: [arm(48, 0), arm(48, 0)] }), b: pose({ t: 145, legs: [leg(-46, 0, 50), leg(-46, 0, 50)], arms: [arm(92, -64), arm(92, -64)] }), p: 2.6, anchor: "hands" },
-  dip: { a: pose({ t: 2, legs: [leg(72, 62), leg(72, 62)], arms: [arm(-16, 0), arm(-16, 0)] }), b: pose({ t: 10, legs: [leg(84, 92), leg(84, 92)], arms: [arm(-78, 82), arm(-78, 82)] }), p: 2.4, props: ["chairHands"] },
+  dip: { a: pose({ t: 2, legs: [leg(72, 62), leg(72, 62)], arms: [arm(-16, 0, 16), arm(-16, 0, 16)] }), b: pose({ t: 8, legs: [leg(93.5, 86.3), leg(93.5, 86.3)], arms: [arm(-66.3, 79.7, -13.4), arm(-66.3, 79.7, -13.4)] }), p: 2.4, props: ["chairHands"] },
   chestPress: { a: pose({ legs: [leg(10, 0), leg(-10, 0)], arms: [arm(-30, 120), arm(-30, 120)] }), b: pose({ legs: [leg(10, 0), leg(-10, 0)], arms: [arm(88, 0), arm(88, 0)] }), p: 2.2 },
   floorPress: { a: SUPINE({ arms: [arm(90, 90), arm(90, 90)] }), b: SUPINE({ arms: [arm(180, 0), arm(180, 0)] }), p: 2.4, anchor: "hip", w: "hands" },
   benchPress: { a: pose({ t: -90, legs: [leg(90, 90), leg(90, 90)], arms: [arm(20, 160), arm(20, 160)] }), b: pose({ t: -90, legs: [leg(90, 90), leg(90, 90)], arms: [arm(180, 0), arm(180, 0)] }), p: 2.4, anchor: "hip", props: ["bench"], w: "hands" },
   skull: { a: SUPINE({ arms: [arm(165, 120), arm(165, 120)] }), b: SUPINE({ arms: [arm(178, 2), arm(178, 2)] }), p: 2.2, anchor: "hip", w: "hands" },
-  pullover: { a: SUPINE({ arms: [arm(178, 4), arm(178, 4)] }), b: SUPINE({ arms: [arm(282, 6), arm(282, 6)] }), p: 2.8, anchor: "hip", w: "hands" },
+  pullover: { a: SUPINE({ arms: [arm(178, 4), arm(178, 4)] }), b: SUPINE({ arms: [arm(272, 8), arm(272, 8)] }), p: 2.8, anchor: "hip", w: "hands" },
   curl: { a: pose({ arms: [arm(2, 8), arm(2, 8)] }), b: pose({ arms: [arm(8, 140), arm(8, 140)] }), p: 2.2, w: "hands" },
   tricepsDown: { a: pose({ arms: [arm(-8, 120), arm(-8, 120)] }), b: pose({ arms: [arm(-6, 4), arm(-6, 4)] }), p: 2, props: ["bandUp"] },
   press: { a: pose({ arms: [arm(25, 155), arm(25, 155)] }), b: pose({ arms: [arm(176, 4), arm(176, 4)] }), p: 2.4, w: "hands" },
@@ -90,18 +93,18 @@ const P = {
   ohTriceps: { a: SEATED({ arms: [arm(165, 140), arm(165, 140)] }), b: SEATED({ arms: [arm(174, 4), arm(174, 4)] }), p: 2.2, props: ["chairA"], w: "hands" },
   kickback: { a: HINGE({ t: 75, arms: [arm(-75, 75), arm(28, 0)] }), b: HINGE({ t: 75, arms: [arm(-75, 0), arm(28, 0)] }), p: 2, w: "near" },
   frontRaise: { a: pose({ arms: [arm(3, 5), arm(3, 5)] }), b: pose({ arms: [arm(88, 5), arm(88, 5)] }), p: 2.2, w: "hands" },
-  superman: { a: pose({ t: 90, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(90, 0), arm(90, 0)] }), b: pose({ t: 84, legs: [leg(-100, 0, -100), leg(-100, 0, -100)], arms: [arm(102, 0), arm(102, 0)] }), p: 2.6, anchor: "hip" },
-  backExtHold: { a: pose({ t: 84, legs: [leg(-98, 0, -98), leg(-98, 0, -98)], arms: [arm(100, 0), arm(100, 0)] }), anchor: "hip" },
+  superman: { a: pose({ t: 90, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(90, 0), arm(90, 0)] }), b: pose({ t: 84, curve: 0.014, legs: [leg(-100, 0, -100), leg(-100, 0, -100)], arms: [arm(102, 0), arm(102, 0)] }), p: 2.6, anchor: "hip" },
+  backExtHold: { a: pose({ t: 84, curve: 0.014, legs: [leg(-98, 0, -98), leg(-98, 0, -98)], arms: [arm(100, 0), arm(100, 0)] }), anchor: "hip" },
   proneYT: { a: pose({ t: 90, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(90, 0), arm(90, 0)] }), b: pose({ t: 88, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(108, 0), arm(108, 0)] }), p: 2.4, anchor: "hip" },
   standRow: { a: pose({ legs: [leg(8, 12), leg(8, 12)], arms: [arm(88, 0), arm(88, 0)] }), b: pose({ legs: [leg(8, 12), leg(8, 12)], arms: [arm(-35, 125), arm(-35, 125)] }), p: 2.2, props: ["bandFront"] },
   row: { a: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)] }), b: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)], arms: [arm(-75, 75), arm(-75, 75)] }), p: 2.2, w: "hands" },
   reverseFly: { a: HINGE({ t: 72 }), b: HINGE({ t: 72, arms: [arm(-72, 6), arm(-72, 6)] }), p: 2.4, w: "hands" },
   hang: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), hang: 2.24, props: ["bar"] },
-  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(-12, 186), arm(-12, 186)] }), p: 2.8, hang: 2.24, props: ["bar"] },
+  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(-12, 186), arm(-12, 186)] }), p: 2.8, hang: 2.24, anchor: "hands", props: ["bar"] },
   shrug: { a: pose({ arms: [arm(2, 0), arm(2, 0)] }), b: pose({ sh: 0.05, arms: [arm(2, 0), arm(2, 0)] }), p: 1.8, w: "hands" },
   renegade: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(-71, 0, -5), leg(-71, 0, -5)], arms: [arm(-72, 82), arm(3, 0)] }), alt: true, p: 2.2, w: "hands" },
-  doorRow: { a: pose({ t: -28, legs: [leg(28, 0), leg(28, 0)], arms: [arm(100, 0), arm(100, 0)] }), b: pose({ t: -12, legs: [leg(12, 0), leg(12, 0)], arms: [arm(-25, 115), arm(-25, 115)] }), p: 2.4, props: ["door"] },
-  deadBug: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), b: SUPINE({ legs: [leg(180, 90, 180), leg(100, 0, 100)], arms: [arm(285, 0), arm(180, 0)] }), alt: true, p: 2.4, anchor: "hip", w: "hands" },
+  doorRow: { a: pose({ t: -28, legs: [leg(28, 0), leg(28, 0)], arms: [arm(80, 0), arm(80, 0)] }), b: pose({ t: -12, legs: [leg(12, 0), leg(12, 0)], arms: [arm(-13.6, 114.9, -16.3), arm(-13.6, 114.9, -16.3)] }), p: 2.4, props: ["door"] },
+  deadBug: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), b: SUPINE({ legs: [leg(180, 90, 180), leg(100, 0, 100)], arms: [arm(270, 0), arm(180, 0)] }), alt: true, p: 2.4, anchor: "hip", w: "hands" },
   deadBugHold: { a: SUPINE({ legs: [leg(180, 90, 180), leg(180, 90, 180)], arms: [arm(180, 0), arm(180, 0)] }), anchor: "hip" },
   birdDog: { a: QUAD(), b: QUAD({ legs: [KNEEL[0], leg(-90, 0, -90)], arms: [arm(92, 0), arm(0, 0)] }), alt: true, p: 2.6, anchor: "hip" },
   catCow: { a: QUAD({ n: -30, curve: 0.04 }), b: QUAD({ n: 42, curve: -0.05 }), p: 3.2, anchor: "hip" },
@@ -109,8 +112,9 @@ const P = {
   plank: { a: pose({ t: 85, legs: [leg(-85, 0, -5), leg(-85, 0, -5)], arms: [arm(0, 90), arm(0, 90)] }) },
   kneePlank: { a: pose({ t: 64, legs: [leg(-64, 90, -150), leg(-64, 90, -150)], arms: [arm(0, 90), arm(0, 90)] }) },
   sidePlank: { a: pose({ t: 78, legs: [leg(-78, 0, -12), leg(-78, 0, -12)], arms: [arm(0, 90), arm(180, 0)] }) },
-  hollow: { a: pose({ t: -76, legs: [leg(105, 0, 105), leg(105, 0, 105)], arms: [arm(-108, 0), arm(-108, 0)] }), anchor: "hip" },
-  crunch: { a: SUPINE({ arms: [arm(110, 60), arm(110, 60)] }), b: SUPINE({ t: -68, arms: [arm(100, 20), arm(100, 20)] }), p: 2.2, anchor: "hip" },
+  hollow: { a: pose({ t: -76, curve: -0.016, legs: [leg(105, 0, 105), leg(105, 0, 105)], arms: [arm(-108, 0), arm(-108, 0)] }), anchor: "hip" },
+  // скручивание: поясница остаётся на полу, поднимаются лопатки — спина округляется (curve < 0)
+  crunch: { a: SUPINE({ arms: [arm(110, 60), arm(110, 60)] }), b: SUPINE({ t: -68, curve: -0.024, arms: [arm(100, 20), arm(100, 20)] }), p: 2.2, anchor: "hip" },
   carry: { a: pose({ arms: [arm(0, 0), arm(0, 0)] }), b: pose({ legs: [leg(42, 64), leg(0, 0)], arms: [arm(0, 0), arm(0, 0)] }), alt: true, p: 1.3, w: "hands" },
   kbCarry: { a: pose({ arms: [arm(20, 140), arm(20, 140)] }), b: pose({ legs: [leg(42, 64), leg(0, 0)], arms: [arm(20, 140), arm(20, 140)] }), alt: true, p: 1.3, w: "chest" },
   getUp: { a: SUPINE({ legs: [leg(130, 95), leg(89, 0, 178)], arms: [arm(180, 0), arm(135, 0)] }), b: SUPINE({ t: -62, legs: [leg(130, 95), leg(89, 0, 178)], arms: [arm(180, 0), arm(0, 90)] }), p: 3.2, anchor: "hip", w: "near" },
@@ -120,7 +124,7 @@ const P = {
   sitIso: { a: SEATED({ arms: [arm(30, 80), arm(30, 80)] }), props: ["chairA"] },
   shadowBox: { a: pose({ t: 5, legs: [leg(12, 15), leg(-12, 15, 76)], arms: [arm(25, 120), arm(25, 120)] }), b: pose({ t: 8, legs: [leg(12, 15), leg(-12, 15, 76)], arms: [arm(88, 0), arm(25, 120)] }), alt: "arms", p: 1 },
   mountain: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(60, 130, -80), leg(-71, 0, -5)], arms: [arm(3, 0), arm(3, 0)] }), m: pose({ t: 71, legs: [leg(-30, 110, -60), leg(-71, 0, -5)], arms: [arm(3, 0), arm(3, 0)] }), alt: true, p: 0.9 },
-  burpee: { a: pose({ t: 55, legs: [leg(100, 130), leg(100, 130)], arms: [arm(-10, 35), arm(-10, 35)] }), b: PLANK_HIGH, m: pose({ t: 100, legs: [leg(30, 120, -30), leg(30, 120, -30)], arms: [arm(-4, 10), arm(-4, 10)] }), p: 2.4, anchor: "hands" },
+  burpee: { a: pose({ t: 55, legs: [leg(100, 130), leg(100, 130)], arms: [arm(-10, 35), arm(-10, 35)] }), b: PLANK_HIGH, m: pose({ t: 100, hs: 1, legs: [leg(30, 120, -30), leg(30, 120, -30)], arms: [arm(-4, 10), arm(-4, 10)] }), p: 2.4, anchor: "hands" },
   thruster: { a: SQUAT_LOW({ arms: [arm(25, 155), arm(25, 155)] }), b: pose({ arms: [arm(176, 4), arm(176, 4)] }), p: 2.4, w: "hands" },
   clean: { a: pose({ t: 62, legs: [leg(25, 32), leg(25, 32)], arms: [arm(-25, 0), arm(-25, 0)] }), b: pose({ arms: [arm(15, 150), arm(4, 0)] }), p: 2, w: "near" },
   bear: { a: pose({ t: 80, legs: [leg(15, 100, -60), leg(15, 100, -60)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ t: 80, legs: [leg(15, 100, -60), leg(32, 100, -50)], arms: [arm(18, 0), arm(0, 0)] }), m: pose({ t: 80, legs: [leg(15, 100, -60), leg(30, 122, -36)], arms: [arm(9, 0), arm(0, 0)] }), alt: true, p: 1.2 },
@@ -131,21 +135,22 @@ const P = {
   standIso: { a: pose({ arms: [arm(0, 90), arm(20, 90)] }), b: pose({ arms: [arm(0, 88), arm(20, 92)] }), p: 3 },
   openBook: { a: pose({ t: -90, legs: [leg(130, 95), leg(130, 95)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -90, legs: [leg(130, 95), leg(130, 95)], arms: [arm(270, 0), arm(178, 0)] }), p: 3, anchor: "hip" },
   hipFlexor: { a: pose({ t: -4, legs: [leg(85, 99), leg(-15, 72, -88)], arms: [arm(10, 0), arm(10, 0)] }), b: pose({ t: -10, legs: [leg(85, 109), leg(-25, 62, -88)], arms: [arm(10, 0), arm(10, 0)] }), p: 3.2, anchor: "near" },
-  thoracicReach: { a: pose({ arms: [arm(150, 30), arm(150, 30)] }), b: pose({ arms: [arm(178, 5), arm(178, 5)] }), p: 2.6, props: ["wallFront"] },
-  sphinx: { a: pose({ t: 62.5, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(0, 90), arm(0, 90)] }), anchor: "hip" },
-  cobra: { a: pose({ t: 74, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(-60, 70), arm(-60, 70)] }), b: pose({ t: 52, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(10, 35), arm(10, 35)] }), p: 3.2, anchor: "hip" },
+  thoracicReach: { a: pose({ arms: [arm(88.1, 81.8), arm(88.1, 81.8)] }), b: pose({ arms: [arm(127.2, 27.5, 21.4), arm(127.2, 27.5, 21.4)] }), p: 2.6, props: ["wallFront"] },
+  sphinx: { a: pose({ t: 62.5, curve: 0.026, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(0, 90), arm(0, 90)] }), anchor: "hip" },
+  cobra: { a: pose({ t: 74, curve: 0.012, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(-114, 128, -14), arm(-114, 128, -14)] }), b: pose({ t: 52, n: -8, curve: 0.034, legs: [leg(-86, 0, -90), leg(-86, 0, -90)], arms: [arm(-69, 106, -37), arm(-69, 106, -37)] }), p: 3.2, anchor: "hip" },
   kneesToChest: { a: pose({ t: -90, legs: [leg(215, 120, 150), leg(215, 120, 150)], arms: [arm(160, 40), arm(160, 40)] }), b: pose({ t: -84, legs: [leg(222, 120, 150), leg(222, 120, 150)], arms: [arm(160, 40), arm(160, 40)] }), p: 3, anchor: "hip" },
   downDog: { a: pose({ t: 132, legs: [leg(-38, 0, 58), leg(-38, 0, 58)], arms: [arm(48, 0), arm(48, 0)] }), b: pose({ t: 132, legs: [leg(-36, 8, 72), leg(-38, 0, 58)], arms: [arm(48, 0), arm(48, 0)] }), p: 3 },
   worldStretch: { a: LUNGE_LOW({ t: 30, arms: [arm(10, 0), arm(10, 0)] }), b: LUNGE_LOW({ t: 25, arms: [arm(176, 0), arm(10, 0)] }), p: 3 },
-  childPose: { a: pose({ t: 115, legs: [leg(35, 122, -88), leg(35, 122, -88)], arms: [arm(75, 0), arm(75, 0)] }), b: pose({ t: 118, legs: [leg(30, 117, -88), leg(30, 117, -88)], arms: [arm(75.5, 0), arm(75.5, 0)] }), p: 4 },
-  forwardFold: { a: pose({ t: 98, legs: [leg(-6, 0), leg(-6, 0)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ t: 104, legs: [leg(-6, 0), leg(-6, 0)], arms: [arm(0, 0), arm(0, 0)] }), p: 4 },
+  // поза ребёнка: таз опущен к пяткам, голени лежат на полу, грудь на бёдрах, руки вытянуты вперёд по полу
+  childPose: { a: pose({ t: 102, curve: -0.024, legs: [leg(60, 148, -88), leg(60, 148, -88)], arms: [arm(77.5, 0), arm(77.5, 0)] }), b: pose({ t: 104, curve: -0.03, legs: [leg(62, 150, -88), leg(62, 150, -88)], arms: [arm(80.2, 0), arm(80.2, 0)] }), p: 4 },
+  forwardFold: { a: pose({ t: 98, curve: -0.014, legs: [leg(-6, 0), leg(-6, 0)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ t: 104, curve: -0.02, legs: [leg(-6, 0), leg(-6, 0)], arms: [arm(0, 0), arm(0, 0)] }), p: 4 },
   strapHam: { a: pose({ t: -90, legs: [leg(185, 0, 100), leg(89, 0, 178)], arms: [arm(172, 0), arm(172, 0)] }), b: pose({ t: -90, legs: [leg(195, 0, 105), leg(89, 0, 178)], arms: [arm(178, 0), arm(178, 0)] }), p: 4, anchor: "hip", props: ["strap"] },
   quadStretch: { a: pose({ legs: [leg(-8, 160, -170), leg(0, 0)], arms: [arm(-15, 0), arm(20, 10)] }), anchor: "far" },
   calfStretch: { a: pose({ t: 15, legs: [leg(30, 50), leg(-25, 0)], arms: [arm(75, 0), arm(75, 0)] }), props: ["wallHands"] },
   chestStretch: { a: pose({ t: 8, legs: [leg(15, 0), leg(-15, 0)], arms: [arm(-70, 160), arm(-70, 160)] }), b: pose({ t: 12, legs: [leg(15, 0), leg(-15, 0)], arms: [arm(-80, 165), arm(-80, 165)] }), p: 4 },
   tricepsStretch: { a: pose({ arms: [arm(172, 160), arm(150, 60)] }) },
   butterfly: { a: pose({ t: -5, legs: [leg(118, 150, 90), leg(118, 150, 90)], arms: [arm(40, 20), arm(40, 20)] }), b: pose({ t: 12, legs: [leg(112, 150, 90), leg(112, 150, 90)], arms: [arm(50, 15), arm(50, 15)] }), p: 3.2, anchor: "hip" },
-  seatedFold: { a: pose({ t: -6, legs: [leg(89, 0, 175), leg(89, 0, 175)], arms: [arm(170, 0), arm(170, 0)] }), b: pose({ t: 58, legs: [leg(89, 0, 170), leg(89, 0, 170)], arms: [arm(82, 0), arm(82, 0)] }), p: 3.6, anchor: "hip" },
+  seatedFold: { a: pose({ t: -6, legs: [leg(89, 0, 175), leg(89, 0, 175)], arms: [arm(170, 0), arm(170, 0)] }), b: pose({ t: 58, curve: -0.024, legs: [leg(89, 0, 170), leg(89, 0, 170)], arms: [arm(82, 0), arm(82, 0)] }), p: 3.6, anchor: "hip" },
   reachUp: { a: pose({ arms: [arm(4, 6), arm(4, 6)] }), b: pose({ legs: [leg(0, 0, 70), leg(0, 0, 70)], arms: [arm(178, 0), arm(178, 0)] }), p: 3, anchor: "toes" },
   warrior: { a: pose({ t: -4, legs: [leg(72, 72), leg(-47, 0, 78)], arms: [arm(176, 0), arm(176, 0)] }) },
   tree: { a: pose({ legs: [leg(0, 0), leg(30, 125, 30)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: 2, legs: [leg(0, 0), leg(30, 125, 30)], arms: [arm(178, 0), arm(178, 0)] }), p: 3, anchor: "near" },
@@ -153,7 +158,7 @@ const P = {
   // v1.5: равновесие, осанка, эспандер, корпус. Позы с опорой подобраны так, чтобы кисти
   // оставались на стене или столе, а обе стопы — на полу
   tandem: { a: pose({ legs: [leg(7, 2), leg(-7, 2)], arms: [arm(28, 12), arm(28, 12)] }), b: pose({ t: 2, legs: [leg(7, 2), leg(-7, 2)], arms: [arm(34, 12), arm(22, 12)] }), p: 3.2 },
-  legBack: { a: pose({ arms: [arm(10, 10), arm(70, 10)] }), b: pose({ t: 7, legs: [leg(-28, 6), leg(0, 0)], arms: [arm(10, 10), arm(74, 10)] }), p: 2.4, anchor: "far", props: ["wallHands"] },
+  legBack: { a: pose({ arms: [arm(10, 10), arm(70, 10)] }), b: pose({ t: 7, legs: [leg(-28, 6), leg(0, 0)], arms: [arm(10, 10), arm(47.1, 55.5, -22.6)] }), p: 2.4, anchor: "far", props: ["wallHands"] },
   kneeLift: { a: pose({ arms: HANDS_HIPS }), b: pose({ legs: [leg(84, 92), leg(0, 0)], arms: HANDS_HIPS }), p: 3.2, anchor: "far" },
   toeRaise: { a: pose({ t: -8, legs: [leg(8, 0), leg(8, 0)] }), b: pose({ t: -8, legs: [leg(8, 0, 124), leg(8, 0, 124)] }), p: 2, props: ["wallBack"], anchor: "heels" },
   rock: { a: pose({ legs: [leg(0, 0, 118), leg(0, 0, 118)], arms: [arm(8, 14), arm(8, 14)] }), b: pose({ legs: [leg(0, 0, 55), leg(0, 0, 55)], arms: [arm(8, 14), arm(8, 14)] }), p: 2.2 },
@@ -164,7 +169,7 @@ const P = {
   thread: { a: QUAD({ arms: [arm(150, 0), arm(0, 0)] }), b: QUAD({ t: 84, arms: [arm(-78, 0), arm(-41, 70)] }), p: 3.2, anchor: "hip" },
   kneeToWall: { a: pose({ t: 4, legs: [leg(12, 10), leg(-9, 19, 76)], arms: [arm(15, 108), arm(15, 108)] }), b: pose({ t: 8, legs: [leg(28, 62), leg(-7, 48.5, 70)], arms: [arm(9, 147), arm(9, 147)] }), p: 2.6, anchor: "near", props: ["wallHands"] },
   incline: { a: pose({ t: 36, legs: [leg(-36, 0, 40), leg(-36, 0, 40)], arms: [arm(8, 0), arm(8, 0)] }), b: pose({ t: 48, legs: [leg(-48, 0, 34), leg(-48, 0, 34)], arms: [arm(-62, 86), arm(-62, 86)] }), p: 2.4, props: ["tableHands"] },
-  bicycle: { a: pose({ t: -72, legs: [leg(160, 95, 150), leg(160, 95, 150)], arms: [arm(170, 150), arm(170, 150)] }), b: pose({ t: -66, legs: [leg(212, 112, 160), leg(108, 0, 108)], arms: [arm(170, 150), arm(170, 150)] }), alt: true, p: 2.2, anchor: "hip" },
+  bicycle: { a: pose({ t: -72, curve: -0.02, legs: [leg(160, 95, 150), leg(160, 95, 150)], arms: [arm(170, 150), arm(170, 150)] }), b: pose({ t: -66, curve: -0.022, legs: [leg(212, 112, 160), leg(108, 0, 108)], arms: [arm(170, 150), arm(170, 150)] }), alt: true, p: 2.2, anchor: "hip" },
   reverseCrunch: { a: pose({ t: -90, legs: [leg(178, 92, 178), leg(178, 92, 178)], arms: [arm(90, 0), arm(90, 0)] }), b: pose({ t: -102, n: 10, legs: [leg(214, 108, 165), leg(214, 108, 165)], arms: [arm(90, 0), arm(90, 0)] }), p: 2.6, anchor: "shoulder" },
   legLower: { a: SUPINE({ legs: [leg(178, 0, 178), leg(178, 0, 178)] }), b: SUPINE({ legs: [leg(104, 0, 104), leg(178, 0, 178)] }), alt: true, p: 2.8, anchor: "hip" },
   bearHold: { a: pose({ t: 80, legs: [leg(15, 100, -60), leg(15, 100, -60)], arms: [arm(0, 0), arm(0, 0)] }) },
@@ -393,7 +398,7 @@ function armToward(sg, t, shw, lk, fwDef) {
 
 const lerp = (a, b, k) => a + (b - a) * k;
 // Параметры позы, которые плавно меняются; у конечностей — значения по умолчанию
-const POSE_KEYS = ["t", "n", "sh", "air", "lift", "tp", "curve", "tw", "hd", "nd", "sf", "se", "lb", "ox", "oy", "oz"];
+const POSE_KEYS = ["t", "n", "sh", "air", "lift", "tp", "curve", "tw", "hd", "nd", "sf", "se", "lb", "ox", "oy", "oz", "hs"];
 const LIMB_DEF = { f: 90, ft: 1, fs: 1 };
 const limbVal = (L, key) => (L[key] !== undefined ? L[key] : LIMB_DEF[key] !== undefined ? LIMB_DEF[key] : 0);
 const limbKeys = list => [...new Set(list.flatMap(L => Object.keys(L)))];
@@ -452,7 +457,14 @@ function place(pat, Pz) {
   if (pat.hang) dy = pat.hang - J.arms[0].hand[1];
   // носки стоят на краю ступеньки высотой standY, пятки свободно опускаются ниже
   else if (pat.standY !== undefined) dy = pat.standY + 0.03 - Math.min(J.legs[0].toe[1], J.legs[1].toe[1]);
-  else dy = -Math.min(...contactPoints(J).map(([p, r]) => p[1] - r)) + (Pz.air || 0) + (Pz.lift || 0);
+  else {
+    // В профиль высоту задают тело и ноги: рука, которая опускается ниже лежащего тела (за голову,
+    // к полу у груди), не приподнимает его — кисть потом сама встаёт на пол
+    // (hs — доля опоры на руки: в прыжке ногами назад тело на мгновение держится на кистях)
+    const pts = contactPoints(J), low = list => -Math.min(...list.map(([p, r]) => p[1] - r));
+    const all = low(pts), body = Pz.front ? all : low(pts.slice(0, 11));
+    dy = body + (all - body) * Math.min(1, Math.max(0, Pz.hs || 0)) + (Pz.air || 0) + (Pz.lift || 0);
+  }
   return { J, dy };
 }
 const shiftJ = (J, dx, dy) => {
@@ -1220,6 +1232,13 @@ function lockLimbs(J0, Pz, locks, k, front, dx) {
   J.arms.forEach((A, i) => { if (!arms.has(i)) body.push([A.elbow, 0.045]); });
   const under = Math.max(0, ...body.map(([q, r]) => r - q[1] - 0.003));
   if (under > 0) J = shiftJ(J, 0, under);
+  // Заперты только ладони на полу (отжимания с колен): колени не зависают над полом между позами
+  else if (!front && !(Pz.hs > 0.01) && goals.length && goals.every(g => g.kind === "arm" && g.T[1] - FOOT_R < 0.06)) {
+    const pts = [[J.hip, 0.1], [J.sh, 0.1], [J.head, LEN.head]];
+    J.legs.forEach(L => pts.push([L.knee, 0.06], [L.ankle, 0.035], [L.toe, FOOT_R], [L.heel, FOOT_R]));
+    const over = Math.min(...pts.map(([q, r]) => q[1] - r));
+    if (over > 0.003 && over < 0.2) J = shiftJ(J, 0, -over);
+  }
   const outLegs = J.legs.slice(), outArms = J.arms.slice();
   for (const g of goals) {
     if (g.kind === "leg") {
@@ -1470,6 +1489,8 @@ export function motionOf(id) {
       return { J: S.at(f.Pz, f.k, f.second), Pz: f.Pz, phase: f.phase, k: f.k, second: f.second };
     },
     key(i) { return S.at(keyPose(pat, i), keyK(pat, i)); },
+    // какие кисти узор держит на опоре (пол, стена, стул) — в объёме они лежат на ней ладонью
+    held(second) { return S.locks[second ? 1 : 0].filter(g => g.kind === "arm").map(g => g.i); },
     keyPz(i) { return keyPose(pat, i); }
   };
 }

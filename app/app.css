@@ -264,6 +264,10 @@ img, svg { display: block; }
 .btn.block { width: 100%; }
 .btn.small { min-height: 38px; padding: 0 14px; font-size: .9rem; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+/* запуск тренировки на странице плана: виден всегда, над нижним меню */
+.plan-cta { position: sticky; bottom: calc(90px + env(safe-area-inset-bottom)); z-index: 5; padding: 6px; margin-inline: -6px; border-radius: 999px; background: var(--glass-strong); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 6px 24px rgba(0, 0, 0, .1); }
+.plan-cta .btn { flex: 1; }
+.plan-cta + .btn-row { margin-top: 8px; }
 .btn-row .btn { flex: 1 1 auto; }
 .icon-btn {
   display: grid;
@@ -733,18 +737,32 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 /* ----- Схема техники ----- */
 .demo { margin: 4px auto 12px; padding: 8px 6px 4px; border-radius: 22px; background: var(--accent-soft); }
 .demo-svg { display: block; width: 100%; max-width: 340px; height: auto; margin: 0 auto; overflow: visible; }
-/* Объёмная схема: холст 6:5, фигуру можно повернуть пальцем; кнопка паузы в углу */
+/* Объёмная схема: холст 6:5, фигуру можно повернуть пальцем. Под схемой — панель показа: пауза,
+   ползунок фазы движения, замедление, ракурс. В плеере схема маленькая — кнопки поверх неё */
 .demo3d { position: relative; width: 100%; max-width: 380px; margin: 0 auto; }
 .demo3d-canvas { display: block; width: 100%; height: auto; aspect-ratio: 6 / 5; touch-action: pan-y; cursor: grab; }
 .demo3d-canvas:active { cursor: grabbing; }
-.demo3d-btn { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--glass-strong); color: var(--text); cursor: pointer; }
-.demo3d-btn::before { content: ""; width: 10px; height: 12px; border-left: 3.5px solid currentColor; border-right: 3.5px solid currentColor; box-sizing: border-box; }
-.demo3d-btn.is-paused::before { width: 0; height: 0; border-top: 6.5px solid transparent; border-bottom: 6.5px solid transparent; border-left: 11px solid currentColor; border-right: 0; margin-left: 3px; }
-.demo3d-btn:focus-visible, .demo3d-canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-/* кнопка «другой ракурс»: круговая стрелка, слева от паузы */
-.demo3d-view { right: 40px; }
-.demo3d-view::before { width: 14px; height: 14px; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; box-sizing: border-box; }
-.demo3d-view::after { content: ""; position: absolute; top: 7px; right: 8px; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 5.5px solid currentColor; transform: rotate(20deg); }
+.demo3d-btn { position: relative; display: grid; flex: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--glass-strong); color: var(--text); font: inherit; cursor: pointer; }
+.demo3d-play::before { content: ""; width: 10px; height: 12px; border-left: 3.5px solid currentColor; border-right: 3.5px solid currentColor; box-sizing: border-box; }
+.demo3d-play.is-paused::before { width: 0; height: 0; border-top: 6.5px solid transparent; border-bottom: 6.5px solid transparent; border-left: 11px solid currentColor; border-right: 0; margin-left: 3px; }
+.demo3d-btn:focus-visible, .demo3d-canvas:focus-visible, .demo3d-seek:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+/* «другой ракурс»: круговая стрелка */
+.demo3d-view::before { content: ""; width: 14px; height: 14px; border: 2.5px solid currentColor; border-right-color: transparent; border-radius: 50%; box-sizing: border-box; }
+.demo3d-view::after { content: ""; position: absolute; top: 9px; right: 10px; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-top: 5.5px solid currentColor; transform: rotate(20deg); }
+.demo3d-bar { display: flex; align-items: center; gap: 8px; padding: 6px 4px 2px; }
+.demo3d-seek { flex: 1; min-width: 0; height: 28px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.demo3d-rate { font-size: .8rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.demo3d-rate[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+/* маленькая схема в плеере: пауза и ракурс в правом верхнем углу, «крупнее» — в левом */
+.demo3d-mini .demo3d-btn { position: absolute; top: 3px; right: 3px; width: 28px; height: 28px; }
+.demo3d-mini .demo3d-view { right: 34px; }
+.demo3d-mini .demo3d-view::after { top: 5px; right: 6px; }
+.demo3d-mini .demo3d-play::before { transform: scale(.85); }
+.demo3d-mini .demo3d-expand { right: auto; left: 3px; }
+.demo3d-expand::before, .demo3d-expand::after { content: ""; position: absolute; width: 7px; height: 7px; border: 2.5px solid currentColor; box-sizing: border-box; }
+.demo3d-expand::before { top: 6px; right: 6px; border-bottom: 0; border-left: 0; }
+.demo3d-expand::after { bottom: 6px; left: 6px; border-top: 0; border-right: 0; }
+.demo3d-mini .demo3d-canvas { cursor: zoom-in; }
 .demo-svg .d-ground { stroke: var(--line); }
 /* Фигура: нейтральное тело, дальние руки и ноги светлее, работающие мышцы — акцентным цветом */
 /* Фигура: кожа, футболка, шорты, кроссовки, волосы; дальние рука и нога бледнее */
@@ -779,7 +797,16 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .demo-svg .d-prop-fill { fill: var(--muted); }
 .demo-svg .d-plate { fill: none; stroke: var(--muted); stroke-width: .045; }
 .demo-svg .d-band { stroke: #f59e0b; stroke-dasharray: .05 .035; }
-.player-card .demo { max-width: 250px; margin: 8px auto 4px; }
+.player-card .demo { max-width: 300px; margin: 8px auto 4px; padding: 4px; }
+/* отдых: следующее упражнение со схемой */
+.rest-next { display: grid; justify-items: center; gap: 2px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.rest-next-label { margin: 0; color: var(--muted); font-size: .9rem; font-weight: 650; }
+.rest-next .demo { max-width: 200px; margin: 6px auto 4px; }
+.player-card.is-rest .big-timer { font-size: clamp(3.2rem, 18vw, 5rem); }
+/* вес в плеере можно ввести числом: значение — кнопка */
+.w-edit { padding: 2px 4px; border: 0; border-bottom: 2px dashed var(--line); border-radius: 6px 6px 0 0; background: transparent; color: inherit; font: inherit; font-size: 1.3rem; font-weight: 800; cursor: pointer; }
+.w-edit:hover { border-bottom-color: var(--accent); }
+.w-edit:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .demo.is-loading { min-height: 140px; }
 /* Каркас экрана до запуска скриптов: первый кадр появляется сразу */
 .boot-shell { display: grid; place-items: center; align-content: center; gap: 14px; min-height: 100vh; min-height: 100dvh; color: var(--text); font-size: 1.4rem; font-weight: 750; }
@@ -789,10 +816,12 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .spinner { width: 22px; height: 22px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-height: 740px) {
-  .player-card .demo { max-width: 190px; padding: 4px; margin: 6px auto 2px; }
+  .player-card .demo { max-width: 220px; margin: 6px auto 2px; }
+  .rest-next .demo { max-width: 170px; }
 }
 @media (max-height: 680px) {
-  .player-card .demo { max-width: 150px; border-radius: 16px; }
+  .player-card .demo { max-width: 170px; border-radius: 16px; }
+  .rest-next .demo { max-width: 150px; }
   .swap-btn { padding: 2px 10px; }
 }
 .swap-btn { display: inline-flex; align-items: center; gap: 5px; margin: 2px auto 0; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }

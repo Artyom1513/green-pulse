@@ -178,10 +178,6 @@ export function saveLook(look) {
     return false;
   }
 }
-export function removeLook() {
-  try { localStorage.removeItem(LOOK_KEY); } catch (e) { /* нечего удалять */ }
-}
-
 // ----- Цвет и контраст -----
 const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const toHex = c => `#${c.map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, "0")).join("")}`;

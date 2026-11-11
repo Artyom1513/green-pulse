@@ -532,6 +532,7 @@ function buildFigure(regionIndex, sex = "m") {
       classify: (p, d, u) => (u < 0.18 ? R("wrist", p) : R("hand", p))
     });
     const fingers = [[0.027, 0.072, 0.0095], [0.009, 0.080, 0.0102], [-0.009, 0.075, 0.0096], [-0.026, 0.060, 0.0086]];
+    mesh.part = PART.finger[si];
     for (const [dz, Lf, rf] of fingers) {
       const p0 = at(0.006, -0.086, 0.01 + dz);
       sweep(mesh, {
@@ -542,6 +543,7 @@ function buildFigure(regionIndex, sex = "m") {
         classify: p => R("fingers", p)
       });
     }
+    mesh.part = PART.thumb[si];
     sweep(mesh, {
       pts: [at(0.002, -0.026, 0.028), at(-0.003, -0.058, 0.04), at(-0.007, -0.083, 0.043)], rings: 10, segs: 12, capRings: 4,
       shape: (u, ct, st) => ellipse(0.0118 * hk * (1 - 0.2 * u), 0.0112 * hk * (1 - 0.18 * u), ct, st),
@@ -645,7 +647,8 @@ function buildFigure(regionIndex, sex = "m") {
 // Части тела для скелета: у парных — [правая, левая]
 export const PART = {
   torso: 0, neck: 1, head: 2, hair: 3, tie: 4, pony: 17,
-  arm: [5, 11], hand: [6, 12], leg: [7, 13], kneecap: [8, 14], malleolus: [9, 15], foot: [10, 16]
+  arm: [5, 11], hand: [6, 12], leg: [7, 13], kneecap: [8, 14], malleolus: [9, 15], foot: [10, 16],
+  finger: [18, 20], thumb: [19, 21]
 };
 
 // Суставы тела в исходной позе (стоя, руки вдоль тела) — кости скелета для схем упражнений.
@@ -663,6 +666,11 @@ function bindJoints(B) {
     wrist: side(s => [s * wr[0], wr[1], wr[2]]),
     knuckle: side(s => [s * (wr[0] + 0.008 * hk), wr[1] - 0.096 * hk, wr[2] + 0.01 * hk]),
     finger: side(s => [s * (wr[0] + 0.004 * hk), wr[1] - 0.17 * hk, wr[2] + 0.012 * hk]),
+    // суставы пальцев: основание (линия костяшек), середина пальца; большой палец — основание и кончик
+    mcp: side(s => [s * (wr[0] + 0.006 * hk), wr[1] - 0.086 * hk, wr[2] + 0.01 * hk]),
+    pip: side(s => [s * (wr[0] + 0.005 * hk), wr[1] - 0.122 * hk, wr[2] + 0.011 * hk]),
+    thumb0: side(s => [s * (wr[0] + 0.002 * hk), wr[1] - 0.026 * hk, wr[2] + 0.028 * hk]),
+    thumbTip: side(s => [s * (wr[0] - 0.007 * hk), wr[1] - 0.083 * hk, wr[2] + 0.043 * hk]),
     hip: side(s => [s * l0[0], l0[1] - 0.045, l0[2] + 0.004]),
     knee: side(s => [s * kn[0], kn[1], kn[2]]),
     ankle: side(s => [s * an[0], an[1] - 0.005, an[2]]),
