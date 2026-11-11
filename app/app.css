@@ -939,10 +939,37 @@ button.cal-cell { cursor: pointer; }
 
 
 /* ----- Новая структура: главный экран ----- */
+/* Тренировка дня — обложка: фигура выполняет главное упражнение, крупное название, плашки и одна
+   большая кнопка. Как у больших спортивных приложений: картинка и действие, а не абзац текста */
 .hero { padding: 20px 18px; }
+.hero:not(.warn) { padding: 0; overflow: hidden; }
+.hero-cover { position: relative; min-height: 120px; background: radial-gradient(120% 95% at 72% 18%, var(--accent-soft), transparent 70%), linear-gradient(180deg, transparent 55%, var(--glass-strong)); }
+.hero-cover .demo-cover { max-width: none; margin: 0; padding: 0; border-radius: 0; background: transparent; }
+.demo-cover .demo3d { max-width: none; }
+.demo-cover .demo3d-canvas { aspect-ratio: 16 / 9; pointer-events: none; cursor: default; }
+.demo-cover .demo-svg { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+.demo-cover.is-loading { min-height: 200px; }
+.hero-badge { position: absolute; top: 14px; left: 16px; margin: 0; padding: 5px 11px; border-radius: 999px; background: var(--glass-strong); color: var(--accent-text); font-size: .78rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.hero-body { padding: 4px 18px 18px; }
 .hero-title { margin: 2px 0 4px; font-size: 1.35rem; letter-spacing: -.01em; }
+.hero:not(.warn) .hero-title { margin: 0; font-size: clamp(1.5rem, 6.4vw, 1.9rem); font-weight: 800; line-height: 1.12; letter-spacing: -.02em; }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.meta-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 5px 11px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-size: .86rem; font-weight: 650; }
+.meta-chip .icon { flex: none; }
 .hero-care { margin: 6px 0 0; }
 .hero-done { margin: 8px 0 0; color: var(--accent-text); font-weight: 600; }
+.hero-actions { margin-top: 16px; }
+.hero-actions .btn.primary { flex: 1 1 60%; min-height: 54px; font-size: 1.08rem; }
+.hero-actions .btn.ghost { flex: 0 1 auto; }
+.hero-body .ready-chip { margin-top: 10px; }
+/* вопрос о боли после тренировки — компактная плашка */
+.followup { padding: 14px 16px; }
+.followup-head { display: flex; align-items: center; gap: 10px; }
+.followup-head h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; line-height: 1.3; }
+.followup-head .fi { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 11px; background: var(--danger-soft, var(--accent-soft)); color: var(--danger, var(--accent)); }
+.followup-head a { flex: none; }
+.followup .answer-row { flex-wrap: nowrap; gap: 8px; margin-top: 10px; }
+.followup .answer-row .btn { flex: 1 1 0; min-width: 0; min-height: 40px; padding: 0 8px; }
 .ready-chip { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin: 14px 0 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 16px; background: transparent; color: var(--text); font: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
 .ready-chip b { color: var(--accent-text); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .ready-chip span { flex: 1; min-width: 0; }

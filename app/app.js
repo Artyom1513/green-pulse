@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -69,13 +69,14 @@ function loadDemo3d() {
 }
 const want3d = () => look.figstyle === "3d" && demo3d !== false;
 // Блок со схемой движения: пока модуль грузится, место под схему уже занято
-function demoBox(id, { mini = false, onExpand = null } = {}) {
-  const box = h("div", { class: "demo" });
+function demoBox(id, { mini = false, onExpand = null, cover = false } = {}) {
+  const box = h("div", { class: cover ? "demo demo-cover" : "demo" });
+  const label = cover ? `Главное упражнение сегодня: ${EX[id].name}` : undefined;
   const make = () => {
     if (want3d() && demo3d) {
-      try { return demo3d.createDemo(id, { sex: figureSex(), controls: mini ? "mini" : "full", onExpand }); } catch (e) { demo3d = false; }
+      try { return demo3d.createDemo(id, { sex: figureSex(), controls: cover ? "cover" : mini ? "mini" : "full", onExpand, label }); } catch (e) { demo3d = false; }
     }
-    return animMod.exerciseDemo(id);
+    return animMod.exerciseDemo(id, { paused: cover, label });
   };
   if (animMod && (!want3d() || demo3d)) box.append(make());
   else {
@@ -546,8 +547,10 @@ function viewToday() {
         h("h1", { class: "page-title", text: greeting() })),
       avatarEl({ href: "#more", label: "Профиль" })),
     r.acute.length ? acuteCard(r) : null,
-    todayNotice(),
-    ...(shown.length ? shown : [h("section", { class: "card glass" },
+    // вопрос о боли после тренировки — коротко и над тренировкой: от ответа зависит план
+    followupCard() || rescreenCard(),
+    // одно главное действие: тренировка идёт первой, остальные сообщения — под ней
+    ...(shown.length ? [shown[0], infoNotice(), ...shown.slice(1)] : [infoNotice(), h("section", { class: "card glass" },
       h("p", { class: "muted", text: "Все блоки главного экрана скрыты." }),
       h("a", { class: "btn ghost", href: "#more/look", text: "Настроить главный экран" }))])
   ];
@@ -572,9 +575,9 @@ function avatarEl({ big = false, href = "", label = "" } = {}) {
   if (href) return h("a", { class: cls, href, "aria-label": label }, ...inner);
   return h("span", { class: cls, "aria-hidden": "true" }, ...inner);
 }
-// Подсказки по важности: самое срочное — вопрос о боли после вчерашней тренировки
-function todayNotice() {
-  return followupCard() || rescreenCard() || weekSummaryCard() || whatsNewCard() || backupCard();
+// Сообщения, которые не меняют план: итоги недели, что нового, напоминание о копии — по одному
+function infoNotice() {
+  return weekSummaryCard() || whatsNewCard() || backupCard();
 }
 // Интенсивность дня словами: «обычная нагрузка», а не «режим обычная»
 const MODE_PHRASE = { recovery: "день восстановления", light: "лёгкая нагрузка", normal: "обычная нагрузка", push: "нагрузка посильнее" };
@@ -593,16 +596,25 @@ function heroCard(plan, r, ci, done) {
       h("div", { class: "btn-row" }, h("a", { class: "btn primary", href: "#more/breath", text: "Дыхательная практика" })));
   }
   const care = r.reasons.slice(0, 3).join(", ").toLowerCase() + (r.reasons.length > 3 ? ` и ещё ${r.reasons.length - 3}` : "");
+  // главное упражнение дня — первое в основной части; его показывает фигура на обложке
+  const main = plan.blocks.find(b => b.sets) || plan.blocks[Math.min(1, plan.blocks.length - 1)];
+  const coverId = main && main.items[0] ? main.items[0].id : null;
+  const chip = (ic, text) => h("span", { class: "meta-chip" }, icon(ic, 15), text);
   return h("section", { class: "card glass hero" },
-    h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
-    h("h2", { class: "hero-title", text: plan.title }),
-    h("p", { class: "muted", text: `≈ ${plan.est} мин · ${plan.count} ${E.plural(plan.count, "подход", "подхода", "подходов")}` }),
-    r.reasons.length ? h("p", { class: "small hero-care" }, h("span", { class: "muted", text: "Учтено: " }), care) : null,
-    done.length ? h("p", { class: "small hero-done", text: "Сегодня тренировка уже есть ✓ Можно отдохнуть или размяться перед сном." }) : null,
-    ready,
-    h("div", { class: "btn-row" },
-      h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), "Начать"),
-      h("a", { class: "btn ghost", href: "#workout", text: "Состав" })));
+    h("div", { class: "hero-cover" },
+      coverId ? demoBox(coverId, { cover: true }) : null,
+      h("p", { class: "hero-badge", text: done.length ? "Сегодня уже была тренировка" : "Тренировка на сегодня" })),
+    h("div", { class: "hero-body" },
+      h("h2", { class: "hero-title", text: plan.title }),
+      h("div", { class: "hero-meta" },
+        chip("timer", `≈ ${plan.est} мин`),
+        chip("workout", `${plan.count} ${E.plural(plan.count, "подход", "подхода", "подходов")}`),
+        r.reasons.length ? chip("shield", `учтено: ${care}`) : null),
+      done.length ? h("p", { class: "small hero-done", text: "Можно отдохнуть или размяться перед сном." }) : null,
+      h("div", { class: "btn-row hero-actions" },
+        h("button", { class: "btn primary", type: "button", onClick: () => startPlayer(plan) }, icon("play", 18), "Начать"),
+        h("a", { class: "btn ghost", href: "#workout", text: "Состав" })),
+      ready));
 }
 // Отметка самочувствия — в отдельном окне, чтобы главный экран оставался коротким
 function checkinSheet() {
@@ -846,14 +858,14 @@ function followupCard() {
     toast(v === "worse" ? "Бережём зону ещё неделю. Если боль не проходит или усиливается — покажитесь врачу" : v === "same" ? "Понятно. Тренер продолжит беречь эту зону" : "Отлично! Продолжаем по плану");
   };
   return h("section", { class: "card glass followup" },
-    h("p", { class: "eyebrow", text: "Правило 24 часов" }),
-    h("h2", { text: `Как ${names} после ${when}?` }),
-    h("p", { class: "muted small" }, "Нормально, если к утру боль утихла. Если стало хуже, чем до тренировки, нагрузку на эту зону нужно снизить. ",
-      h("a", { href: "#guide/pain-exercise", text: "Какая боль допустима" })),
+    h("div", { class: "followup-head" },
+      h("span", { class: "fi" }, icon("heart", 18)),
+      h("h2", { text: `Как ${names} после ${when}?` }),
+      h("a", { class: "small", href: "#guide/pain-exercise", "aria-label": "Какая боль после тренировки допустима", text: "Подробнее" })),
     h("div", { class: "btn-row answer-row" },
       h("button", { class: "btn small ghost", type: "button", text: "Не болит", onClick: () => answer("better") }),
-      h("button", { class: "btn small ghost", type: "button", text: "Как до тренировки", onClick: () => answer("same") }),
-      h("button", { class: "btn small pain", type: "button", text: "Сильнее, чем было", onClick: () => answer("worse") })));
+      h("button", { class: "btn small ghost", type: "button", text: "Как было", onClick: () => answer("same") }),
+      h("button", { class: "btn small pain", type: "button", text: "Хуже", onClick: () => answer("worse") })));
 }
 
 // Итоги прошлой недели — в понедельник и вторник, как еженедельная сводка у больших приложений
@@ -894,12 +906,12 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
+  "Новый экран «Сегодня»: тренировка дня — большая обложка, где фигура показывает главное упражнение, крупное название, время и одна кнопка «Начать»; вопрос о боли — короткая плашка",
   "Кисти как у людей: пальцы обхватывают гантель, гирю, гриф и перекладину, в боксе — кулак; ладонь на полу, стене или стуле лежит плашмя",
   "Стопа перекатывается через носок, а в отжиманиях, «кобре», тяге у двери и отжиманиях от стены ладони и носки больше не скользят",
   "Живее тело: плечо поднимается вслед за рукой, спина округляется в скручиваниях и прогибается в «кобре»; ровные края одежды, глаза, брови и губы",
   "Под схемой — пауза, ползунок (остановите движение в любой точке), замедление ½× и смена ракурса; в плеере схему можно открыть крупно",
-  "Плеер: кнопка «назад» к предыдущему упражнению, на отдыхе видно следующее упражнение, вес можно ввести числом",
-  "Кнопка «Начать тренировку» видна сразу, а на вкладке «Тело» модель — сразу под переключателем"
+  "Плеер: кнопка «назад» к предыдущему упражнению, на отдыхе видно следующее упражнение, вес можно ввести числом; «Начать тренировку» на странице плана видна сразу"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;

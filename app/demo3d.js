@@ -1842,7 +1842,12 @@ function loop(now) {
     d.seen = true;
     // «меньше анимации»: само не играет, но если человек сам нажал «играть» или двигает ползунок — показываем
     const running = !d.paused && (!reduced() || d.manual);
-    if (running) { d.t += ((clock - d.lastClock) / 1000) * d.rate; anyRunning = true; }
+    if (running) {
+      d.t += ((clock - d.lastClock) / 1000) * d.rate;
+      // обложка показывает движение пару повторов и замирает в выразительной позе (без бесконечной анимации)
+      if (d.stopAt && d.t >= d.stopAt) { d.t = d.stopAt; d.paused = true; d.dirty = true; }
+      anyRunning = true;
+    }
     d.lastClock = clock;
     // 30 кадров в секунду достаточно для плавного показа и бережёт батарею
     if (d.visible && (d.dirty || (running && now - (d.drawn || 0) >= 32))) { draw(d); d.drawn = now; }
@@ -1998,7 +2003,7 @@ const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a
 // Создать схему: элемент с холстом и управлением показом.
 // controls: "full" — под схемой панель: пауза, ползунок фазы движения (можно остановить в любой точке
 // и рассмотреть), замедление вдвое, смена ракурса; "mini" — только кнопки поверх схемы (в плеере),
-// onExpand — кнопка «крупнее»
+// onExpand — кнопка «крупнее»; "cover" — обложка без кнопок: движение 3–5 секунд и стоп в позе
 export function createDemo(id, { label, paused = false, sex, controls = "full", onExpand } = {}) {
   const M = motionOf(id);
   const el = document.createElement("div");
@@ -2020,6 +2025,14 @@ export function createDemo(id, { label, paused = false, sex, controls = "full", 
   const probe = solvePose(M, d.C, { J: M.key(0), Pz: M.keyPz(0) }, null).P;
   if (Math.min(probe.pelvis[1], probe.neck[1]) < 0.45) d.elev = 20;
   if (FRONTAL.has(M.pid) || M.pid === "openBook") d.az = 58;
+  if (controls === "cover") {
+    // повторы целиком: остановка в позе B (середина цикла), не дольше 5 секунд (WCAG 2.2.2)
+    const p = M.period, n = Math.max(0, Math.ceil(3.5 / p - 0.5));
+    let stop = p * (n + 0.5);
+    if (stop > 5) stop = Math.min(4.9, p * 0.5);
+    d.stopAt = stop;
+    el.classList.add("demo3d-cover");
+  }
   if (M.props.some(p => p === "wallHands" || p === "wallFront" || p === "door")) d.az = -108;
   const button = (cls, name) => {
     const b = document.createElement("button");
@@ -2060,7 +2073,9 @@ export function createDemo(id, { label, paused = false, sex, controls = "full", 
     requestAnimationFrame(step);
   };
   viewBtn.addEventListener("click", () => { vi = (vi + 1) % views.length; turnTo(views[vi]); });
-  if (controls === "mini") {
+  if (controls === "cover") {
+    // обложка не управляется: только картинка
+  } else if (controls === "mini") {
     el.append(btn, viewBtn);
     if (onExpand) {
       const ex = button("demo3d-btn demo3d-expand", "Показать крупнее");
@@ -2098,7 +2113,7 @@ export function createDemo(id, { label, paused = false, sex, controls = "full", 
     el.append(bar);
   }
   // с клавиатуры: стрелки влево-вправо поворачивают фигуру
-  canvas.tabIndex = 0;
+  if (controls !== "cover") canvas.tabIndex = 0;
   canvas.addEventListener("keydown", e => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
