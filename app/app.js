@@ -10,7 +10,7 @@ import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.2.0";
+const VERSION = "2.3.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -906,6 +906,7 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
+  "Красочные обложки: у каждой готовой тренировки, программы и челленджа — цветная плитка по теме с фигурой в характерной позе главного упражнения",
   "Новый экран «Сегодня»: тренировка дня — большая обложка, где фигура показывает главное упражнение, крупное название, время и одна кнопка «Начать»; вопрос о боли — короткая плашка",
   "Кисти как у людей: пальцы обхватывают гантель, гирю, гриф и перекладину, в боксе — кулак; ладонь на полу, стене или стуле лежит плашмя",
   "Стопа перекатывается через носок, а в отжиманиях, «кобре», тяге у двери и отжиманиях от стены ладони и носки больше не скользят",
@@ -1064,7 +1065,7 @@ function cardioSection() {
 function challengesSection() {
   return [
     h("p", { class: "lead", text: "Каждый день немного больше. Один день челленджа — один календарный день, отдых тоже засчитывается." }),
-    h("div", { class: "quick" }, CHALLENGES.map(challengeCard))
+    h("div", { class: "covers" }, CHALLENGES.map(challengeCard))
   ];
 }
 function stretchSection() {
@@ -1155,17 +1156,73 @@ function planView() {
   return out;
 }
 
-// ----- Готовые тренировки -----
-function quickCard(q) {
-  const missing = (q.equip || []).filter(e => !state.profile.equipment.includes(e));
-  return h("button", { class: "quick-item glass", type: "button", onClick: () => quickSheet(q.id) },
-    h("span", { class: "fi" }, icon(q.cat === "weights" ? "workout" : "bolt", 20)),
-    h("span", { class: "row-text" },
-      h("b", { text: q.name }),
-      h("span", { class: "muted small", text: q.desc }),
-      missing.length ? h("span", { class: "need", text: `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` }) : null),
-    icon("chevron", 18));
+// ----- Обложки каталога -----
+// Каждая тренировка, программа и челлендж — цветная плитка с фигурой в характерной позе главного
+// упражнения. Цвет — по теме (сила, кардио, растяжка…), фигура — кадр объёмной схемы, который
+// рисуется один раз и дальше берётся из памяти. Без WebGL плитка остаётся цветной, без фигуры
+// темы обложек (цвета — в app.css, классы cover-<тема>)
+const COVER_THEMES = ["strength", "cardio", "stretch", "core", "joints", "balance", "calm", "morning", "weights", "walk"];
+const COVER_THEME = {
+  snack: "morning", desk: "calm", morning: "morning", posture: "calm", joints: "joints", knees: "joints", ankles: "joints", shoulders: "joints",
+  back: "core", seated: "calm", evening: "stretch", balance: "balance", balance2: "balance", quietCardio: "cardio", coreSafe: "core",
+  bandBody: "strength", yoga: "stretch", stretchAll: "stretch", noEquip: "strength", hiit: "cardio", warmW: "morning",
+  squat30: "strength", plank30: "core", pushup30: "strength", stretch30: "stretch", posture30: "calm", balance30: "balance", walk30: "walk",
+  run: "cardio"
+};
+// упражнение для обложки: самое «узнаваемое» — первое силовое или заметное движение комплекса
+const COVER_POSE = {
+  snack: ["chairSquat", 0.5], desk: ["wallAngel", 0.5], morning: ["highKnees", 0.25], posture: ["chinTuck", 0.5], joints: ["singleLeg", 0.5], knees: ["bridge", 0.5],
+  ankles: ["calfHold", 0.5], shoulders: ["wallAngel", 0.5], back: ["birdDog", 0.5], seated: ["seatedPunch", 0.5], evening: ["childPose", 0.5], balance: ["tree", 0.5],
+  balance2: ["starReach", 0.5], quietCardio: ["skater", 0.5], coreSafe: ["sidePlank", 0.5], bandBody: ["bandRow", 0.5], yoga: ["warrior", 0.5], stretchAll: ["hamStretch", 0.5],
+  noEquip: ["pushUp", 0.5], hiit: ["jacks", 0.5], warmW: ["inchworm", 0.5], dbFull: ["gobletSquat", 0.5], dbUpper: ["ohPress", 0.5], dbLegs: ["dbLunge", 0.5],
+  arms: ["bicepsCurl", 0.5], coreW: ["woodchop", 0.5], kbBase: ["kbSwing", 0.55], bbBase: ["bbSquat", 0.5],
+  squat30: ["squat", 0.5], plank30: ["plank", 0.3], pushup30: ["pushUp", 0.5], stretch30: ["downDog", 0.5], posture30: ["wallAngel", 0.5], balance30: ["tree", 0.5], walk30: ["march", 0.25],
+  run: ["jog", 0.25]
+};
+function coverTheme(id, q) {
+  if (COVER_THEME[id]) return COVER_THEME[id];
+  if (q && q.cat === "weights") return "weights";
+  if (q && q.kind === "strength") return "strength";
+  return "joints";
 }
+function coverPose(id, items) {
+  if (COVER_POSE[id]) return COVER_POSE[id];
+  const list = items || [];
+  const pick = list.find(x => EX[x] && EX[x].group !== "mobility" && EX[x].type !== "hold") || list[0];
+  return pick ? [pick, 0.5] : null;
+}
+// Картинка фигуры появляется, когда объёмный модуль загружен; до этого и без WebGL — только цвет
+function coverArt(id, items) {
+  const art = h("span", { class: "cover-art", "aria-hidden": "true" });
+  const pose = coverPose(id, items);
+  if (!pose || !want3d()) return art;
+  const put = () => {
+    if (!demo3d) return;
+    demo3d.poster(pose[0], { sex: figureSex(), t: pose[1], w: 300, h: 180 }, url => {
+      if (url) { art.style.backgroundImage = `url("${url}")`; art.classList.add("has-art"); }
+    });
+  };
+  if (demo3d) put();
+  else loadDemo3d().then(put);
+  return art;
+}
+// Плитка-обложка: градиент темы, фигура, название и короткие сведения; кнопка или ссылка
+function coverTile({ id, theme, items, title, sub, need, progress, href, onClick, big = false }) {
+  const th = COVER_THEMES.includes(theme) ? theme : "joints";
+  const inner = [
+    coverArt(id, items),
+    h("span", { class: "cover-text" },
+      h("b", { text: title }),
+      sub ? h("span", { class: "cover-sub", text: sub }) : null,
+      need ? h("span", { class: "cover-need", text: need }) : null,
+      progress !== undefined && progress !== null ? h("span", { class: "progress slim cover-progress", "aria-hidden": "true" }, h("i", { style: { width: `${progress}%` } })) : null)
+  ];
+  const attrs = { class: `cover cover-${th}${big ? " cover-big" : ""}` };
+  return href ? h("a", { ...attrs, href }, inner) : h("button", { ...attrs, type: "button", onClick }, inner);
+}
+
+// ----- Готовые тренировки -----
+const quickCard = q => quickRow(q);
 // Готовые тренировки по смысловым группам: короткие списки легче просматривать, чем один длинный
 const READY_GROUPS = [
   ["Быстро, в течение дня", ["snack", "desk", "posture", "morning"]],
@@ -1176,18 +1233,16 @@ const READY_GROUPS = [
 // Строка списка: компактнее карточки, длинный каталог читается как «Настройки» в iPhone
 function quickRow(q) {
   const missing = (q.equip || []).filter(e => !state.profile.equipment.includes(e));
-  return h("button", { class: "row row-btn lg-row", type: "button", onClick: () => quickSheet(q.id) },
-    h("span", { class: "fi" }, icon(q.cat === "weights" ? "workout" : "bolt", 18)),
-    h("span", { class: "row-text" },
-      h("b", { text: q.name }),
-      h("span", { class: "muted small", text: q.desc }),
-      missing.length ? h("span", { class: "need", text: `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` }) : null),
-    icon("chevron", 16));
+  return coverTile({
+    id: q.id, theme: coverTheme(q.id, q), items: q.items, title: q.name, sub: q.desc,
+    need: missing.length ? `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` : "",
+    onClick: () => quickSheet(q.id)
+  });
 }
 function readyWorkouts() {
   const listed = new Set(READY_GROUPS.flatMap(g => g[1]));
   const rest = QUICK.filter(q => q.cat !== "weights" && !listed.has(q.id));
-  const group = (title, list) => list.length ? [h("h2", { class: "group-title", text: title }), h("section", { class: "card glass list-group" }, h("div", { class: "list" }, list.map(quickRow)))] : [];
+  const group = (title, list) => list.length ? [h("h2", { class: "group-title", text: title }), h("div", { class: "covers" }, list.map(quickRow))] : [];
   return [
     h("p", { class: "lead", text: "Комплексы на любой случай. Неподходящие вам упражнения тренер заменит безопасными." }),
     ...READY_GROUPS.flatMap(([title, ids]) => group(title, ids.map(id => QUICK.find(q => q.id === id)).filter(Boolean))),
@@ -3949,24 +4004,24 @@ function guideExercises(a, exs, r) {
 function programCard(p) {
   const pr = E.programProgress(state, p.id);
   const missing = (p.equip || []).filter(e => !state.profile.equipment.includes(e));
-  return h("a", { class: "quick-item glass", href: `#program/${p.id}` },
-    h("span", { class: "fi emoji", "aria-hidden": "true", text: p.icon }),
-    h("span", { class: "row-text" },
-      h("b", { text: p.name }),
-      h("span", { class: "muted small", text: pr.finished ? "Пройдена 🎉" : pr.started ? `Занятие ${pr.next} из ${p.days}` : `${p.days} ${E.plural(p.days, "занятие", "занятия", "занятий")} · ${p.desc}` }),
-      missing.length ? h("span", { class: "need", text: `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` }) : null,
-      pr.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((pr.done / p.days) * 100)}%` } })) : null),
-    icon("chevron", 18));
+  const items = p.phases ? p.phases[Math.min(1, p.phases.length - 1)].items : [];
+  return coverTile({
+    id: p.id, theme: coverTheme(p.id, p), items, title: p.name,
+    sub: pr.finished ? "Пройдена 🎉" : pr.started ? `Занятие ${pr.next} из ${p.days}` : `${p.days} ${E.plural(p.days, "занятие", "занятия", "занятий")} · ${p.desc}`,
+    need: missing.length ? `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}` : "",
+    progress: pr.started && !pr.finished ? Math.round((pr.done / p.days) * 100) : null,
+    href: `#program/${p.id}`
+  });
 }
 function programsSection() {
   return [
     h("p", { class: "lead", text: "Курсы по шагам: каждое занятие немного сложнее предыдущего. Упражнения подстраиваются под ваши зоны и инвентарь." }),
     h("h2", { class: "section-title", text: "Восстановление" }),
-    h("div", { class: "quick" }, PROGRAMS.filter(p => p.kind !== "strength").map(programCard)),
+    h("div", { class: "covers" }, PROGRAMS.filter(p => p.kind !== "strength").map(programCard)),
     h("h2", { class: "section-title", text: "Сила" }),
-    h("div", { class: "quick" }, PROGRAMS.filter(p => p.kind === "strength").map(programCard)),
+    h("div", { class: "covers" }, PROGRAMS.filter(p => p.kind === "strength").map(programCard)),
     h("h2", { class: "section-title", text: "Выносливость" }),
-    h("div", { class: "quick" }, runCard()),
+    h("div", { class: "covers" }, runCard()),
     h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#workout/challenges", text: "Челленджи на 30 дней →" }))
   ];
 }
@@ -3980,13 +4035,12 @@ function runPlanText(s) {
 const runTotalMin = s => Math.round((600 + s.run * s.reps + s.walk * Math.max(0, s.reps - 1)) / 60);
 function runCard() {
   const rs = E.runState(state);
-  return h("a", { class: "quick-item glass", href: "#run" },
-    h("span", { class: "fi emoji", "aria-hidden": "true", text: "👟" }),
-    h("span", { class: "row-text" },
-      h("b", { text: "Бег с нуля: 9 недель" }),
-      h("span", { class: "muted small", text: rs.finished ? "Пройдена 🏅" : rs.started ? `Занятие ${rs.next} из ${RUN_DAYS} · ${runPlanText(rs.session)}` : "От минуты бега до 30 минут без остановки, 3 раза в неделю" }),
-      rs.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((rs.done / RUN_DAYS) * 100)}%` } })) : null),
-    icon("chevron", 18));
+  return coverTile({
+    id: "run", theme: "cardio", title: "Бег с нуля: 9 недель",
+    sub: rs.finished ? "Пройдена 🏅" : rs.started ? `Занятие ${rs.next} из ${RUN_DAYS} · ${runPlanText(rs.session)}` : "От минуты бега до 30 минут без остановки, 3 раза в неделю",
+    progress: rs.started && !rs.finished ? Math.round((rs.done / RUN_DAYS) * 100) : null,
+    href: "#run"
+  });
 }
 function startRun(n, repeat = false) {
   const rs = E.runState(state);
@@ -4071,13 +4125,13 @@ function challengeLine(cs) {
 }
 function challengeCard(c) {
   const cs = E.challengeState(state, c.id);
-  return h("a", { class: "quick-item glass", href: `#challenge/${c.id}` },
-    h("span", { class: "fi emoji", "aria-hidden": "true", text: c.icon }),
-    h("span", { class: "row-text" },
-      h("b", { text: c.name }),
-      h("span", { class: "muted small", text: cs.started ? challengeLine(cs) : c.desc }),
-      cs.started ? h("span", { class: "progress slim", "aria-hidden": "true" }, h("i", { style: { width: `${Math.round((cs.done / 30) * 100)}%` } })) : null),
-    icon("chevron", 18));
+  const items = Array.isArray(c.ex) ? c.ex : c.ex ? [c.ex] : (c.items ? c.items[0] : []);
+  return coverTile({
+    id: c.id, theme: coverTheme(c.id), items, title: c.name,
+    sub: cs.started ? challengeLine(cs) : c.desc,
+    progress: cs.started && !cs.finished ? Math.round((cs.done / 30) * 100) : null,
+    href: `#challenge/${c.id}`
+  });
 }
 function viewChallenge(id) {
   const c = CHALLENGES.find(x => x.id === id);

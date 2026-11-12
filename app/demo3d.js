@@ -1861,14 +1861,14 @@ function destroy(d) {
   if (R && d.workBuf) R.gl.deleteBuffer(d.workBuf);
 }
 
-function draw(d) {
+function draw(d, o = {}) {
   let r;
   try { r = renderer(); } catch (e) { return; }
   if (r.lost) return;
   const { gl } = r;
-  const rect = d.canvas.getBoundingClientRect();
+  const rect = d.getRect ? d.getRect() : d.canvas.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = o.dpr || Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.round(rect.width * dpr), h = Math.round(rect.height * dpr);
   if (d.canvas.width !== w || d.canvas.height !== h) { d.canvas.width = w; d.canvas.height = h; }
   d.w = w; d.h = h;
@@ -1999,6 +1999,41 @@ function packBones(m) {
   return PACK;
 }
 const mixc = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+// ----- Кадр-картинка: фигура в выразительной позе упражнения для обложек каталога -----
+// Рисуется один раз на упражнение, пол и размер; картинка отдаётся как blob-ссылка (политика
+// безопасности разрешает картинки только своего происхождения и blob:) и хранится в памяти.
+// Прозрачный фон — обложка подкладывает свой цвет. Без WebGL в колбэк приходит null
+const POSTERS = new Map();
+export function poster(id, { sex, w = 320, h = 200, t = 0.5, az, elev } = {}, done) {
+  const sx = sex === "f" ? "f" : "m";
+  const key = `${id}|${sx}|${w}x${h}|${t}|${az === undefined ? "" : az}|${elev === undefined ? "" : elev}`;
+  const have = POSTERS.get(key);
+  if (have) { if (have.url !== undefined) done(have.url); else have.wait.push(done); return; }
+  const entry = { url: undefined, wait: [done] };
+  POSTERS.set(key, entry);
+  const finish = url => { entry.url = url; for (const f of entry.wait) f(url); entry.wait = []; };
+  try {
+    const M = motionOf(id);
+    const side = !M.front;
+    const C = character(sx);
+    const d = { id, M, el: null, canvas: null, sex: sx, C, t: t * M.cycle, az: az === undefined ? (side ? -62 : -20) : az, elev: elev === undefined ? (side ? 9 : 7) : elev, orbit: 0, paused: true, dirty: true, visible: true, statics: null, rate: 1, manual: true, w, h };
+    const probe = solvePose(M, C, { J: M.key(0), Pz: M.keyPz(0) }, null).P;
+    if (elev === undefined && Math.min(probe.pelvis[1], probe.neck[1]) < 0.45) d.elev = 20;
+    if (az === undefined) {
+      if (FRONTAL.has(M.pid) || M.pid === "openBook") d.az = 58;
+      if (M.props.some(p => p === "wallHands" || p === "wallFront" || p === "door")) d.az = -108;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    d.canvas = canvas;
+    d.el = document.documentElement;
+    d.getRect = () => ({ width: w, height: h });
+    draw(d, { dpr: 1 });
+    if (d.workBuf && R) R.gl.deleteBuffer(d.workBuf);
+    canvas.toBlob(b => finish(b ? URL.createObjectURL(b) : null), "image/png");
+  } catch (e) { finish(null); }
+}
 
 // Создать схему: элемент с холстом и управлением показом.
 // controls: "full" — под схемой панель: пауза, ползунок фазы движения (можно остановить в любой точке

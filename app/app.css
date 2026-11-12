@@ -401,6 +401,38 @@ input.switch:checked::after { transform: translateX(20px); }
 .adapt li::before { content: ""; position: absolute; left: 4px; top: .55em; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .adapt li.note::before { background: var(--warn); }
 .quick { display: grid; gap: 10px; }
+/* Обложки каталога: цветной градиент темы, фигура справа, текст слева снизу. Как карточки
+   тренировок у больших спортивных приложений — картинка и название, а не строка со значком */
+.covers { display: grid; gap: 12px; }
+.cover { --c1: #0369a1; --c2: #38bdf8; position: relative; display: flex; align-items: flex-end; width: 100%; min-height: 150px; padding: 14px 16px; border: 0; border-radius: 22px; overflow: hidden; isolation: isolate; background: linear-gradient(120deg, var(--c1) 0%, var(--c2) 100%); color: #fff; font: inherit; text-align: left; text-decoration: none; cursor: pointer; box-shadow: 0 10px 28px -14px var(--c1); }
+.cover-strength { --c1: #0f766e; --c2: #2dd4bf; }
+.cover-cardio { --c1: #c2410c; --c2: #fb923c; }
+.cover-stretch { --c1: #7e22ce; --c2: #c084fc; }
+.cover-core { --c1: #1d4ed8; --c2: #60a5fa; }
+.cover-joints { --c1: #0369a1; --c2: #38bdf8; }
+.cover-balance { --c1: #4d7c0f; --c2: #a3e635; }
+.cover-calm { --c1: #4338ca; --c2: #a78bfa; }
+.cover-morning { --c1: #b45309; --c2: #fbbf24; }
+.cover-weights { --c1: #1e293b; --c2: #64748b; }
+.cover-walk { --c1: #15803d; --c2: #4ade80; }
+/* блик сверху справа и затемнение снизу слева, чтобы белый текст читался на любом цвете */
+.cover::before { content: ""; position: absolute; inset: 0; background: radial-gradient(80% 90% at 88% 8%, rgba(255, 255, 255, .34), transparent 62%), linear-gradient(100deg, rgba(0, 0, 0, .42) 0%, rgba(0, 0, 0, .18) 45%, transparent 70%); pointer-events: none; }
+.cover-art { position: absolute; top: 0; right: -4px; bottom: 0; width: 58%; background: no-repeat right center / contain; opacity: 0; transition: opacity .35s; pointer-events: none; filter: drop-shadow(0 8px 10px rgba(0, 0, 0, .25)); }
+.cover-art.has-art { opacity: 1; }
+.cover-text { position: relative; display: grid; gap: 3px; max-width: 62%; text-shadow: 0 1px 3px rgba(0, 0, 0, .45); }
+.cover-text b { font-size: 1.12rem; font-weight: 800; line-height: 1.15; letter-spacing: -.01em; }
+.cover-sub { color: rgba(255, 255, 255, .88); font-size: .82rem; line-height: 1.3; }
+.cover-need { display: inline-block; width: max-content; max-width: 100%; margin-top: 3px; padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, .28); font-size: .74rem; font-weight: 650; }
+.cover-progress { margin-top: 6px; background: rgba(255, 255, 255, .3); }
+.cover-progress i { background: #fff; }
+.cover:hover { filter: brightness(1.04); }
+.cover:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.cover-big { min-height: 190px; }
+@media (min-width: 600px) { .covers { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .cover-art { transition: none; } }
+:root.d-compact .cover { min-height: 128px; padding: 12px 14px; }
+:root.r-calm .cover { border-radius: 13px; }
+:root.r-sharp .cover { border-radius: 5px; }
 .quick-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border-radius: 22px; color: var(--text); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
 .quick-item .fi { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); }
 
