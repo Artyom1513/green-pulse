@@ -8,8 +8,12 @@ const ASSETS = [
 ];
 const SCOPE = new URL("./", self.location).pathname;
 
+// Файлы новой версии берём с сервера в обход кэша браузера: иначе в первые минуты после
+// публикации (хостинг разрешает хранить файлы до 10 минут) в кэш новой версии попали бы старые
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(VERSION).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(VERSION)
+    .then(cache => cache.addAll(ASSETS.map(url => new Request(url, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", event => {

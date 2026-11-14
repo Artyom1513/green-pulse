@@ -570,6 +570,28 @@ input.switch:checked::after { transform: translateX(20px); }
 .toast.has-action.is-visible { pointer-events: auto; }
 .toast-btn { flex: none; min-height: 36px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--accent-soft); color: var(--accent-text); font: inherit; font-weight: 750; cursor: pointer; }
 .fx-canvas { position: fixed; inset: 0; z-index: 400; width: 100%; height: 100%; pointer-events: none; }
+/* Плашка «Вышла новая версия»: над нижним меню, ниже плеера и карточек */
+.update-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(540px, calc(100% - 20px));
+  padding: 10px 8px 10px 16px;
+  border-radius: 20px;
+  background: var(--glass-strong);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .14);
+  transform: translateX(-50%);
+  animation: update-in .3s ease-out;
+}
+.update-text { display: grid; flex: 1; min-width: 0; gap: 1px; line-height: 1.3; }
+.update-bar .btn { flex: none; }
+.update-later { flex: none; width: 36px; height: 36px; }
+@keyframes update-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+@media (prefers-reduced-motion: reduce) { .update-bar { animation: none; } }
 
 /* ----- Плеер тренировки ----- */
 .player {

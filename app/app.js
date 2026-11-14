@@ -284,8 +284,10 @@ function clearMedia() {
   applyLookNow();
 }
 
-// ===== Офлайн-режим =====
+// ===== Офлайн-режим и обновления =====
 // Адрес service worker проходит через политику Trusted Types, которая пропускает только ./sw.js
+let swReg = null;
+let lastUpdateCheck = 0;
 function registerSW() {
   if (!("serviceWorker" in navigator)) return;
   try {
@@ -300,12 +302,43 @@ function registerSW() {
       url = policy.createScriptURL("./sw.js");
     }
     const hadController = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!hadController) return;
-      toast("Листопульс обновился", { action: { label: "Перезапустить", onClick: () => { if (player || tracker) { toast("Сначала завершите тренировку"); return; } flush().then(() => window.location.reload()); } } });
-    });
-    navigator.serviceWorker.register(url, { scope: "./" }).catch(() => {});
+    // Новая версия встала на место старой — показываем плашку с кнопкой «Обновить»
+    // (при самой первой установке обновлять нечего)
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) showUpdateBar(); });
+    navigator.serviceWorker.register(url, { scope: "./", updateViaCache: "none" }).then(reg => {
+      swReg = reg;
+      lastUpdateCheck = Date.now();
+      // пока приложение открыто — проверяем раз в час
+      setInterval(() => { if (document.visibilityState === "visible") checkForUpdate(true); }, 60 * 60 * 1000);
+    }).catch(() => {});
   } catch (e) { /* без офлайн-режима */ }
+}
+// Браузер сам ищет новую версию только при запуске, а установленное приложение обычно не
+// закрывают, а разворачивают из фона. Поэтому проверяем и при возвращении в приложение —
+// не чаще раза в 10 минут
+function checkForUpdate(force = false) {
+  if (!swReg || navigator.onLine === false) return;
+  if (!force && Date.now() - lastUpdateCheck < 10 * 60 * 1000) return;
+  lastUpdateCheck = Date.now();
+  swReg.update().catch(() => {});
+}
+// Плашка над нижним меню: не исчезает сама, пока не обновитесь или не нажмёте «Позже».
+// Во время тренировки обновление откладывается — плеер не прерывается
+function showUpdateBar() {
+  if (document.querySelector(".update-bar")) return;
+  const bar = h("div", { class: "update-bar glass", role: "status", "aria-live": "polite" },
+    h("span", { class: "update-text" },
+      h("b", { text: "Вышла новая версия" }),
+      h("span", { class: "muted small", text: "Нажмите «Обновить», чтобы открыть её" })),
+    h("button", {
+      class: "btn small primary", type: "button", text: "Обновить",
+      onClick: () => {
+        if (player || tracker) { toast("Сначала завершите тренировку — обновим после неё"); return; }
+        flush().then(() => window.location.reload());
+      }
+    }),
+    h("button", { class: "icon-btn update-later", type: "button", "aria-label": "Обновить позже", title: "Позже", onClick: () => bar.remove() }, icon("close", 18)));
+  document.body.append(bar);
 }
 
 // ===== Запуск =====
@@ -370,6 +403,7 @@ function onVisibility() {
     return;
   }
   if (player || tracker) keepAwake(true);
+  checkForUpdate();
   if (state && store.isEncrypted() && hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000 && !player && !tracker) lockNow();
   hiddenAt = 0;
 }
@@ -944,7 +978,8 @@ const WHATS_NEW = [
   "Коснитесь мышцы — карточка расскажет, что она делает, как восстановилась после тренировок и какие упражнения её тренируют; мышца подсвечивается на модели",
   "Над моделью три слоя: «Мышцы», «Зоны боли» и «Нагрузка». Нагрузка и восстановление считаются по отдельным мышцам, а не по зонам",
   "Схемы упражнений подсвечивают именно работающие мышцы: подъём рук в стороны — среднюю дельту, тяга в наклоне — заднюю дельту, широчайшие и бицепс",
-  "В карточке упражнения — главные мышцы и помощники; на вкладке «Тело» — список всех мышц по группам"
+  "В карточке упражнения — главные мышцы и помощники; на вкладке «Тело» — список всех мышц по группам",
+  "Обновления не теряются: когда выходит новая версия, над нижним меню появляется плашка с кнопкой «Обновить», и она не исчезает сама. Приложение проверяет обновления и при возвращении в него из фона"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
