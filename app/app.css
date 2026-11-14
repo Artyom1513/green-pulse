@@ -909,6 +909,19 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .recovery-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
 .recovery-bar { margin-top: 6px; }
 .recovery-bar i { background: #8b5cf6; }
+.recovery-btn { display: block; width: 100%; padding: 6px 8px; margin: -6px -8px; box-sizing: content-box; border: 0; border-radius: 12px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.recovery-btn:hover { background: var(--line); }
+.recovery-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+/* Атлас мышц: легенда и мышцы упражнения */
+.pill.mus-pill { background: #c85a50; color: #fff; }
+.pill.tendon-pill { background: #efdcc7; color: #6b4f37; }
+:root[data-theme="dark"] .pill.mus-pill { background: #a94a42; }
+:root[data-theme="dark"] .pill.tendon-pill { background: #4a3d32; color: #f1dcc4; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pill.mus-pill { background: #a94a42; }
+  :root:not([data-theme="light"]) .pill.tendon-pill { background: #4a3d32; color: #f1dcc4; }
+}
+.sheet .tags .pill { white-space: normal; }
 .card-head > .btn { flex: none; white-space: nowrap; }
 :root[data-theme="dark"] .pill.load-1 { color: #c4b5fd; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill.load-1 { color: #c4b5fd; } }

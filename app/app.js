@@ -7,10 +7,11 @@ import {
   EQUIPMENT, WEIGHT_EQUIP, GROUPS, EXERCISES, EX, QUICK, PROGRAMS, RECORD_EX, BADGES, TIPS, RED_FLAGS, SCREENING, CHALLENGES, RUN_DAYS
 } from "./data.js";
 import { GUIDE, GUIDE_AREAS, GUIDE_BY_ID } from "./guide.js";
+import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./muscles.js";
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -99,8 +100,8 @@ function getFigure() {
   try {
     figure = body3d.createFigure({
       regions: REGIONS.map(r => r.id),
-      label: "3D-модель человека. Касание выбирает зону, режим «Обвести» выделяет область",
-      onTap: (id, side) => regionSheet(id, side),
+      label: "3D-модель человека с мышцами. Касание выбирает мышцу или зону, режим «Обвести» выделяет область",
+      onTap: (id, side, muscle) => onFigureTap(id, side, muscle),
       onLasso: result => onLasso(result),
       sex: figureSex()
     });
@@ -116,28 +117,53 @@ const isDark = () => {
 };
 const SEV_RGB = [null, [0.98, 0.76, 0.28], [0.98, 0.52, 0.22], [0.92, 0.25, 0.25]];
 const mixRGB = (a, b, w) => [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, a[2] + (b[2] - a[2]) * w];
-// Что показывает модель: зоны боли или нагрузку мышц после тренировок (карта восстановления)
-let bodyLayer = "pain";
+// Что показывает модель: мышцы как в анатомическом атласе, зоны боли или нагрузку мышц после
+// тренировок (карта восстановления). Пока слой не выбран вручную, при отмеченной боли открываются
+// зоны боли, иначе — мышцы
+let bodyLayer = "muscles";
+let bodyLayerPicked = false;
 const LOAD_RGB = [0.5, 0.36, 0.95];
-// Зоны модели, которые закрашиваются на карте нагрузки, и их мышечные группы
-const MUSCLE_KEYS = {
-  neck: ["neck"], trapezius: ["upperBack", "neck"], shoulder: ["shoulder"], upperArm: ["elbow"], triceps: ["elbow"], forearm: ["wrist"],
-  chest: ["chest"], abdomen: ["abdomen"], obliques: ["abdomen"], shoulderBlade: ["upperBack"], upperBack: ["upperBack"], lowerBack: ["lowerBack"],
-  glute: ["hip"], hip: ["hip"], thighFront: ["knee"], thighOuter: ["hip"], thighInner: ["groin"], groin: ["groin"], hamstring: ["hamstring"],
-  calf: ["ankle"], shin: ["ankle"]
-};
+// Атлас мышц: у соседних мышц разные оттенки, сухожилия и кости светлые, кожа — цвет модели
+const MUSCLE_TONES = [[0.80, 0.36, 0.32], [0.70, 0.27, 0.26], [0.87, 0.46, 0.40], [0.75, 0.31, 0.30], [0.90, 0.56, 0.48]];
+const TENDON_RGB = [0.93, 0.86, 0.78];
+const SEL_MUSCLE_RGB = [0.16, 0.7, 0.86];
+// мышца, открытая в карточке, подсвечивается на модели
+let selMuscle = null;
+const hasPainMarks = () => state.marks.length > 0 || REGIONS.some(reg => E.regionSeverity(state, reg.id, E.dayKey(), false) > 0);
+function atlasColor(mid, base, dark) {
+  const m = MUSCLE[mid];
+  if (!m) return base;
+  const c = m.bone ? TENDON_RGB : MUSCLE_TONES[m.tone] || MUSCLE_TONES[0];
+  return dark ? c.map(x => x * 0.82) : c;
+}
+// на гладкой модели мышцы различаются едва заметно — чтобы цвета боли оставались главными
+function softTone(mid, base) {
+  const m = MUSCLE[mid];
+  if (!m) return base;
+  if (m.bone) return mixRGB(base, [1, 1, 1], 0.12);
+  return base.map(x => x * (1 - 0.018 * m.tone));
+}
 function paintFigure() {
   if (!figure || !state) return;
   const dark = isDark();
   const tone = L.bodyColors(look, dark);
   if (figure.setSex) figure.setSex(figureSex());
-  figure.setTheme({ rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4, hair: dark ? [0.28, 0.245, 0.235] : [0.26, 0.21, 0.18] });
+  figure.setTheme({
+    rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4, hair: dark ? [0.28, 0.245, 0.235] : [0.26, 0.21, 0.18],
+    fibers: bodyLayer === "muscles" ? 1 : bodyLayer === "load" ? 0.55 : 0.3
+  });
   const base = tone.base;
+  const sel = c => (mid => (selMuscle && mid === selMuscle ? mixRGB(c(mid), SEL_MUSCLE_RGB, 0.72) : c(mid)));
+  if (bodyLayer === "muscles") {
+    const col = sel(mid => atlasColor(mid, base, dark));
+    figure.setColorizer((id, side, p, n, mid) => col(mid));
+    figure.repaint();
+    return;
+  }
   if (bodyLayer === "load") {
-    const f = E.muscleFatigue(state);
-    const lvl = {};
-    for (const [id, keys] of Object.entries(MUSCLE_KEYS)) lvl[id] = Math.max(...keys.map(k => f[k] || 0));
-    figure.setColorizer(id => (lvl[id] > 0.03 ? mixRGB(base, LOAD_RGB, 0.25 + 0.7 * lvl[id]) : base));
+    const f = E.muscleLoad(state);
+    const col = sel(mid => (f[mid] > 0.03 ? mixRGB(base, LOAD_RGB, 0.25 + 0.7 * f[mid]) : softTone(mid, base)));
+    figure.setColorizer((id, side, p, n, mid) => col(mid));
     figure.repaint();
     return;
   }
@@ -147,8 +173,9 @@ function paintFigure() {
     if (sev) tint[reg.id] = { sev, sides: (state.body[reg.id] && state.body[reg.id].sides) || [] };
   }
   const marks = state.marks;
-  figure.setColorizer((id, side, p, n) => {
-    let col = base;
+  const soft = sel(mid => softTone(mid, base));
+  figure.setColorizer((id, side, p, n, mid) => {
+    let col = soft(mid);
     const t = tint[id];
     if (t && (!t.sides.length || !side || t.sides.includes(side))) col = mixRGB(col, SEV_RGB[t.sev], 0.62);
     for (const m of marks) {
@@ -160,6 +187,13 @@ function paintFigure() {
     return col;
   });
   figure.repaint();
+}
+// Касание модели: на слоях мышц и нагрузки — карточка мышцы, на слое боли (и там, где мышцы нет:
+// голова, кисти, стопы, сухожилия) — карточка зоны
+function onFigureTap(id, side, muscle) {
+  const m = MUSCLE[muscle];
+  if (bodyLayer !== "pain" && m && !m.bone) muscleSheet(muscle, side);
+  else regionSheet(id, side);
 }
 
 // ===== Сохранение =====
@@ -906,13 +940,11 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Красочные обложки: у каждой готовой тренировки, программы и челленджа — цветная плитка по теме с фигурой в характерной позе главного упражнения",
-  "Новый экран «Сегодня»: тренировка дня — большая обложка, где фигура показывает главное упражнение, крупное название, время и одна кнопка «Начать»; вопрос о боли — короткая плашка",
-  "Кисти как у людей: пальцы обхватывают гантель, гирю, гриф и перекладину, в боксе — кулак; ладонь на полу, стене или стуле лежит плашмя",
-  "Стопа перекатывается через носок, а в отжиманиях, «кобре», тяге у двери и отжиманиях от стены ладони и носки больше не скользят",
-  "Живее тело: плечо поднимается вслед за рукой, спина округляется в скручиваниях и прогибается в «кобре»; ровные края одежды, глаза, брови и губы",
-  "Под схемой — пауза, ползунок (остановите движение в любой точке), замедление ½× и смена ракурса; в плеере схему можно открыть крупно",
-  "Плеер: кнопка «назад» к предыдущему упражнению, на отдыхе видно следующее упражнение, вес можно ввести числом; «Начать тренировку» на странице плана видна сразу"
+  "Мышцы на модели, как в анатомическом атласе: передняя, средняя и задняя дельта, бицепс, трицепс, грудные, пресс, косые, широчайшие, трапеция, ягодичные, головки квадрицепса, икроножная и ещё десятки мышц — с бороздками между ними и волокнами",
+  "Коснитесь мышцы — карточка расскажет, что она делает, как восстановилась после тренировок и какие упражнения её тренируют; мышца подсвечивается на модели",
+  "Над моделью три слоя: «Мышцы», «Зоны боли» и «Нагрузка». Нагрузка и восстановление считаются по отдельным мышцам, а не по зонам",
+  "Схемы упражнений подсвечивают именно работающие мышцы: подъём рук в стороны — среднюю дельту, тяга в наклоне — заднюю дельту, широчайшие и бицепс",
+  "В карточке упражнения — главные мышцы и помощники; на вкладке «Тело» — список всех мышц по группам"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1484,6 +1516,7 @@ function exerciseSheet(id) {
   const why = E.whyNot(ex, r, state.profile);
   const alt = why.length ? E.findReplacement(ex, r, state.profile) : null;
   const loads = Object.entries(ex.load);
+  const ms = muscleSummary(id);
   const w = state.weights[id];
   sheet({
     title: ex.name,
@@ -1500,6 +1533,12 @@ function exerciseSheet(id) {
       ex.weighted && w && w.hist.length > 1 ? h("div", { class: "spark-row" }, weightSpark(w.hist), h("span", { class: "muted small", text: `${w.hist.length} ${E.plural(w.hist.length, "запись", "записи", "записей")}` })) : null,
       h("h3", { class: "sub-title", text: "Как выполнять" }),
       h("ul", { class: "bullets" }, ex.cues.map(c => h("li", { text: c }))),
+      ms.main.length || ms.helpers.length ? [
+        h("h3", { class: "sub-title", text: "Какие мышцы работают" }),
+        h("div", { class: "tags" },
+          ms.main.map(m => h("span", { class: "pill mus-pill", text: m.name })),
+          ms.helpers.map(m => h("span", { class: "pill muted-pill", text: m.name }))),
+        h("p", { class: "muted small", style: { marginTop: "6px" }, text: ms.helpers.length ? "Цветом — главные мышцы, серым — те, что помогают." : "Главные мышцы упражнения." })] : null,
       h("h3", { class: "sub-title", text: "Нагрузка на суставы и спину" }),
       loads.length ? h("ul", { class: "bullets" }, loads.map(([reg, l]) => h("li", { text: `${REGION[reg].name} — ${LOAD_WORD[l]}` })))
         : h("p", { class: "muted small", text: "Почти не нагружает суставы." }),
@@ -1523,8 +1562,11 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 
 const STAGE_HINT = {
   rotate: "Ведите пальцем по фигуре, чтобы повернуть её. Коснитесь зоны, чтобы отметить её.",
+  muscles: "Ведите пальцем, чтобы повернуть фигуру. Коснитесь мышцы — расскажем, что она делает и какие упражнения её тренируют.",
+  load: "Чем ярче мышца, тем сильнее она нагружена за последние 3 дня. Коснитесь мышцы, чтобы узнать подробнее.",
   lasso: "Обведите пальцем место, которое беспокоит, — потом опишите, что там происходит."
 };
+const stageHint = () => (figureMode === "lasso" ? STAGE_HINT.lasso : bodyLayer === "pain" ? STAGE_HINT.rotate : STAGE_HINT[bodyLayer]);
 const STAGE_VIEWS = [["front", "Спереди"], ["back", "Сзади"], ["side", "Сбоку"]];
 
 // layers — переключатель «Зоны боли / Нагрузка мышц» и выбор тела; в знакомстве их нет, чтобы модель
@@ -1532,6 +1574,7 @@ const STAGE_VIEWS = [["front", "Спереди"], ["back", "Сзади"], ["side
 function bodyStage({ layers = true } = {}) {
   const fig = getFigure();
   if (!layers) bodyLayer = "pain";
+  else if (!bodyLayerPicked) bodyLayer = hasPainMarks() ? "pain" : "muscles";
   if (fig === undefined) {
     const route = lastRoute;
     loadBody3d().then(() => { if (lastRoute === route || !state.profile.onboarded) render(); });
@@ -1541,7 +1584,7 @@ function bodyStage({ layers = true } = {}) {
     return [bodyMap(), h("p", { class: "muted small center", text: "Объёмная модель не поддерживается этим браузером, поэтому показана простая карта. Все зоны есть в списке ниже." })];
   }
   fig.setMode(figureMode);
-  const hint = h("p", { class: "stage-hint", "aria-live": "polite", text: STAGE_HINT[figureMode] });
+  const hint = h("p", { class: "stage-hint", "aria-live": "polite", text: stageHint() });
   const painLegend = h("div", { class: "legend" },
     [1, 2, 3].map(v => h("span", { class: `pill sev-${v}`, text: SEVERITY[v].name })),
     h("span", { class: "pill sel-pill", text: "выделение" }));
@@ -1549,20 +1592,26 @@ function bodyStage({ layers = true } = {}) {
     h("span", { class: "pill load-0", text: "восстановились" }),
     h("span", { class: "pill load-1", text: "восстанавливаются" }),
     h("span", { class: "pill load-2", text: "нагружены" }));
+  const muscleLegend = h("div", { class: "legend" },
+    h("span", { class: "pill mus-pill", text: "мышцы" }),
+    h("span", { class: "pill tendon-pill", text: "сухожилия и кости" }),
+    h("span", { class: "pill muted-pill", text: `${MUSCLES.filter(m => !m.bone).length} мышц` }));
   const showLayer = () => {
     painLegend.hidden = bodyLayer !== "pain";
     loadLegend.hidden = bodyLayer !== "load";
+    muscleLegend.hidden = bodyLayer !== "muscles";
+    hint.textContent = stageHint();
   };
   showLayer();
   const layer = choice({
     className: "seg stage-layer", label: "Что показать на модели", value: bodyLayer,
-    options: [{ value: "pain", label: "Зоны боли" }, { value: "load", label: "Нагрузка мышц" }],
-    onChange: v => { bodyLayer = v; showLayer(); paintFigure(); }
+    options: [{ value: "muscles", label: "Мышцы" }, { value: "pain", label: "Зоны боли" }, { value: "load", label: "Нагрузка" }],
+    onChange: v => { bodyLayer = v; bodyLayerPicked = true; showLayer(); paintFigure(); }
   });
   const mode = choice({
     className: "seg stage-mode", label: "Режим работы с моделью", value: figureMode,
     options: [{ value: "rotate", label: "Вращать" }, { value: "lasso", label: "✎ Обвести" }],
-    onChange: v => { figureMode = v; fig.setMode(v); hint.textContent = STAGE_HINT[v]; }
+    onChange: v => { figureMode = v; fig.setMode(v); hint.textContent = stageHint(); }
   });
   const sexSeg = layers && choice({
     className: "seg stage-sex", label: "Тело на модели", value: figureSex(),
@@ -1585,31 +1634,106 @@ function bodyStage({ layers = true } = {}) {
     h("div", { class: "chips stage-views", role: "group", "aria-label": "Ракурс" },
       STAGE_VIEWS.map(([id, label]) => h("button", { class: "chip", type: "button", onClick: () => fig.setView(id) }, label))),
     hint,
+    muscleLegend,
     painLegend,
     loadLegend,
     h("p", { class: "muted small center", text: "Модель стоит к вам лицом: её правая сторона — слева от вас." }),
     sexSeg || null);
 }
 
-// Восстановление мышц по последним тренировкам (как у силовых приложений, но с учётом боли)
+// Восстановление мышц по последним тренировкам (как у силовых приложений, но с учётом боли):
+// по отдельным мышцам — передняя дельта, широчайшие, квадрицепс и так далее
 function recoveryCard() {
-  const f = E.muscleFatigue(state);
-  const keys = Object.keys(E.KEY_NAME).filter(k => f[k] >= 0.05).sort((a, b) => f[b] - f[a]);
-  if (!keys.length) return null;
+  const f = E.muscleLoad(state);
+  const list = MUSCLES.filter(m => !m.bone && f[m.id] >= 0.05).sort((a, b) => f[b.id] - f[a.id]);
+  if (!list.length) return null;
   return h("section", { class: "card glass" },
     h("div", { class: "card-head" },
       h("div", {}, h("p", { class: "eyebrow", text: "После тренировок" }), h("h2", { text: "Восстановление мышц" })),
-      figure ? h("button", { class: "btn small ghost", type: "button", text: "На модели", onClick: () => { bodyLayer = "load"; render(); const card = document.querySelector(".stage-card"); if (card) card.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" }); } }) : null),
+      figure ? h("button", { class: "btn small ghost", type: "button", text: "На модели", onClick: () => { bodyLayer = "load"; bodyLayerPicked = true; render(); const card = document.querySelector(".stage-card"); if (card) card.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" }); } }) : null),
     h("p", { class: "muted small", text: "Мышцам нужно 48–72 часа, чтобы восстановиться. Тренер сам ставит в план тех, кто уже отдохнул." }),
-    h("div", { class: "recovery-list" }, keys.slice(0, 8).map(k => {
-      const pct = Math.round((1 - f[k]) * 100);
-      const word = pct >= 85 ? "почти готовы" : pct >= 50 ? "восстанавливаются" : "сильно нагружены";
-      return h("div", { class: "recovery-item" },
+    h("div", { class: "recovery-list" }, list.slice(0, 8).map(m => {
+      const pct = Math.round((1 - f[m.id]) * 100);
+      const word = pct >= 85 ? "почти готова" : pct >= 50 ? "восстанавливается" : "сильно нагружена";
+      return h("button", { class: "recovery-item recovery-btn", type: "button", "aria-label": `${m.name}: ${word}, восстановлено на ${pct}%`, onClick: () => muscleSheet(m.id) },
         h("div", { class: "recovery-head" },
-          h("b", { text: E.KEY_NAME[k][0].toUpperCase() + E.KEY_NAME[k].slice(1) }),
+          h("b", { text: m.name }),
           h("span", { class: "muted small", text: `${word} · ${pct}%` })),
-        h("span", { class: "progress slim recovery-bar", role: "img", "aria-label": `Восстановлено на ${pct}%` }, h("i", { style: { width: `${pct}%` } })));
+        h("span", { class: "progress slim recovery-bar", "aria-hidden": "true" }, h("i", { style: { width: `${pct}%` } })));
     })));
+}
+
+// ----- Карточка мышцы -----
+const MUSCLE_GROUP_NAME = Object.fromEntries(MUSCLE_GROUPS.map(g => [g.id, g.name]));
+function muscleSheet(mid, side = "") {
+  const m = MUSCLE[mid];
+  if (!m || m.bone || player) return;
+  const reg = REGION[m.region] ? m.region : "";
+  const load = E.muscleLoad(state)[mid] || 0;
+  const pct = Math.round((1 - load) * 100);
+  const r = E.restrictions(state);
+  const sev = reg ? E.regionSeverity(state, reg, E.dayKey(), false) : 0;
+  // сначала то, что подходит пользователю сейчас
+  const exs = exercisesFor(mid, 12)
+    .map((ex, i) => ({ ex, i, ok: !E.whyNot(ex, r, state.profile).length }))
+    .sort((a, b) => b.ok - a.ok || a.i - b.i)
+    .slice(0, 6).map(x => x.ex);
+  selMuscle = mid;
+  paintFigure();
+  const close = sheet({
+    title: m.name,
+    body: [
+      h("div", { class: "tags" },
+        h("span", { class: "pill", text: MUSCLE_GROUP_NAME[m.group] || "Мышца" }),
+        m.latin ? h("span", { class: "pill muted-pill", text: m.latin }) : null,
+        m.short ? h("span", { class: "pill muted-pill", text: m.short }) : null),
+      h("p", { style: { marginTop: "12px" }, text: m.does }),
+      load >= 0.05
+        ? h("div", { class: "recovery-item" },
+          h("div", { class: "recovery-head" }, h("b", { text: "Восстановление" }), h("span", { class: "muted small", text: `${pct}% · нагружалась за последние 3 дня` })),
+          h("span", { class: "progress slim recovery-bar", role: "img", "aria-label": `Восстановлено на ${pct}%` }, h("i", { style: { width: `${pct}%` } })))
+        : h("p", { class: "muted small", text: "За последние 3 дня тренировки её почти не нагружали — мышца отдохнула." }),
+      sev ? h("div", { class: "note-box" },
+        h("b", { text: `Зона «${REGION[reg].name}» отмечена: ${SEVERITY[sev].name.toLowerCase()}.` }),
+        h("p", { class: "small", text: "Упражнения, которые её нагружают, тренер убрал или облегчил." })) : null,
+      exs.length ? [
+        h("h3", { class: "sub-title", text: "Какие упражнения её тренируют" }),
+        h("div", { class: "list" }, exs.map(ex => {
+          const why = E.whyNot(ex, r, state.profile);
+          return h("button", { class: "row row-btn", type: "button", onClick: () => exerciseSheet(ex.id) },
+            h("span", { class: "row-text" }, h("b", { text: ex.name }), h("span", { class: "muted small", text: `${GROUPS[ex.group]} · ${LEVELS[ex.level - 1].name.toLowerCase()}` })),
+            why.length ? h("span", { class: "pill muted-pill", text: "сейчас не подходит" }) : null,
+            icon("chevron", 18));
+        }))] : null,
+      reg ? h("p", { class: "muted small", style: { marginTop: "12px" }, text: `Мышца относится к зоне «${REGION[reg].name}». Если здесь болит, отметьте зону — тренер уберёт опасные упражнения.` }) : null
+    ],
+    actions: [
+      reg ? h("button", { class: "btn ghost", type: "button", text: sev ? "Изменить зону боли" : "Здесь болит", onClick: () => { close(); regionSheet(reg, side); } }) : null,
+      h("button", { class: "btn primary", type: "button", text: "Понятно", onClick: () => close() })
+    ].filter(Boolean),
+    onClose: () => { if (selMuscle === mid) { selMuscle = null; paintFigure(); } }
+  });
+}
+
+// ----- Все мышцы списком: для тех, кому удобнее список, и для браузеров без 3D -----
+function musclesCard() {
+  const f = E.muscleLoad(state);
+  const list = MUSCLES.filter(m => !m.bone);
+  return h("section", { class: "card glass" },
+    h("h2", { text: "Все мышцы" }),
+    h("p", { class: "muted small", text: `${list.length} ${E.plural(list.length, "мышца", "мышцы", "мышц")} на модели — что делает каждая, как восстановилась и какие упражнения её тренируют.` }),
+    MUSCLE_GROUPS.map(g => {
+      const ms = list.filter(m => m.group === g.id);
+      const busy = ms.filter(m => f[m.id] >= 0.05).length;
+      return h("details", { class: "group" },
+        h("summary", {},
+          h("span", { text: g.name }),
+          busy ? h("span", { class: "pill load-1", text: `нагружено ${busy}` }) : h("span", { class: "muted small", text: `${ms.length} ${E.plural(ms.length, "мышца", "мышцы", "мышц")}` })),
+        h("div", { class: "list" }, ms.map(m => h("button", { class: "row row-btn", type: "button", onClick: () => muscleSheet(m.id) },
+          h("span", { class: "row-text" }, h("b", { text: m.name }), m.short || m.latin ? h("span", { class: "muted small", text: m.short || m.latin }) : null),
+          f[m.id] >= 0.05 ? h("span", { class: `pill ${f[m.id] >= 0.5 ? "load-2" : "load-1"}`, text: `${Math.round((1 - f[m.id]) * 100)}%` }) : null,
+          icon("chevron", 18)))));
+    }));
 }
 
 // Тело: три раздела вместо одной длинной страницы — модель, здоровье и справочник
@@ -1624,11 +1748,12 @@ function viewBody(sub) {
   return [
     h("h1", { class: "page-title", text: "Тело" }),
     bodyTabs(""),
-    h("p", { class: "lead", text: "Коснитесь зоны или обведите место, которое болит, — тренер уберёт опасные упражнения и подскажет, что делать." }),
+    h("p", { class: "lead", text: "Мышцы на модели — как в анатомическом атласе: коснитесь любой, чтобы узнать, что она делает. Если что-то болит, отметьте зону или обведите место — тренер уберёт опасные упражнения." }),
     h("section", { class: "card glass stage-card" }, bodyStage()),
     recoveryCard(),
     marksCard(),
-    regionsCard(r)
+    regionsCard(r),
+    musclesCard()
   ];
 }
 function bodyHealth(r) {

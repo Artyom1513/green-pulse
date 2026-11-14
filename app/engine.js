@@ -1,6 +1,7 @@
 // ===== Листопульс: логика подбора тренировок =====
 // Чистые функции без доступа к DOM и сети. Всё считается на устройстве пользователя.
 import { REGIONS, LOAD_KEYS, CONDITIONS, AGE_GROUPS, GOALS, EXERCISES, EX, QUICK, GROUPS, EQUIPMENT, PROGRAMS, WEIGHT_EQUIP, MORNING, CHALLENGES, RUN_WEEKS, RUN_DAYS } from "./data.js";
+import { MUSCLE_IDS, exerciseMuscles } from "./muscles.js";
 
 export const REGION_NAME = Object.fromEntries(REGIONS.map(r => [r.id, r.name]));
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
@@ -651,6 +652,30 @@ export function muscleFatigue(state, now = Date.now()) {
   return Object.fromEntries(LOAD_KEYS.map(k => [k, Math.round((1 - fresh[k]) * 1000) / 1000]));
 }
 const maxFatigue = (ex, fat) => Math.max(0, ...Object.keys(ex.load).map(k => fat[k] || 0));
+
+// Нагрузка за 72 часа по каждой мышце (передняя и задняя дельта, бицепс, головки квадрицепса…) —
+// для карты на 3D-модели и карточки восстановления. Считается так же, как по ключам, но доля
+// упражнения на мышцу берётся из таблицы мышц (muscles.js): главная мышца — 1, помощники — меньше
+export function muscleLoad(state, now = Date.now()) {
+  const fresh = Object.fromEntries(MUSCLE_IDS.map(m => [m, 1]));
+  for (const ss of state.sessions) {
+    if (!ss.ex || !ss.ex.length) continue;
+    const t = new Date(`${ss.d}T${String(ss.hour).padStart(2, "0")}:00:00`).getTime();
+    const hours = (now - t) / 36e5;
+    if (!(hours >= 0) || hours >= 72) continue;
+    const decay = 1 - hours / 72;
+    const effort = ss.rpe ? 0.6 + ss.rpe / 15 : 1;
+    const raw = {};
+    for (const [id, n] of ss.ex) {
+      const ex = EX[id];
+      if (!ex) continue;
+      const w = ex.weighted ? 1.4 : ex.group === "warm" || ex.group === "cool" || ex.group === "mobility" ? 0.3 : 1;
+      for (const [m, share] of Object.entries(exerciseMuscles(id))) raw[m] = (raw[m] || 0) + share * 3 * n * w * effort;
+    }
+    for (const [m, v] of Object.entries(raw)) if (Object.prototype.hasOwnProperty.call(fresh, m)) fresh[m] *= 1 - Math.min(1, v / 16) * decay;
+  }
+  return Object.fromEntries(MUSCLE_IDS.map(m => [m, Math.round((1 - fresh[m]) * 1000) / 1000]));
+}
 
 // ----- Прогрессия -----
 export function applyFeedback(state, rpe, painCount) {

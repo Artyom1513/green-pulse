@@ -8,6 +8,7 @@
 
 import { buildBody, PART } from "./body3d.js";
 import { REGIONS, EX } from "./data.js";
+import { MUSCLE_IDS, exerciseMuscles } from "./muscles.js";
 import { motionOf } from "./anim.js";
 
 const D = Math.PI / 180;
@@ -247,25 +248,20 @@ function materials(geo, j, sex) {
 }
 
 // ----- Подсветка работающих мышц -----
-// Нагрузка упражнения (data.js, load) → зоны модели: те же соответствия, что у слоя «Нагрузка мышц»
-const MUSCLE_KEYS = {
-  neck: ["neck"], trapezius: ["upperBack", "neck"], shoulder: ["shoulder"], upperArm: ["elbow"], triceps: ["elbow"], forearm: ["wrist"],
-  chest: ["chest"], abdomen: ["abdomen"], obliques: ["abdomen"], shoulderBlade: ["upperBack"], upperBack: ["upperBack"], lowerBack: ["lowerBack"],
-  glute: ["hip"], hip: ["hip"], thighFront: ["knee"], thighOuter: ["hip"], thighInner: ["groin"], groin: ["groin"], hamstring: ["hamstring"],
-  calf: ["ankle"], shin: ["ankle"]
-};
+// Каждая точка модели знает свою мышцу (body3d.js), а таблица мышц (muscles.js) — долю упражнения
+// на каждую мышцу: подъём рук в стороны подсвечивает среднюю дельту, тяга в наклоне — заднюю дельту,
+// широчайшие и бицепс. Главные мышцы ярче, помощники — слабее
 const REG_IDS = REGIONS.map(r => r.id);
 function workOf(id, geo) {
-  const load = (EX[id] || {}).load || {};
-  const lvl = { 1: 0, 2: 0.72, 3: 1 };
-  const byReg = REG_IDS.map(rid => Math.max(0, ...(MUSCLE_KEYS[rid] || []).map(k => lvl[load[k]] || 0)));
+  const share = exerciseMuscles(id);
+  const byMus = MUSCLE_IDS.map(m => share[m] || 0);
   const n = geo.pos.length / 3, out = new Float32Array(n);
   for (let v = 0; v < n; v++) {
-    const r = geo.reg[v] - 1;
-    if (geo.mat[v] || r < 0) continue;
-    out[v] = byReg[r] || 0;
+    const m = geo.mus[v] - 1;
+    if (geo.mat[v] || m < 0) continue;
+    const k = byMus[m];
+    out[v] = k >= 0.25 ? 0.55 + 0.45 * k : 0;
   }
-  // мягкая граница подсветки: соседние вершины чуть подсвечиваются
   return out;
 }
 

@@ -1,9 +1,18 @@
 // ===== Листопульс: 3D-модель человека =====
 // WebGL 1 без сторонних библиотек. Фигура строится процедурно из гладких поверхностей вращения,
-// каждая вершина знает свою зону тела и сторону. Касание и обводка определяют зону по «карте
-// идентификаторов» — отдельному кадру, где каждая зона закрашена своим кодом.
+// каждая вершина знает свою зону тела, сторону и мышцу (передняя, средняя и задняя дельта, бицепс,
+// трицепс, головки квадрицепса и так далее — как в анатомическом атласе). Между мышцами в
+// геометрии прорезаны бороздки, а по волокнам идёт лёгкая штриховка, поэтому мышцы видны и на
+// гладком манекене. Касание и обводка определяют зону и мышцу по «карте идентификаторов» —
+// отдельному кадру, где каждая зона закрашена своим кодом.
+
+import { MUSCLE_IDS } from "./muscles.js";
 
 const SELECT = [0.18, 0.72, 0.86]; // цвет выделения при обводке
+const MUSCLE_INDEX = Object.fromEntries(MUSCLE_IDS.map((id, i) => [id, i + 1]));
+const FIB_PERIOD = 0.007; // штриховка волокон: период 7 мм
+const FIB_FREQ = 2 * Math.PI / FIB_PERIOD;
+const FIB_ORIGIN = [0, 1.1, 0];
 
 // ----- Векторы -----
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -52,10 +61,12 @@ function catmull(rows, t) {
 // Таблица значений на равномерной сетке от 0 до 1 — гладкая интерполяция
 const table = (rows, v) => catmull(rows, Math.min(1, Math.max(0, v)) * (rows.length - 1));
 
-// Трубка из rings колец по segs точек; point(i, j) → { p, c, u }; classify(p, dir, u) → [зона, сторона]
+// Трубка из rings колец по segs точек; point(i, j) → { p, c, u };
+// classify(p, dir, u, i) → [зона, сторона] или [зона, сторона, мышца, направление волокон]
 function tube(mesh, rings, segs, point, classify) {
   const row = segs + 1;
   const base = mesh.count;
+  const fid = mesh.fns.push(classify) - 1; // для разреза по границам мышц (cutMuscles)
   const P = new Array(rings * row), C = new Array(rings), U = new Array(rings);
   for (let i = 0; i < rings; i++) {
     for (let j = 0; j < segs; j++) {
@@ -65,6 +76,10 @@ function tube(mesh, rings, segs, point, classify) {
     }
     P[i * row + segs] = P[i * row];
   }
+  // штриховка волокон вдоль трубки: целое число штрихов по окружности, чтобы на шве не было скачка
+  let rSum = 0;
+  for (let i = 0; i < rings; i++) for (let j = 0; j < segs; j++) rSum += len(sub(P[i * row + j], C[i]));
+  const strokes = Math.max(6, Math.round((2 * Math.PI * rSum / (rings * segs)) / FIB_PERIOD));
   for (let i = 0; i < rings; i++) {
     const endDir = i < rings / 2 ? sub(C[0], C[Math.min(1, rings - 1)]) : sub(C[rings - 1], C[Math.max(rings - 2, 0)]);
     for (let j = 0; j <= segs; j++) {
@@ -77,8 +92,10 @@ function tube(mesh, rings, segs, point, classify) {
       if (flat || len(n) < 1e-12) n = flat ? endDir : radial;
       else if (dot(n, radial) < 0) n = scale(n, -1);
       n = norm(n);
-      const [region, side] = classify(p, flat ? n : norm(radial), U[i]);
-      mesh.push(p, n, region, side);
+      const dir = flat ? n : norm(radial);
+      const [region, side, muscle, fiber] = classify(p, dir, U[i], i);
+      mesh.push(p, n, region, side, muscle, fiber, (j / segs) * strokes * 2 * Math.PI);
+      mesh.prb.push(fid, dir[0], dir[1], dir[2], U[i], i);
     }
   }
   for (let i = 0; i < rings - 1; i++) {
@@ -301,27 +318,232 @@ const BODY = {
   }
 };
 
+// ----- Мышцы -----
+// Мышца каждой точки задаётся отдельно от зоны боли: у зон границы по суставам и областям, у мышц —
+// по анатомическим контурам: каплевидная дельта с тремя пучками, веретено бицепса, нижний край
+// грудной мышцы дугой к подмышке, ромб трапеции, зубцы передней зубчатой, портняжная мышца
+// наискосок через бедро. "tendon" — сухожилие или кость у самой кожи (ключица, грудина,
+// надколенник, гребень и внутренняя поверхность голени, локоть, ахилл), "" — просто кожа
+const clamp01 = x => Math.min(1, Math.max(0, x));
+const deg = (a, b) => Math.atan2(a, b) * 180 / Math.PI;
+// разность углов в градусах (−180…180)
+const dAng = (a, b) => ((a - b + 540) % 360) - 180;
+// пучок дельты по углу вокруг плеча: a > 0 — вперёд, a < 0 — назад; b — полуширина среднего пучка
+const deltHead = (a, b = 34) => (a > b ? "deltFront" : a < -b ? "deltRear" : "deltSide");
+const clavY = ax => 1.426 + 0.11 * (ax - 0.02); // линия ключицы по высоте
+
+// Туловище. ax — |x| с поправкой на ширину тела, y — высота, th — угол вокруг оси туловища
+// (0 — спереди, 90 — сбоку, 180 — сзади)
+function torsoMuscle(ax, y, th) {
+  const a = 90 - th; // +90 спереди, 0 сбоку, −90 сзади
+  // дельтогрудная борозда спереди и задний край дельты: дельта сужается книзу к подмышке
+  const dpg = 0.128 + 0.24 * Math.max(0, 1.43 - y);
+  const pdb = 0.138 + 0.2 * Math.max(0, 1.42 - y);
+  if (y > 1.395) {
+    if (ax > 0.152) return deltHead(a);
+    if (th < 75 - 200 * Math.max(0, ax - 0.06)) {
+      // перед надплечья: ключица, под ней грудная, над ней надключичная ямка и ножка кивательной мышцы
+      const dc = y - clavY(ax);
+      if (Math.abs(dc) < 0.0065 && ax > 0.016) return "tendon";
+      if (dc < 0) return ax < 0.011 ? "tendon" : ax > dpg ? deltHead(a) : "pecUpper";
+      return ax < 0.03 ? "scm" : "";
+    }
+    return "trapUpper";
+  }
+  if (th < 64) {
+    // ----- Грудь и живот -----
+    if (y > 1.28 && ax > dpg) return deltHead(a);
+    const pecLow = 1.19 + 10 * Math.max(0, ax - 0.06) ** 2 + 4 * Math.max(0, 0.06 - ax) ** 2;
+    if (y > pecLow) {
+      if (ax < 0.011) return "tendon"; // грудина
+      return y > 1.386 - 0.4 * (ax - 0.015) ? "pecUpper" : "pecLower";
+    }
+    // прямая мышца живота: белая линия посередине, три сухожильные перемычки, край — полулунная линия
+    const rw = 0.046 + 0.026 * clamp01((y - 0.87) / 0.16) ** 0.7;
+    if (ax < rw && y > 0.872) {
+      if (ax < 0.0035 && y < 1.19) return "tendon";
+      for (const yk of [1.035, 1.09, 1.142]) if (Math.abs(y - yk - 0.006 * (ax / rw) ** 2) < 0.0028) return "tendon";
+      return "rectus";
+    }
+    // паховая связка: от передней ости таза к лобку; ниже — сгибатели бедра, напрягатель фасции, лобок
+    const ing = 0.872 + (ax - 0.03) * 0.95;
+    if (y < ing) return ax < 0.05 ? "" : ax > 0.112 ? "tfl" : "hipFlex";
+    return serratusOrOblique(ax, y, th);
+  }
+  if (th <= 112) {
+    // ----- Бок -----
+    if (y > 1.33) return th < 92 ? deltHead(a) : th > 100 ? "deltRear" : "deltSide";
+    const latEdge = 97 - 14 * clamp01((1.3 - y) / 0.3); // передний край широчайшей
+    const crest = 0.99 + 0.012 * Math.sin((th - 40) * Math.PI / 140); // гребень подвздошной кости
+    if (y < crest) return th < 66 + 60 * Math.max(0, 0.95 - y) ? "tfl" : "gluteMed";
+    if (th > latEdge && y > crest + 0.01) return "lats";
+    return serratusOrOblique(ax, y, th);
+  }
+  // ----- Спина -----
+  // ость лопатки: от корня (ax 0,07) вверх к акромиону; трапеция ромбом до XII грудного позвонка
+  const spine = 1.355 + 0.53 * Math.max(0, ax - 0.07);
+  const trapW = y > 1.12 ? 0.072 * ((y - 1.12) / 0.235) ** 0.8 : 0;
+  if (y > 1.28 && ax > pdb) return "deltRear";
+  if (y > 1.12 && (ax < trapW || y > spine)) return y > 1.372 + 0.22 * ax ? "trapUpper" : "trapMid";
+  const infLow = 1.226 + 0.95 * Math.max(0, ax - 0.085); // нижний край подостной: от нижнего угла лопатки к подмышке
+  if (y > infLow && y > 1.2) return "infraspinatus";
+  const crest = 0.985 + 0.012 * clamp01((ax - 0.045) / 0.1);
+  if (y > crest) {
+    if (ax < 0.052) return y < 1.125 ? "erectors" : "lats";
+    if (y < 1.04 && ax < 0.052 + 0.32 * (1.04 - y)) return "tendon"; // пояснично-грудная фасция
+    return "lats";
+  }
+  // крестец треугольником, межъягодичная складка, большая ягодичная ниже косой линии, над ней средняя
+  if (y > 0.9 && ax < 0.034 * (y - 0.9) / 0.085) return "tendon";
+  if (ax < 0.008 && y < 0.92) return "";
+  return y > 0.975 - 0.85 * Math.max(0, ax - 0.045) ? "gluteMed" : "gluteMax";
+}
+// Бок груди спереди: передняя зубчатая зубцами заходит между зубцами наружной косой мышцы
+function serratusOrOblique(ax, y, th) {
+  if (y < 1.1) return "obliques";
+  // линия зубцов идёт наискосок: от края грудной (впереди, выше) назад и вниз к широчайшей
+  const s = clamp01((th - 55) / 45);
+  const base = 1.27 - 0.15 * s;
+  const tooth = 0.018 * Math.abs(((s * 4.5) % 1) * 2 - 1);
+  return y > base - tooth ? "serratus" : "obliques";
+}
+// Волокна мышц туловища (для левой стороны; для правой x зеркалится): направление волокон
+// и куда смотрит мышца. Грудные веером к плечу, широчайшие и косые наискось, трапеция от шеи
+// к плечам, ягодичные наискось. Штрихи — линии вдоль волокон: их фаза растёт поперёк волокон
+const TORSO_FIBER = {
+  scm: [[0.4, 1, 0], [0, 0, 1]], trapUpper: [[0.85, -0.55, 0], [0.2, 0.6, -1]], trapMid: [[1, 0.25, 0], [0, 0, -1]],
+  deltFront: [[0.2, -1, 0.1], [0.5, 0.2, 1]], deltSide: [[0, -1, 0], [1, 0.3, 0]], deltRear: [[-0.2, -1, -0.1], [0.5, 0.2, -1]],
+  infraspinatus: [[1, 0.35, 0], [0.3, 0, -1]], pecUpper: [[1, -0.3, 0], [0.2, 0.2, 1]], pecLower: [[1, 0.35, 0], [0.2, 0, 1]],
+  serratus: [[0.3, 0.6, 0.75], [1, 0, 0.3]], rectus: [[0, 1, 0], [0, 0, 1]], obliques: [[0.55, 0.6, 0.55], [0.7, 0, 1]],
+  lats: [[0.55, 0.75, -0.3], [0.8, 0, -1]], erectors: [[0, 1, 0], [0, 0, -1]], gluteMax: [[0.65, -0.76, 0], [0.4, 0, -1]],
+  gluteMed: [[0.2, -1, 0], [1, 0, -0.3]], hipFlex: [[0.25, -1, 0], [0.2, 0, 1]], tfl: [[0.2, -1, 0], [0.8, 0, 1]]
+};
+const TORSO_G = Object.fromEntries(Object.entries(TORSO_FIBER).map(([m, [f, face]]) => [m, scale(norm(cross(norm(face), norm(f))), FIB_FREQ)]));
+const torsoFiber = (m, x) => { const g = TORSO_G[m]; return g ? { g: [x < 0 ? -g[0] : g[0], g[1], g[2]] } : null; };
+
+// Плечо (v: 0 — плечевой сустав, 1 — локоть). a — угол вокруг руки: 0 — наружу, +90 — вперёд,
+// −90 — назад, ±180 — к туловищу
+function upperArmMuscle(v, a) {
+  const aa = Math.abs(a);
+  // дельта: клин, остриём вниз по наружной стороне; пучки расходятся от острия веером
+  const tip = 0.47;
+  const dEnd = aa >= 150 ? 0 : tip - (tip - 0.15) * (aa / 150) ** 1.25;
+  if (v < dEnd) return deltHead(a, 34 * (1 - 0.8 * v / tip));
+  if (v < 0.13 && aa > 140) return ""; // подмышка
+  // бицепс — веретено спереди, чуть ближе к туловищу
+  const bw = 54 * Math.sin(Math.PI * clamp01((v - 0.17) / 0.82)) ** 0.5;
+  if (Math.abs(dAng(a, 102)) < bw) return v > 0.93 && Math.abs(dAng(a, 102)) > 14 ? "" : "biceps";
+  // плечевая мышца выглядывает снаружи между бицепсом и трицепсом в нижней половине
+  const brw = 44 * Math.sin(Math.PI * clamp01((v - 0.4) / 0.56)) ** 0.6;
+  if (Math.abs(dAng(a, 30)) < brw) return "brachialis";
+  // локоть сзади — локтевой отросток
+  if (v > 0.92 && Math.abs(dAng(a, -95)) < 34 * clamp01((v - 0.92) / 0.06)) return "tendon";
+  return a > 150 ? "biceps" : "triceps";
+}
+// Предплечье (v: 0 — локоть, 1 — запястье). a: 0 — тыльная сторона, +90 — сторона большого
+// пальца, −90 — локтевая, ±180 — ладонная. Брюшки мышц сужаются к запястью в сухожилия
+function forearmMuscle(v, a) {
+  if (v > 0.9) return "tendon"; // удерживатели сухожилий на запястье
+  if (v < 0.08 && Math.abs(dAng(a, -95)) < 40 * (1 - v / 0.08)) return "tendon"; // локтевой отросток
+  if (Math.abs(dAng(a, -95)) < 7) return "tendon"; // локтевая кость под кожей
+  const ext = dAng(a, -95) > 0 && dAng(a, -95) < 225; // от локтевой кости через тыл к лучевой стороне
+  const c = ext ? 20 : -168, hw = ext ? 106 : 76;
+  const end = 0.6 + 0.16 * (1 - (dAng(a, c) / hw) ** 2);
+  if (v > end) return "tendon";
+  return ext ? "forearmExt" : "forearmFlex";
+}
+// Бедро (v: 0 — тазобедренный сустав, 1 — колено). p — угол: 0 — вперёд, +90 — наружу,
+// ±180 — назад, −90 — внутрь
+function thighMuscle(v, p) {
+  const b = p >= 0 ? 180 - p : -180 - p; // от середины задней поверхности: + наружу, − внутрь
+  // большая ягодичная заходит на бедро сзади и снаружи: ягодичная складка
+  if (b > -62 && b < 88) {
+    const gm = b >= 0 ? 0.13 + 0.1 * (b / 88) ** 1.6 : 0.13 * (1 + b / 62);
+    if (v < gm) return "gluteMax";
+  }
+  // портняжная — лента от передней ости таза наискосок к внутренней стороне колена (лежит поверх)
+  const sc = 38 - 150 * v ** 1.1, sw = 7 + 3.5 * v;
+  if (v < 0.97 && Math.abs(dAng(p, sc)) < sw) return "sartorius";
+  // напрягатель широкой фасции спереди-снаружи вверху, ниже — подвздошно-большеберцовый тракт
+  if (v < 0.27 - 0.002 * Math.abs(p - 60) && p > 24 && p < 100) return "tfl";
+  if (p > 90 && p < 114 && v > 0.16) return v > 0.97 ? "" : "tendon";
+  // надколенник и связки колена
+  if ((p / 40) ** 2 + ((v - 1) / 0.105) ** 2 < 1) return "tendon";
+  if (v > 0.9 && p > 50 && p < 120) return "tendon";
+  if (v > 0.94 && p < -60 && p > -130) return "tendon";
+  // прямая мышца бедра — веретено спереди
+  const rw = 26 * Math.sin(Math.PI * clamp01((v - 0.05) / 0.83)) ** 0.55;
+  if (Math.abs(p - 4) < rw) return "quadRF";
+  // треугольник у паха: подвздошно-поясничная мышца между портняжной и длинной приводящей
+  if (v < 0.27 && p < sc - sw && p > -42 + 60 * v) return "hipFlex";
+  if (p > 0 && p <= 114) return v > 0.93 ? "tendon" : "quadVL";
+  // подколенная ямка ромбом между сухожилиями задней поверхности бедра
+  if (v > 0.86 && Math.abs(b) < 26 * (v - 0.86) / 0.14) return "";
+  if (p > 114 || p < -180 + 52) return p > 0 ? "hamOuter" : "hamInner";
+  // внутренняя широкая — «капля» над коленом изнутри, впереди портняжной
+  if (v > 0.42 && p > sc + sw) return "quadVM";
+  return "adductors";
+}
+// Голень (v: 0 — колено, 1 — лодыжка), угол как у бедра
+function shankMuscle(v, p) {
+  const b = p >= 0 ? 180 - p : -180 - p;
+  if (v > 0.87) return "tendon"; // лодыжка: сухожилия и удерживатели
+  if (v < 0.13) {
+    if (Math.abs(p) < 30) return "tendon"; // связка надколенника и бугристость
+    if (p < -30 && p > -122) return "tendon"; // «гусиная лапка» изнутри
+  }
+  // ахиллово сухожилие: широкое у икроножной, узкое у пятки
+  if (v > 0.58 && Math.abs(b) < 15 + 22 * (1 - clamp01((v - 0.58) / 0.36)) ** 2) return "tendon";
+  // икроножная: наружная головка короче внутренней, нижние края закруглены
+  if (b >= 0 && b < 54 && v < 0.43 - 0.07 * (b / 54) ** 2) return "gastroc";
+  if (b < 0 && b > -60 && v < 0.53 - 0.09 * (b / 60) ** 2) return "gastroc";
+  if (p >= -36 && p < 4) return "tendon"; // внутренняя поверхность и гребень большеберцовой кости
+  if (p >= 5 && p < 62) return v > 0.74 ? "tendon" : "tibialis";
+  if (p >= 62 && p < 108) return "peroneals";
+  return "soleus";
+}
+
+// Шея: кивательные мышцы — две косые ленты от грудины к затылку за ухом, сзади — верхняя трапеция
+function neckMuscle(d, u) {
+  if (u > 0.9) return "";
+  const phi = Math.atan2(Math.abs(d[0]), d[2]) * 180 / Math.PI; // 0 — спереди, 180 — сзади
+  if (Math.abs(phi - (22 + 75 * u)) < 15) return "scm";
+  return phi > 118 ? "trapUpper" : "";
+}
+
 // Сборка фигуры. regionIndex(id) → номер зоны (1…), сторона: 0 — центр, 1 — правая (x < 0), 2 — левая.
 // sex: "m" — мужское тело, "f" — женское. mat: 0 — кожа, 1 — волосы, 2 — резинка для волос
 function buildFigure(regionIndex, sex = "m") {
   const B = BODY[sex] || BODY.m;
-  const pos = [], nor = [], reg = [], sid = [], mat = [], prt = [], idx = [];
-  // part — часть тела для скелета схем упражнений (PART): какая кость двигает вершину
+  const pos = [], nor = [], reg = [], sid = [], mat = [], prt = [], mus = [], fib = [], fpl = [], idx = [];
+  // part — часть тела для скелета схем упражнений (PART): какая кость двигает вершину;
+  // mus — мышца (номер в MUSCLE_IDS, 0 — нет), fib — направление волокон для штриховки
+  // fns и prb — функция разметки каждой трубки и входы разметки каждой вершины: по ним сетка
+  // режется точно по границам мышц (cutMuscles)
   const mesh = {
-    idx, material: 0, part: PART.torso,
+    idx, material: 0, part: PART.torso, fns: [], prb: [],
     get count() { return pos.length / 3; },
-    push(p, n, region, side) {
+    push(p, n, region, side, muscle = "", fiber = null, ring = 0) {
       pos.push(p[0], p[1], p[2]);
       nor.push(n[0], n[1], n[2]);
       reg.push(regionIndex(region));
       sid.push(side);
       mat.push(this.material);
       prt.push(this.part);
+      mus.push(muscle ? MUSCLE_INDEX[muscle] || 0 : 0);
+      // штриховка: фаза и вес. На туловище штрихи — параллельные линии вдоль волокон каждой мышцы
+      // (фаза — проекция на поперечное волокнам направление), на руках, ногах и шее — вдоль трубки
+      const has = muscle && muscle !== "tendon";
+      const g = has && fiber && fiber.g;
+      fib.push(g ? dot(sub(p, FIB_ORIGIN), g) : ring, has ? 1 : 0);
+      fpl.push(g ? g[0] : 0, g ? g[1] : 0, g ? g[2] : 0);
     }
   };
   const sideOf = x => (x < -0.012 ? 1 : x > 0.012 ? 2 : 0);
   const R = (id, p) => [id, sideOf(p[0])];
   const C = id => [id, 0];
+  // зона с мышцей; fiber — направление штриховки на туловище (у рук и ног штрихи идут вдоль трубки)
+  const M = (r, m, fiber) => (m ? [r[0], r[1], m, fiber] : r);
   const mu = B.muscle;
   // Ширина по высоте для границ зон: у женского тела уже плечи и талия, шире таз
   const kx = y => (y > 1.17 ? B.kx.top : y > 0.99 ? B.kx.mid : B.kx.low);
@@ -374,26 +596,28 @@ function buildFigure(regionIndex, sex = "m") {
     },
     classify: (p, d) => {
       const ax = Math.abs(p[0]) / kx(p[1]), y = p[1], fr = d[2];
-      if (y > 1.445) return ax > 0.115 ? R("shoulder", p) : R("trapezius", p);
+      const m = torsoMuscle(ax, y, deg(Math.abs(d[0]), d[2])), fiber = torsoFiber(m, p[0]);
+      const Z = r => M(r, m, fiber);
+      if (y > 1.445) return Z(ax > 0.115 ? R("shoulder", p) : R("trapezius", p));
       if (y > 1.39) {
-        if (ax > 0.155) return R("shoulder", p);
-        if (fr > 0.2) return R("collarbone", p);
-        return fr < -0.2 ? R("trapezius", p) : R("shoulder", p);
+        if (ax > 0.155) return Z(R("shoulder", p));
+        if (fr > 0.2) return Z(R("collarbone", p));
+        return Z(fr < -0.2 ? R("trapezius", p) : R("shoulder", p));
       }
       if (fr < -0.3) {
-        if (y > 1.22) return ax < 0.045 ? C("upperBack") : R("shoulderBlade", p);
-        if (y > 1.12) return C("upperBack");
-        if (y > 0.99) return C("lowerBack");
-        return ax < 0.04 ? C("pelvis") : R("glute", p);
+        if (y > 1.22) return Z(ax < 0.045 ? C("upperBack") : R("shoulderBlade", p));
+        if (y > 1.12) return Z(C("upperBack"));
+        if (y > 0.99) return Z(C("lowerBack"));
+        return Z(ax < 0.04 ? C("pelvis") : R("glute", p));
       }
       if (fr > 0.3) {
-        if (y > 1.17) return ax > 0.16 ? R("shoulder", p) : C("chest");
-        if (y > 0.925) return ax > 0.115 ? R("obliques", p) : C("abdomen");
-        return ax > 0.035 ? R("groin", p) : C("abdomen");
+        if (y > 1.17) return Z(ax > 0.16 ? R("shoulder", p) : C("chest"));
+        if (y > 0.925) return Z(ax > 0.115 ? R("obliques", p) : C("abdomen"));
+        return Z(ax > 0.035 ? R("groin", p) : C("abdomen"));
       }
-      if (y > 1.12) return R("ribs", p);
-      if (y > 0.99) return R("obliques", p);
-      return R("hip", p);
+      if (y > 1.12) return Z(R("ribs", p));
+      if (y > 0.99) return Z(R("obliques", p));
+      return Z(R("hip", p));
     }
   });
 
@@ -404,7 +628,7 @@ function buildFigure(regionIndex, sex = "m") {
     shape: (u, ct, st) => ellipse(B.neck[0] - 0.004 * u, B.neck[1] - 0.006 * u, ct, st,
       // кивательные мышцы спереди и мягкая выемка гортани
       0.003 * bell(u, 0.45, 0.3) * Math.max(0, ct * 0.7 + Math.abs(st) * 0.6) ** 6),
-    classify: () => C("neck")
+    classify: (p, d, u) => M(C("neck"), neckMuscle(d, u))
   });
   const J = B.jaw;
   mesh.part = PART.head;
@@ -504,16 +728,18 @@ function buildFigure(regionIndex, sex = "m") {
         return ellipse(a, b, ct, st, extra);
       },
       classify: (p, d, u, K) => {
-        const ue = K[3];
+        const ue = K[3], front = d[2];
+        const a = deg(front, d[0] * s); // 0 — наружу, +90 — вперёд, −90 — назад
         if (u <= ue) {
-          const v = u / ue;
-          if (v < 0.24) return R("shoulder", p);
-          if (v < 0.86) return d[2] >= -0.15 ? R("upperArm", p) : R("triceps", p);
-          return R("elbow", p);
+          const v = u / ue, m = upperArmMuscle(v, a);
+          if (v < 0.24) return M(R("shoulder", p), m);
+          if (v < 0.86) return M(front >= -0.15 ? R("upperArm", p) : R("triceps", p), m);
+          return M(R("elbow", p), m);
         }
         const v = (u - ue) / (1 - ue);
-        if (v < 0.14) return R("elbow", p);
-        return v < 0.88 ? R("forearm", p) : R("wrist", p);
+        const m = forearmMuscle(v, a);
+        if (v < 0.14) return M(R("elbow", p), m);
+        return M(v < 0.88 ? R("forearm", p) : R("wrist", p), m);
       }
     });
 
@@ -570,6 +796,7 @@ function buildFigure(regionIndex, sex = "m") {
         }
         const v = (u - uk) / (1 - uk), [a, b] = table(shank, v);
         const extra = (0.55 + 0.45 * mu) * 0.024 * bell(v, 0.3, 0.16) * Math.max(0, -ct) ** 1.6 * (1 + 0.25 * inn)
+          - 0.0035 * bell(v, 0.3, 0.18) * Math.max(0, -ct) ** 6 * bell(st, 0, 0.14) // ложбинка между головками икроножной
           - 0.006 * bell(v, 0.86, 0.08) * Math.max(0, -ct) ** 2
           + 0.010 * bell(v, 0.02, 0.05) * Math.max(0, ct) ** 3
           + 0.003 * bell(v, 0.35, 0.3) * Math.max(0, ct) ** 8 // гребень большеберцовой кости
@@ -578,26 +805,28 @@ function buildFigure(regionIndex, sex = "m") {
       },
       classify: (p, d, u, K) => {
         const uk = K[3], fr = d[2], out = d[0] * s;
+        // угол вокруг ноги: 0 — вперёд, 90 — наружу, ±180 — назад, −90 — внутрь
+        const phi = deg(out, fr);
         if (u <= uk) {
-          const v = u / uk;
-          if (v < 0.16) return fr < -0.3 ? R("glute", p) : out < -0.3 ? R("groin", p) : R("hip", p);
+          const v = u / uk, m = thighMuscle(v, phi);
+          if (v < 0.16) return M(fr < -0.3 ? R("glute", p) : out < -0.3 ? R("groin", p) : R("hip", p), m);
           if (v < 0.8) {
-            if (fr > 0.35) return R("thighFront", p);
-            if (fr < -0.35) return R("hamstring", p);
-            return out > 0 ? R("thighOuter", p) : R("thighInner", p);
+            if (fr > 0.35) return M(R("thighFront", p), m);
+            if (fr < -0.35) return M(R("hamstring", p), m);
+            return M(out > 0 ? R("thighOuter", p) : R("thighInner", p), m);
           }
-          return fr < -0.3 ? R("kneeBack", p) : R("knee", p);
+          return M(fr < -0.3 ? R("kneeBack", p) : R("knee", p), m);
         }
-        const v = (u - uk) / (1 - uk);
-        if (v < 0.16) return fr < -0.3 ? R("kneeBack", p) : R("knee", p);
-        if (v < 0.8) return fr < -0.15 ? R("calf", p) : R("shin", p);
-        return fr < -0.3 ? R("achilles", p) : R("ankle", p);
+        const v = (u - uk) / (1 - uk), m = shankMuscle(v, phi);
+        if (v < 0.16) return M(fr < -0.3 ? R("kneeBack", p) : R("knee", p), m);
+        if (v < 0.8) return M(fr < -0.15 ? R("calf", p) : R("shin", p), m);
+        return M(fr < -0.3 ? R("achilles", p) : R("ankle", p), m);
       }
     });
     // Надколенник и косточки лодыжки
     const knee = legPts[3];
     mesh.part = PART.kneecap[si];
-    ellipsoid(mesh, [knee[0], knee[1] + 0.006, knee[2] + (sex === "f" ? 0.04 : 0.043)], 0.024, 0.03, 0.012, p => R("knee", p), 10, 14);
+    ellipsoid(mesh, [knee[0], knee[1] + 0.006, knee[2] + (sex === "f" ? 0.04 : 0.043)], 0.024, 0.03, 0.012, p => M(R("knee", p), "tendon"), 10, 14);
     mesh.part = PART.malleolus[si];
     const ank = legPts[5];
     ellipsoid(mesh, [ank[0] + s * 0.024, ank[1] + 0.004, ank[2] - 0.004], 0.009, 0.013, 0.012, p => R("ankle", p), 8, 10);
@@ -635,13 +864,276 @@ function buildFigure(regionIndex, sex = "m") {
     });
   }
 
+  // тень запекаем на исходной ровной сетке: после разреза у вершин на границе соседи
+  // неравномерные, и кривизна по ним считалась бы с ошибкой
+  const shd = Array.from(bakeShade({ pos, nor, mat, idx }));
+  const cut = cutMuscles({ pos, nor, reg, sid, mat, prt, mus, fib, fpl, shd, idx }, mesh.fns, mesh.prb);
+  if (cut.count > 65535) throw new Error("Слишком много вершин для 16-битных индексов");
   const geo = {
     pos: new Float32Array(pos), nor: new Float32Array(nor),
-    reg: new Uint8Array(reg), sid: new Uint8Array(sid), mat: new Uint8Array(mat), part: new Uint8Array(prt), idx: new Uint16Array(idx)
+    reg: new Uint8Array(reg), sid: new Uint8Array(sid), mat: new Uint8Array(mat), part: new Uint8Array(prt),
+    mus: new Uint8Array(mus), fib: new Float32Array(fib), idx: new Uint16Array(cut.idx)
   };
-  geo.shade = bakeShade(geo);
+  // в бороздках чуть темнее — как мягкая тень между мышцами
+  const groove = carveMuscles(geo);
+  geo.shade = new Float32Array(shd);
+  for (let v = 0; v < groove.length; v++) geo.shade[v] *= 1 - 0.08 * groove[v];
   geo.bind = bindJoints(B);
   return geo;
+}
+
+// Вершины с одинаковыми координатами (шов развёртки) считаем одной точкой
+// Ключ точки или ячейки сетки — одно число: по 17 бит на координату
+const key3 = (x, y, z) => ((x + 65536) * 131072 + (y + 65536)) * 131072 + (z + 65536);
+function groupVertices(geo) {
+  const n = geo.pos.length / 3;
+  const group = new Int32Array(n), ids = new Map();
+  for (let v = 0; v < n; v++) {
+    const k = key3(Math.round(geo.pos[v * 3] * 2e4), Math.round(geo.pos[v * 3 + 1] * 2e4), Math.round(geo.pos[v * 3 + 2] * 2e4));
+    if (!ids.has(k)) ids.set(k, ids.size);
+    group[v] = ids.get(k);
+  }
+  return { group, G: ids.size };
+}
+
+// Разрез сетки по границам мышц. Разметка мышц живёт в вершинах, поэтому граница, проходящая
+// наискосок через сетку (портняжная мышца, край грудной, ромб трапеции), выходила бы «лесенкой».
+// Каждое ребро, концы которого принадлежат разным мышцам, делим там, где мышца на самом деле
+// меняется: функцию разметки этой трубки спрашиваем в промежуточных точках (бисекция). В точке
+// разреза ставим по вершине для каждой мышцы — с одинаковыми координатами и нормалью, поэтому
+// поверхность остаётся гладкой, а цвет меняется ровно по линии. Треугольник с двумя мышцами
+// делится на треугольник и четырёхугольник, с тремя — на три четырёхугольника вокруг центра
+function cutMuscles(A, fns, prb) {
+  const { pos, nor, reg, sid, mat, prt, mus, fib, fpl, shd, idx } = A;
+  const n0 = pos.length / 3;
+  const label = (fid, p, d, u, i) => { const r = fns[fid](p, d, u, i); return r[2] ? MUSCLE_INDEX[r[2]] || 0 : 0; };
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const at = (arr, k, a, b, t) => [lerp(arr[a * k], arr[b * k], t), lerp(arr[a * k + 1], arr[b * k + 1], t), lerp(arr[a * k + 2], arr[b * k + 2], t)];
+  // где на ребре a→b кончается мышца вершины a (доля от a)
+  const tCache = new Map(), n1 = n0 + 1;
+  const crossing = (a, b) => {
+    const key = a < b ? a * n1 + b : b * n1 + a;
+    if (tCache.has(key)) { const t = tCache.get(key); return a < b ? t : 1 - t; }
+    const f = prb[a * 6], la = mus[a];
+    let lo = 0, hi = 1;
+    for (let k = 0; k < 7; k++) {
+      const t = (lo + hi) / 2;
+      const p = at(pos, 3, a, b, t);
+      const d = norm([lerp(prb[a * 6 + 1], prb[b * 6 + 1], t), lerp(prb[a * 6 + 2], prb[b * 6 + 2], t), lerp(prb[a * 6 + 3], prb[b * 6 + 3], t)]);
+      if (label(f, p, d, lerp(prb[a * 6 + 4], prb[b * 6 + 4], t), lerp(prb[a * 6 + 5], prb[b * 6 + 5], t)) === la) lo = t; else hi = t;
+    }
+    const t = (lo + hi) / 2;
+    tCache.set(key, a < b ? t : 1 - t);
+    return t;
+  };
+  // новая вершина: положение и нормаль заданы, остальное — от вершины src той же мышцы.
+  // Фаза штриховки: на туловище — по полю волокон мышцы src, на трубках — между концами ребра
+  const add = (p, nr, src, ring, sh) => {
+    const nn = norm(nr), g = [fpl[src * 3], fpl[src * 3 + 1], fpl[src * 3 + 2]];
+    const planar = g[0] || g[1] || g[2];
+    pos.push(p[0], p[1], p[2]);
+    nor.push(nn[0], nn[1], nn[2]);
+    reg.push(reg[src]); sid.push(sid[src]); mat.push(mat[src]); prt.push(prt[src]); mus.push(mus[src]);
+    fib.push(planar ? dot(sub(p, FIB_ORIGIN), g) : ring, fib[src * 2 + 1]);
+    fpl.push(g[0], g[1], g[2]);
+    shd.push(sh);
+    return pos.length / 3 - 1;
+  };
+  // точка разреза ребра a–b для мышцы вершины src (src — a или b); у соседних треугольников общая
+  const ptCache = new Map();
+  const edgePoint = (a, b, src) => {
+    const key = ((a < b ? a * n1 + b : b * n1 + a) * 64) + mus[src];
+    if (ptCache.has(key)) return ptCache.get(key);
+    const t = crossing(a, b);
+    const v = add(at(pos, 3, a, b, t), at(nor, 3, a, b, t), src, lerp(fib[a * 2], fib[b * 2], t), lerp(shd[a], shd[b], t));
+    ptCache.set(key, v);
+    return v;
+  };
+  const out = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    let a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    const ma = mus[a], mb = mus[b], mc = mus[c];
+    if ((ma === mb && ma === mc) || mat[a] || prb[a * 6] !== prb[b * 6] || prb[a * 6] !== prb[c * 6]) { out.push(a, b, c); continue; }
+    if (ma !== mb && mb !== mc && ma !== mc) {
+      // три мышцы: точки на всех рёбрах и центр между ними
+      const pts = [[a, b], [b, c], [c, a]].map(([x, y]) => [edgePoint(x, y, x), edgePoint(x, y, y)]);
+      const cp = [0, 0, 0], cn = [0, 0, 0];
+      let cr = 0, cs = 0;
+      for (const [v] of pts) { cr += fib[v * 2] / 3; cs += shd[v] / 3; for (let k = 0; k < 3; k++) { cp[k] += pos[v * 3 + k] / 3; cn[k] += nor[v * 3 + k] / 3; } }
+      // P — на a–b, Q — на b–c, R — на c–a; [0] — копия для первой вершины ребра, [1] — для второй
+      const [P, Q, R] = pts;
+      const oa = add(cp, cn, a, cr, cs), ob = add(cp, cn, b, cr, cs), oc = add(cp, cn, c, cr, cs);
+      out.push(a, P[0], oa, a, oa, R[1]);
+      out.push(b, Q[0], ob, b, ob, P[1]);
+      out.push(c, R[0], oc, c, oc, Q[1]);
+      continue;
+    }
+    // две мышцы: поворачиваем так, чтобы «одиночка» была первой (обход сохраняется)
+    if (ma === mb) [a, b, c] = [c, a, b];
+    else if (ma === mc) [a, b, c] = [b, c, a];
+    const pa = edgePoint(a, b, a), pb = edgePoint(a, b, b);
+    const qa = edgePoint(a, c, a), qc = edgePoint(a, c, c);
+    out.push(a, pa, qa);
+    out.push(pb, b, c, pb, c, qc);
+  }
+  return { idx: out, count: pos.length / 3, added: pos.length / 3 - n0 };
+}
+
+// Бороздки между мышцами. После разреза граница — это точки с одинаковыми координатами, но
+// разными мышцами; соседние такие точки образуют ломаную по линии границы. Каждая вершина
+// утапливается по нормали тем глубже, чем ближе она к этой ломаной (плавный профиль шириной
+// около 1,7 см), поэтому бороздка ровная при любой сетке. Глубина зависит от пары: между разными
+// мышцами — полная, между пучками одной мышцы и у сухожилия — меньше. Нормали вокруг
+// пересчитываются по треугольникам, чтобы свет ложился в бороздку: так дельты, бицепс и головки
+// квадрицепса читаются и на гладком манекене. Возвращает силу шва для каждой вершины
+const SAME_FAMILY = [["deltFront", "deltSide", "deltRear"], ["trapUpper", "trapMid"], ["pecUpper", "pecLower"], ["hamOuter", "hamInner"], ["forearmExt", "forearmFlex"]]
+  .map(list => list.map(id => MUSCLE_INDEX[id]));
+function carveMuscles(geo, depth = 0.0026, width = 0.017) {
+  const n = geo.pos.length / 3, pos = geo.pos, nor = geo.nor, idx = geo.idx, mus = geo.mus, mat = geo.mat, part = geo.part;
+  const tendon = MUSCLE_INDEX.tendon;
+  const { group, G } = groupVertices(geo);
+  // до трёх разных мышц в точке (на стыке трёх мышц их три); сила шва — по самой «сильной» паре
+  const lab = new Int16Array(G * 3).fill(-1), gpart = new Int16Array(G).fill(-1);
+  for (let v = 0; v < n; v++) {
+    if (mat[v]) continue;
+    const g = group[v], m = mus[v];
+    gpart[g] = part[v];
+    for (let k = 0; k < 3; k++) {
+      const x = lab[g * 3 + k];
+      if (x === m) break;
+      if (x < 0) { lab[g * 3 + k] = m; break; }
+    }
+  }
+  const family = new Int8Array(MUSCLE_IDS.length + 1);
+  SAME_FAMILY.forEach((f, i) => { for (const m of f) family[m] = i + 1; });
+  const pairStrength = (a, b) => {
+    const ra = a && a !== tendon, rb = b && b !== tendon;
+    if (!ra && !rb) return 0;
+    if (!ra || !rb) return 0.45;
+    return family[a] && family[a] === family[b] ? 0.4 : 1;
+  };
+  const edge = new Float32Array(G);
+  for (let g = 0; g < G; g++) {
+    const a = lab[g * 3], b = lab[g * 3 + 1], c = lab[g * 3 + 2];
+    if (b < 0) continue;
+    edge[g] = Math.max(pairStrength(a, b), c < 0 ? 0 : Math.max(pairStrength(a, c), pairStrength(b, c)));
+  }
+  // соседи точек в компактном виде (CSR)
+  const deg = new Int32Array(G + 1);
+  for (let t = 0; t < idx.length; t++) deg[group[idx[t]] + 1] += 2;
+  for (let g = 0; g < G; g++) deg[g + 1] += deg[g];
+  const nbr = new Int32Array(deg[G]), fill = deg.slice(0, G);
+  for (let t = 0; t < idx.length; t += 3) {
+    const ga = group[idx[t]], gb = group[idx[t + 1]], gc = group[idx[t + 2]];
+    nbr[fill[ga]++] = gb; nbr[fill[ga]++] = gc;
+    nbr[fill[gb]++] = ga; nbr[fill[gb]++] = gc;
+    nbr[fill[gc]++] = ga; nbr[fill[gc]++] = gb;
+  }
+  // отрезки границы: рёбра между двумя точками шва; раскладываем по ячейкам размером width
+  const gx = new Float32Array(G), gy = new Float32Array(G), gz = new Float32Array(G);
+  for (let v = 0; v < n; v++) { const g = group[v]; gx[g] = pos[v * 3]; gy[g] = pos[v * 3 + 1]; gz[g] = pos[v * 3 + 2]; }
+  const cellOf = (x, y, z) => key3(Math.floor(x / width), Math.floor(y / width), Math.floor(z / width));
+  const segA = [], segB = [], segS = [], cells = new Map(), seen = new Set();
+  for (let g = 0; g < G; g++) {
+    if (!edge[g]) continue;
+    for (let k = deg[g]; k < deg[g + 1]; k++) {
+      const h = nbr[k];
+      if (h <= g || !edge[h] || gpart[h] !== gpart[g]) continue;
+      const key = g * G + h;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const c = cellOf((gx[g] + gx[h]) / 2, (gy[g] + gy[h]) / 2, (gz[g] + gz[h]) / 2);
+      let list = cells.get(c);
+      if (!list) cells.set(c, list = []);
+      list.push(segA.length);
+      segA.push(g); segB.push(h); segS.push(Math.min(edge[g], edge[h]));
+    }
+  }
+  const disp = new Float32Array(G), w2 = width * width;
+  for (let g = 0; g < G; g++) {
+    if (gpart[g] < 0) continue;
+    const px = gx[g], py = gy[g], pz = gz[g];
+    const cx = Math.floor(px / width), cy = Math.floor(py / width), cz = Math.floor(pz / width);
+    let best = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const list = cells.get(key3(cx + dx, cy + dy, cz + dz));
+      if (!list) continue;
+      for (const i of list) {
+        const a = segA[i], b = segB[i];
+        if (gpart[a] !== gpart[g] || segS[i] <= best) continue;
+        // расстояние от точки до отрезка a–b
+        const abx = gx[b] - gx[a], aby = gy[b] - gy[a], abz = gz[b] - gz[a];
+        const apx = px - gx[a], apy = py - gy[a], apz = pz - gz[a];
+        const ll = abx * abx + aby * aby + abz * abz;
+        const t = ll > 0 ? Math.min(1, Math.max(0, (apx * abx + apy * aby + apz * abz) / ll)) : 0;
+        const qx = apx - abx * t, qy = apy - aby * t, qz = apz - abz * t;
+        const d2 = qx * qx + qy * qy + qz * qz;
+        if (d2 >= w2) continue;
+        const f = segS[i] * (1 - Math.sqrt(d2) / width) ** 2;
+        if (f > best) best = f;
+      }
+    }
+    disp[g] = best;
+  }
+  const touched = new Uint8Array(G);
+  for (let v = 0; v < n; v++) {
+    const g = group[v], d = disp[g] * depth;
+    if (!d || mat[v]) continue;
+    pos[v * 3] -= nor[v * 3] * d;
+    pos[v * 3 + 1] -= nor[v * 3 + 1] * d;
+    pos[v * 3 + 2] -= nor[v * 3 + 2] * d;
+    touched[g] = 1;
+  }
+  // нормали пересчитываем в бороздках и в кольце вокруг них
+  const ring = touched.slice();
+  for (let g = 0; g < G; g++) if (touched[g]) for (let k = deg[g]; k < deg[g + 1]; k++) ring[nbr[k]] = 1;
+  const acc = new Float32Array(G * 3);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    const ga = group[a], gb = group[b], gc = group[c];
+    if (!ring[ga] && !ring[gb] && !ring[gc]) continue;
+    const ax = pos[b * 3] - pos[a * 3], ay = pos[b * 3 + 1] - pos[a * 3 + 1], az = pos[b * 3 + 2] - pos[a * 3 + 2];
+    const bx = pos[c * 3] - pos[a * 3], by = pos[c * 3 + 1] - pos[a * 3 + 1], bz = pos[c * 3 + 2] - pos[a * 3 + 2];
+    // нормаль грани без нормировки — большие треугольники весят больше; знак — по старой нормали
+    let fx = ay * bz - az * by, fy = az * bx - ax * bz, fz = ax * by - ay * bx;
+    if (fx * nor[a * 3] + fy * nor[a * 3 + 1] + fz * nor[a * 3 + 2] < 0) { fx = -fx; fy = -fy; fz = -fz; }
+    acc[ga * 3] += fx; acc[ga * 3 + 1] += fy; acc[ga * 3 + 2] += fz;
+    acc[gb * 3] += fx; acc[gb * 3 + 1] += fy; acc[gb * 3 + 2] += fz;
+    acc[gc * 3] += fx; acc[gc * 3 + 1] += fy; acc[gc * 3 + 2] += fz;
+  }
+  for (let g = 0; g < G; g++) {
+    if (!ring[g]) continue;
+    const l = Math.hypot(acc[g * 3], acc[g * 3 + 1], acc[g * 3 + 2]) || 1;
+    acc[g * 3] /= l; acc[g * 3 + 1] /= l; acc[g * 3 + 2] /= l;
+  }
+  // одно сглаживание: нормаль точки смешивается со средним соседей — узкие треугольники вдоль
+  // косой границы не дают «зубцов» в освещении
+  const sm = acc.slice();
+  for (let g = 0; g < G; g++) {
+    if (!ring[g]) continue;
+    let k = 0, ax = 0, ay = 0, az = 0;
+    for (let j = deg[g]; j < deg[g + 1]; j++) {
+      const h = nbr[j];
+      if (!ring[h]) continue;
+      ax += acc[h * 3]; ay += acc[h * 3 + 1]; az += acc[h * 3 + 2]; k++;
+    }
+    if (!k) continue;
+    sm[g * 3] = 0.5 * acc[g * 3] + 0.5 * ax / k;
+    sm[g * 3 + 1] = 0.5 * acc[g * 3 + 1] + 0.5 * ay / k;
+    sm[g * 3 + 2] = 0.5 * acc[g * 3 + 2] + 0.5 * az / k;
+  }
+  for (let v = 0; v < n; v++) {
+    const g = group[v];
+    if (!ring[g] || mat[v]) continue;
+    const l = Math.hypot(sm[g * 3], sm[g * 3 + 1], sm[g * 3 + 2]);
+    if (l < 1e-9) continue;
+    nor[v * 3] = sm[g * 3] / l;
+    nor[v * 3 + 1] = sm[g * 3 + 1] / l;
+    nor[v * 3 + 2] = sm[g * 3 + 2] / l;
+  }
+  const out = new Float32Array(n);
+  for (let v = 0; v < n; v++) out[v] = mat[v] ? 0 : disp[group[v]];
+  return out;
 }
 
 // Части тела для скелета: у парных — [правая, левая]
@@ -686,29 +1178,18 @@ export function buildBody(regions, sex = "m") {
   return buildFigure(id => regions.indexOf(id) + 1, sex);
 }
 
-// Запечённое затенение: впадины и складки темнее, выпуклости светлее, плюс тонкие швы между зонами —
-// модель выглядит объёмнее, а зоны тела читаются как на анатомическом атласе
+// Запечённое затенение: впадины и складки темнее, выпуклости светлее, плюс лёгкая тень в бороздках
+// между мышцами — модель выглядит объёмнее, а мышцы читаются как на атласе
 function bakeShade(geo) {
   const n = geo.pos.length / 3;
   const shade = new Float32Array(n).fill(1);
-  // Вершины с одинаковыми координатами (шов развёртки) считаем одной точкой
-  const key = v => `${Math.round(geo.pos[v * 3] * 2e4)},${Math.round(geo.pos[v * 3 + 1] * 2e4)},${Math.round(geo.pos[v * 3 + 2] * 2e4)}`;
-  const group = new Int32Array(n), ids = new Map();
-  for (let v = 0; v < n; v++) {
-    const k = key(v);
-    if (!ids.has(k)) ids.set(k, ids.size);
-    group[v] = ids.get(k);
-  }
-  const G = ids.size;
+  const { group, G } = groupVertices(geo);
   const sum = new Float32Array(G * 3), cnt = new Float32Array(G), dist = new Float32Array(G);
-  const seam = new Uint8Array(G);
   const idx = geo.idx;
   for (let t = 0; t < idx.length; t += 3) {
     const tri = [idx[t], idx[t + 1], idx[t + 2]];
-    const mixed = geo.reg[tri[0]] !== geo.reg[tri[1]] || geo.reg[tri[0]] !== geo.reg[tri[2]];
     for (let i = 0; i < 3; i++) {
       const a = tri[i], ga = group[a];
-      if (mixed) seam[ga] = 1;
       for (let j = 1; j < 3; j++) {
         const b = tri[(i + j) % 3];
         sum[ga * 3] += geo.pos[b * 3];
@@ -738,22 +1219,33 @@ function bakeShade(geo) {
     s -= 0.12 * smooth(0.4, 0.9, -ny) * (1 - smooth(0.06, 0.12, py));
     // лоб смотрит прямо на основной свет — чуть приглушаем, иначе издали он читается как светлая повязка
     if (!geo.mat[v]) s -= 0.05 * (pz > 0.04 ? 1 : 0) * bell(py, 1.698, 0.012) * (1 - smooth(0.05, 0.075, axp));
-    if (seam[g] && !geo.mat[v]) s *= 0.95;
     shade[v] = Math.max(0.6, Math.min(1.06, s));
   }
   return shade;
 }
 
 // ----- Шейдеры -----
+// Штриховка волокон: фаза считается заранее для каждой вершины (поперёк волокон, поэтому штрихи
+// идут вдоль них) и линейно интерполируется по треугольнику; во фрагментном шейдере — синус от неё. По fwidth штрихи гаснут, когда на экране становятся мельче пары пикселей,
+// иначе издали они превращались бы в муар
 const VS = `
-attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol;
+attribute vec3 aPos; attribute vec3 aNor; attribute vec3 aCol; attribute vec2 aFib;
 uniform mat4 uMVP; uniform mat3 uNM;
-varying vec3 vN; varying vec3 vC;
-void main() { vN = uNM * aNor; vC = aCol; gl_Position = uMVP * vec4(aPos, 1.0); }`;
-const FS = `
+varying vec3 vN; varying vec3 vC; varying float vFib; varying float vMus;
+void main() {
+  vN = uNM * aNor; vC = aCol;
+  vFib = aFib.x;
+  vMus = aFib.y;
+  gl_Position = uMVP * vec4(aPos, 1.0);
+}`;
+const FS = (deriv) => `${deriv ? "#extension GL_OES_standard_derivatives : enable\n#define FIB 1\n" : ""}
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
-varying vec3 vN; varying vec3 vC;
-uniform vec3 uRim; uniform float uAmb;
+#endif
+varying vec3 vN; varying vec3 vC; varying float vFib; varying float vMus;
+uniform vec3 uRim; uniform float uAmb; uniform float uFib;
 void main() {
   vec3 n = normalize(vN);
   vec3 V = vec3(0.0, 0.0, 1.0);
@@ -771,18 +1263,24 @@ void main() {
   vec3 amb = mix(vec3(0.78, 0.8, 0.86), vec3(1.0), hemi);
   // тёплый оттенок на границе света и тени — объём читается мягче
   float term = w1 * (1.0 - w1) * 4.0;
-  vec3 col = vC * (uAmb * amb + 0.6 * w1 * key + 0.2 * w2 * fill) + vC * vec3(0.05, 0.02, 0.0) * term + uRim * rim * 0.32 + spec * key;
+  vec3 base = vC;
+#ifdef FIB
+  float fw = fwidth(vFib);
+  float fib = uFib * vMus * (1.0 - smoothstep(1.1, 2.4, fw)) * (0.5 + 0.5 * sin(vFib));
+  base *= 1.0 - 0.12 * fib;
+#endif
+  vec3 col = base * (uAmb * amb + 0.6 * w1 * key + 0.2 * w2 * fill) + base * vec3(0.05, 0.02, 0.0) * term + uRim * rim * 0.32 + spec * key;
   gl_FragColor = vec4(col, 1.0);
 }`;
 const PVS = `
-attribute vec3 aPos; attribute vec2 aId;
+attribute vec3 aPos; attribute vec3 aId;
 uniform mat4 uMVP;
-varying vec2 vId;
+varying vec3 vId;
 void main() { vId = aId; gl_Position = uMVP * vec4(aPos, 1.0); }`;
 const PFS = `
 precision mediump float;
-varying vec2 vId;
-void main() { gl_FragColor = vec4(floor(vId + 0.5) / 255.0, 0.0, 1.0); }`;
+varying vec3 vId;
+void main() { gl_FragColor = vec4(floor(vId + 0.5) / 255.0, 1.0); }`;
 
 function compile(gl, vs, fs) {
   const make = (type, src) => {
@@ -821,28 +1319,30 @@ function pointInPolygon(x, y, poly) {
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 
 // ----- Сцена -----
-// regions — список id зон по порядку; onTap(regionId, side); onLasso(result | null)
+// regions — список id зон по порядку; onTap(regionId, side, muscleId); onLasso(result | null)
 export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
   const regionIndex = id => regions.indexOf(id) + 1;
   let bodySex = sex === "f" ? "f" : "m";
   let geo = buildFigure(regionIndex, bodySex);
   let vertexCount = geo.pos.length / 3;
   let colors = new Float32Array(vertexCount * 3);
-  // Для выбора зоны каждый треугольник получает один код: иначе на границе двух зон
+  // Для выбора зоны и мышцы каждый треугольник получает один код: иначе на границе двух зон
   // интерполяция дала бы «чужие» номера посередине
   let triCount = 0, pickPos = null, pickIds = null;
   function buildPick() {
     triCount = geo.idx.length / 3;
     pickPos = new Float32Array(triCount * 9);
-    pickIds = new Float32Array(triCount * 6);
+    pickIds = new Float32Array(triCount * 9);
+    const major = (x, y, z, a, b) => (x === y || x === z ? a : y === z ? b : a);
     for (let t = 0; t < triCount; t++) {
       const a = geo.idx[t * 3], b = geo.idx[t * 3 + 1], c = geo.idx[t * 3 + 2];
-      const ra = geo.reg[a], rb = geo.reg[b], rc = geo.reg[c];
-      const main = ra === rb || ra === rc ? a : rb === rc ? b : a;
+      const main = major(geo.reg[a], geo.reg[b], geo.reg[c], a, b);
+      const mainMus = major(geo.mus[a], geo.mus[b], geo.mus[c], a, b);
       [a, b, c].forEach((v, k) => {
         pickPos.set(geo.pos.subarray(v * 3, v * 3 + 3), t * 9 + k * 3);
-        pickIds[t * 6 + k * 2] = geo.reg[main];
-        pickIds[t * 6 + k * 2 + 1] = geo.sid[main];
+        pickIds[t * 9 + k * 3] = geo.reg[main];
+        pickIds[t * 9 + k * 3 + 1] = geo.sid[main];
+        pickIds[t * 9 + k * 3 + 2] = geo.mus[mainMus];
       });
     }
   }
@@ -863,8 +1363,10 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
   const view = { yaw: 0, pitch: 0.06, zoom: 1, target: null };
   let mode = "rotate";
   let colorizer = () => [0.85, 0.9, 0.88];
-  let theme = { rim: [0.13, 0.64, 0.29], amb: 0.38 };
+  // fibers — сила штриховки волокон (0…1): на атласе мышц полная, на манекене лёгкая
+  let theme = { rim: [0.13, 0.64, 0.29], amb: 0.38, fibers: 1 };
   let hairColor = [0.3, 0.25, 0.22];
+  let fibOk = false; // поддерживаются ли производные во фрагментном шейдере (нужны штриховке)
   let selection = null;
   let gl = null, glState = null, lost = false;
   let cssW = 0, cssH = 0, dpr = 1;
@@ -874,7 +1376,10 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
   function initGL() {
     gl = canvas.getContext("webgl", { antialias: true, alpha: true, premultipliedAlpha: true }) || canvas.getContext("experimental-webgl");
     if (!gl) throw new Error("WebGL недоступен");
-    const prog = compile(gl, VS, FS);
+    // штриховка волокон нужна только там, где есть fwidth и высокая точность во фрагментном шейдере
+    const hp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+    fibOk = !!gl.getExtension("OES_standard_derivatives") && !!hp && hp.precision > 0;
+    const prog = compile(gl, VS, FS(fibOk));
     const pick = compile(gl, PVS, PFS);
     const buffer = (data, target = gl.ARRAY_BUFFER, usage = gl.STATIC_DRAW) => {
       const b = gl.createBuffer();
@@ -884,13 +1389,15 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
     };
     glState = {
       prog, pick,
-      pos: buffer(geo.pos), nor: buffer(geo.nor), col: buffer(colors, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW),
+      pos: buffer(geo.pos), nor: buffer(geo.nor), col: buffer(colors, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW), fib: buffer(geo.fib),
       pickPos: buffer(pickPos), pickIds: buffer(pickIds),
       idx: buffer(geo.idx, gl.ELEMENT_ARRAY_BUFFER),
       loc: {
         aPos: gl.getAttribLocation(prog, "aPos"), aNor: gl.getAttribLocation(prog, "aNor"), aCol: gl.getAttribLocation(prog, "aCol"),
+        aFib: gl.getAttribLocation(prog, "aFib"),
         uMVP: gl.getUniformLocation(prog, "uMVP"), uNM: gl.getUniformLocation(prog, "uNM"),
         uRim: gl.getUniformLocation(prog, "uRim"), uAmb: gl.getUniformLocation(prog, "uAmb"),
+        uFib: gl.getUniformLocation(prog, "uFib"),
         pPos: gl.getAttribLocation(pick, "aPos"), pId: gl.getAttribLocation(pick, "aId"), pMVP: gl.getUniformLocation(pick, "uMVP")
       },
       fbo: null, fboTex: null, fboDepth: null, fboW: 0, fboH: 0
@@ -931,13 +1438,15 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
     bindAttr(glState.pos, L.aPos, 3);
     bindAttr(glState.nor, L.aNor, 3);
     bindAttr(glState.col, L.aCol, 3);
+    bindAttr(glState.fib, L.aFib, 2);
     gl.uniformMatrix4fv(L.uMVP, false, mvp);
     gl.uniformMatrix3fv(L.uNM, false, nm);
     gl.uniform3fv(L.uRim, theme.rim);
     gl.uniform1f(L.uAmb, theme.amb);
+    gl.uniform1f(L.uFib, fibOk ? Math.min(1, Math.max(0, theme.fibers)) : 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, glState.idx);
     gl.drawElements(gl.TRIANGLES, geo.idx.length, gl.UNSIGNED_SHORT, 0);
-    for (const loc of [L.aPos, L.aNor, L.aCol]) if (loc >= 0) gl.disableVertexAttribArray(loc);
+    for (const loc of [L.aPos, L.aNor, L.aCol, L.aFib]) if (loc >= 0) gl.disableVertexAttribArray(loc);
   }
   const requestDraw = () => { if (!frame) frame = requestAnimationFrame(draw); };
 
@@ -974,7 +1483,7 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(glState.pick);
     bindAttr(glState.pickPos, L.pPos, 3);
-    bindAttr(glState.pickIds, L.pId, 2);
+    bindAttr(glState.pickIds, L.pId, 3);
     gl.uniformMatrix4fv(L.pMVP, false, mvp);
     gl.drawArrays(gl.TRIANGLES, 0, triCount * 3);
     for (const loc of [L.pPos, L.pId]) if (loc >= 0) gl.disableVertexAttribArray(loc);
@@ -988,7 +1497,7 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
     gl.readPixels(Math.round(x * dpr), Math.round(h - 1 - y * dpr), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     if (!px[0]) return null;
-    return { region: regions[px[0] - 1], side: px[1] === 1 ? "R" : px[1] === 2 ? "L" : "" };
+    return { region: regions[px[0] - 1], side: px[1] === 1 ? "R" : px[1] === 2 ? "L" : "", muscle: MUSCLE_IDS[px[2] - 1] || "" };
   }
 
   // Какие зоны сейчас видны и сколько пикселей занимают (для проверки модели)
@@ -1066,12 +1575,14 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
   }
 
   // --- Цвета ---
+  // colorizer(зона, сторона, точка, нормаль, мышца) → [r, g, b]
   function repaint() {
     for (let v = 0; v < vertexCount; v++) {
       const p = [geo.pos[v * 3], geo.pos[v * 3 + 1], geo.pos[v * 3 + 2]];
       const n = [geo.nor[v * 3], geo.nor[v * 3 + 1], geo.nor[v * 3 + 2]];
       const m = geo.mat[v];
-      let col = m === 2 ? theme.rim : m ? hairColor : colorizer(regions[geo.reg[v] - 1], geo.sid[v] === 1 ? "R" : geo.sid[v] === 2 ? "L" : "", p, n);
+      let col = m === 2 ? theme.rim : m ? hairColor
+        : colorizer(regions[geo.reg[v] - 1], geo.sid[v] === 1 ? "R" : geo.sid[v] === 2 ? "L" : "", p, n, MUSCLE_IDS[geo.mus[v] - 1] || "");
       if (selection) {
         const d = len(sub(p, selection.c));
         if (d < selection.r && dot(n, selection.n) > -0.25) {
@@ -1214,7 +1725,7 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
       if (poly.length < 6 || maxX - minX < 14 || maxY - minY < 14) {
         drawLasso();
         const hit = pickAt(pt[0], pt[1]);
-        if (hit && onTap) onTap(hit.region, hit.side);
+        if (hit && onTap) onTap(hit.region, hit.side, hit.muscle);
         return;
       }
       lasso = poly;
@@ -1233,7 +1744,7 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
       drag = null;
       if (tap) {
         const hit = pickAt(pt[0], pt[1]);
-        if (hit && onTap) onTap(hit.region, hit.side);
+        if (hit && onTap) onTap(hit.region, hit.side, hit.muscle);
       }
     }
   };
@@ -1287,6 +1798,7 @@ export function createFigure({ regions, onTap, onLasso, label, sex = "m" }) {
         const upload = (buf, data, target = gl.ARRAY_BUFFER, usage = gl.STATIC_DRAW) => { gl.bindBuffer(target, buf); gl.bufferData(target, data, usage); };
         upload(glState.pos, geo.pos);
         upload(glState.nor, geo.nor);
+        upload(glState.fib, geo.fib);
         upload(glState.col, colors, gl.ARRAY_BUFFER, gl.DYNAMIC_DRAW);
         upload(glState.pickPos, pickPos);
         upload(glState.pickIds, pickIds);

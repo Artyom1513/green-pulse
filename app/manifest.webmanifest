@@ -20,7 +20,7 @@
   "screenshots": [
     { "src": "screenshots/today.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "План на день с учётом самочувствия и травм" },
     { "src": "screenshots/player.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "Схема движения, вес и повторы прямо в тренировке" },
-    { "src": "screenshots/body.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "3D-модель тела: отметьте, что болит" },
+    { "src": "screenshots/body.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "3D-модель тела: мышцы как в анатомическом атласе" },
     { "src": "screenshots/gps.webp", "sizes": "780x1688", "type": "image/webp", "form_factor": "narrow", "label": "Прогулки и пробежки с GPS" }
   ],
   "shortcuts": [
