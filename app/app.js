@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -123,18 +123,26 @@ const mixRGB = (a, b, w) => [a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w,
 let bodyLayer = "muscles";
 let bodyLayerPicked = false;
 const LOAD_RGB = [0.5, 0.36, 0.95];
-// Атлас мышц: у соседних мышц разные оттенки, сухожилия и кости светлые, кожа — цвет модели
-const MUSCLE_TONES = [[0.80, 0.36, 0.32], [0.70, 0.27, 0.26], [0.87, 0.46, 0.40], [0.75, 0.31, 0.30], [0.90, 0.56, 0.48]];
-const TENDON_RGB = [0.93, 0.86, 0.78];
+// Атлас мышц: у соседних мышц разные оттенки насыщенного красного, сухожилия и кости — тёплые
+// бежевые, кожа (голова, кисти, стопы) — тёплый «фарфор», как у скульптуры
+const MUSCLE_TONES = [[0.78, 0.31, 0.28], [0.67, 0.23, 0.22], [0.85, 0.40, 0.35], [0.72, 0.27, 0.26], [0.88, 0.50, 0.43]];
+const TENDON_RGB = [0.9, 0.8, 0.7];
+const PORCELAIN_RGB = [0.88, 0.82, 0.78];
+// Свет на каждом слое: на атласе — тёплая обводка, влажный блик и глубина мышц,
+// на гладкой модели — мягче, чтобы цвета боли и нагрузки оставались главными
+const LAYER_LIGHT = {
+  muscles: { fibers: 1, depth: 0.3, sheen: 1, back: [1, 0.9, 0.84], warmRim: true },
+  pain: { fibers: 0.3, depth: 0.12, sheen: 0.25, back: [0.85, 0.95, 1] },
+  load: { fibers: 0.55, depth: 0.18, sheen: 0.4, back: [0.85, 0.95, 1] }
+};
 const SEL_MUSCLE_RGB = [0.16, 0.7, 0.86];
 // мышца, открытая в карточке, подсвечивается на модели
 let selMuscle = null;
 const hasPainMarks = () => state.marks.length > 0 || REGIONS.some(reg => E.regionSeverity(state, reg.id, E.dayKey(), false) > 0);
 function atlasColor(mid, base, dark) {
   const m = MUSCLE[mid];
-  if (!m) return base;
-  const c = m.bone ? TENDON_RGB : MUSCLE_TONES[m.tone] || MUSCLE_TONES[0];
-  return dark ? c.map(x => x * 0.82) : c;
+  const c = !m ? PORCELAIN_RGB : m.bone ? TENDON_RGB : MUSCLE_TONES[m.tone] || MUSCLE_TONES[0];
+  return dark ? c.map(x => x * 0.8) : c;
 }
 // на гладкой модели мышцы различаются едва заметно — чтобы цвета боли оставались главными
 function softTone(mid, base) {
@@ -148,9 +156,12 @@ function paintFigure() {
   const dark = isDark();
   const tone = L.bodyColors(look, dark);
   if (figure.setSex) figure.setSex(figureSex());
+  const light = LAYER_LIGHT[bodyLayer] || LAYER_LIGHT.pain;
+  const accentRim = tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]);
   figure.setTheme({
-    rim: tone.rim || (dark ? [0.3, 0.87, 0.5] : [0.09, 0.64, 0.29]), amb: dark ? 0.3 : 0.4, hair: dark ? [0.28, 0.245, 0.235] : [0.26, 0.21, 0.18],
-    fibers: bodyLayer === "muscles" ? 1 : bodyLayer === "load" ? 0.55 : 0.3
+    rim: light.warmRim ? (dark ? [0.5, 0.36, 0.32] : [0.55, 0.42, 0.38]) : accentRim,
+    amb: dark ? 0.3 : 0.4, hair: dark ? [0.28, 0.245, 0.235] : [0.26, 0.21, 0.18],
+    fibers: light.fibers, depth: light.depth, sheen: light.sheen, back: dark ? light.back.map(x => x * 0.7) : light.back
   });
   const base = tone.base;
   const sel = c => (mid => (selMuscle && mid === selMuscle ? mixRGB(c(mid), SEL_MUSCLE_RGB, 0.72) : c(mid)));
@@ -974,12 +985,11 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Мышцы на модели, как в анатомическом атласе: передняя, средняя и задняя дельта, бицепс, трицепс, грудные, пресс, косые, широчайшие, трапеция, ягодичные, головки квадрицепса, икроножная и ещё десятки мышц — с бороздками между ними и волокнами",
-  "Коснитесь мышцы — карточка расскажет, что она делает, как восстановилась после тренировок и какие упражнения её тренируют; мышца подсвечивается на модели",
-  "Над моделью три слоя: «Мышцы», «Зоны боли» и «Нагрузка». Нагрузка и восстановление считаются по отдельным мышцам, а не по зонам",
-  "Схемы упражнений подсвечивают именно работающие мышцы: подъём рук в стороны — среднюю дельту, тяга в наклоне — заднюю дельту, широчайшие и бицепс",
-  "В карточке упражнения — главные мышцы и помощники; на вкладке «Тело» — список всех мышц по группам",
-  "Обновления не теряются: когда выходит новая версия, над нижним меню появляется плашка с кнопкой «Обновить», и она не исчезает сама. Приложение проверяет обновления и при возвращении в него из фона"
+  "Мышцы стали объёмными: у каждой своё выпуклое брюшко и глубокая бороздка по краю — дельты круглые, бицепс и икры с «пиком», на прессе шесть «кубиков», бёдра и спина рельефные",
+  "Три головки дельты, части трапеции и грудной теперь читаются как одна мышца с лёгкими разделениями — как у настоящего тела",
+  "Студийный свет: тёплый ключевой, холодный заполняющий и контровой свет по силуэту; на атласе мышцы с влажным бликом вдоль волокон и тёплым отсветом в тени",
+  "Атлас красивее: насыщенные оттенки мышц, тёплые бежевые сухожилия, голова, кисти и стопы — как фарфоровая скульптура",
+  "На гладкой модели мышцы видны как у анатомической скульптуры, а цвета боли и нагрузки остаются главными; фигуры в схемах — с мягким рельефом под одеждой"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;

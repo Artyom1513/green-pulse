@@ -270,7 +270,7 @@ const CHARS = {};
 function character(sex) {
   const key = sex === "f" ? "f" : "m";
   if (CHARS[key]) return CHARS[key];
-  const geo = buildBody(REG_IDS, key);
+  const geo = buildBody(REG_IDS, key, { relief: 0.55 }); // в одежде рельеф мягче
   const skel = bindSkeleton(geo.bind);
   const { bi, bw } = skinWeights(geo, geo.bind);
   const look = materials(geo, geo.bind, key);
