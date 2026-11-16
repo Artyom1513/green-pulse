@@ -391,7 +391,8 @@ input.switch:checked::after { transform: translateX(20px); }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 
 /* ----- План тренировки ----- */
-.ex-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ex-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ex-row .icon-btn { width: 44px; height: 44px; }
 .ex-row:last-child { border-bottom: 0; }
 .ex-num { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); font-size: .8rem; font-weight: 750; }
 .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
@@ -618,12 +619,12 @@ input.switch:checked::after { transform: translateX(20px); }
 .player-card.is-rest .big-timer { color: var(--accent); }
 .player-card.is-prep .big-timer { color: var(--warn); }
 .cues { display: grid; gap: 6px; margin: 14px 0 0; padding: 0; color: var(--muted); list-style: none; }
-.next-up { margin: 0; color: var(--muted); font-size: .9rem; text-align: center; }
+.next-up { width: max-content; max-width: 100%; margin: 0 auto; padding: 4px 12px; border-radius: 999px; background: var(--bg-solid, var(--bg)); color: var(--text); font-size: .9rem; text-align: center; }
 .player-controls { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 10px; width: 100%; max-width: 600px; margin: 0 auto; }
 .player-controls .btn { padding: 0 10px; }
 /* Кнопки плеера всегда видны, даже если карточка не помещается по высоте */
-.player-controls { position: sticky; bottom: 0; z-index: 1; padding-top: 10px; }
-.player-controls::before { content: ""; position: absolute; inset: -18px -16px calc(-16px - env(safe-area-inset-bottom)); z-index: -1; background: linear-gradient(to bottom, transparent, var(--bg) 45%); pointer-events: none; }
+.player-controls { position: sticky; bottom: 0; z-index: 1; padding-top: 10px; margin-top: 12px; }
+.player-controls::before { content: ""; position: absolute; inset: -12px -16px calc(-16px - env(safe-area-inset-bottom)); z-index: -1; background: var(--bg); pointer-events: none; }
 @media (max-height: 740px) {
   .player-main { gap: 10px; padding: 10px 0; }
   .player-card { padding: 18px 16px; border-radius: 28px; }
@@ -852,9 +853,52 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .demo-svg .d-plate { fill: none; stroke: var(--muted); stroke-width: .045; }
 .demo-svg .d-band { stroke: #f59e0b; stroke-dasharray: .05 .035; }
 .player-card .demo { max-width: 300px; margin: 8px auto 4px; padding: 4px; }
+/* Сцена плеера: схема во всю ширину карточки, название и подход поверх неё, под ней — таймер
+   или повторы и одна кнопка. Подсказки по технике — по кнопке «Техника» */
+.player-card.is-stage { padding: 0 0 18px; overflow: hidden; }
+.stage-wrap { position: relative; }
+.stage-wrap .demo.demo-stage { max-width: none; margin: 0; padding: 0; border-radius: 0; background: radial-gradient(110% 90% at 70% 0%, var(--accent-soft), transparent 70%); }
+.demo-stage .demo3d { max-width: none; }
+/* стоя — холст ближе к квадрату, фигура крупная; лёжа и на четвереньках — широкий */
+.demo-stage .demo3d-canvas { aspect-ratio: 1 / 1; max-height: 44vh; margin: 0 auto; }
+.demo-stage .demo3d.is-low .demo3d-canvas { aspect-ratio: 16 / 10; max-height: none; }
+.demo-stage .demo-svg { display: block; width: 100%; height: auto; max-height: 46vh; margin: 0 auto; }
+.demo-stage.is-loading { min-height: 240px; }
+.demo-stage .demo3d-mini .demo3d-btn { top: 8px; right: 8px; width: 34px; height: 34px; }
+.demo-stage .demo3d-mini .demo3d-view { right: 48px; }
+.demo-stage .demo3d-mini .demo3d-view::after { top: 8px; right: 9px; }
+.demo-stage .demo3d-mini .demo3d-expand { left: 8px; }
+.stage-head { padding: 12px 18px 0; }
+.stage-head .player-block { font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+.stage-head .player-ex { margin: 2px 0 0; font-size: clamp(1.35rem, 5.6vw, 1.8rem); line-height: 1.12; }
+.stage-tools-row { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.stage-tools-row .cues-btn { margin: 0; }
+.is-stage .big-timer { margin: 6px 0 0; font-size: clamp(4.4rem, 26vw, 7.5rem); }
+.is-stage .big-reps { margin: 8px 0 0; }
+.is-stage .player-dose { padding: 0 18px; }
+.is-stage .hold-phase { margin-top: 6px; }
+.is-stage .weight-ctl { margin: 10px auto 0; }
+.cues-btn { display: inline-flex; align-items: center; gap: 6px; margin: 0 auto; padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg-solid, var(--bg)); color: var(--text); font: inherit; font-size: .88rem; font-weight: 650; cursor: pointer; }
+.cues-btn.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.cues-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.is-stage .cues { margin: 10px 18px 0; text-align: left; }
+.is-stage .cues li { position: relative; padding-left: 18px; }
+.is-stage .cues li::before { content: ""; position: absolute; left: 4px; top: .55em; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+@media (max-height: 740px) {
+  .demo-stage .demo3d-canvas { aspect-ratio: 5 / 4; max-height: 38vh; }
+  .demo-stage .demo3d.is-low .demo3d-canvas { aspect-ratio: 16 / 9; }
+  .is-stage .big-timer { font-size: clamp(3.6rem, 22vw, 6rem); }
+}
+@media (max-height: 680px) {
+  .demo-stage .demo3d-canvas { aspect-ratio: 4 / 3; max-height: 34vh; }
+  .demo-stage .demo3d.is-low .demo3d-canvas { aspect-ratio: 2 / 1; }
+  .stage-head { padding-top: 6px; }
+  .is-stage .big-timer { font-size: clamp(3rem, 19vw, 5rem); }
+  .player-card.is-stage { padding-bottom: 12px; }
+}
 /* отдых: следующее упражнение со схемой */
 .rest-next { display: grid; justify-items: center; gap: 2px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
-.rest-next-label { margin: 0; color: var(--muted); font-size: .9rem; font-weight: 650; }
+.rest-next-label { margin: 0; color: var(--text); font-size: .9rem; font-weight: 700; }
 .rest-next .demo { max-width: 200px; margin: 6px auto 4px; }
 .player-card.is-rest .big-timer { font-size: clamp(3.2rem, 18vw, 5rem); }
 /* вес в плеере можно ввести числом: значение — кнопка */
@@ -935,7 +979,7 @@ input.range::-moz-range-thumb { width: 22px; height: 22px; border: 3px solid #ff
 .recovery-btn:hover { background: var(--line); }
 .recovery-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
 /* Атлас мышц: легенда и мышцы упражнения */
-.pill.mus-pill { background: #c85a50; color: #fff; }
+.pill.mus-pill { background: #b44a41; color: #fff; }
 .pill.tendon-pill { background: #efdcc7; color: #6b4f37; }
 :root[data-theme="dark"] .pill.mus-pill { background: #a94a42; }
 :root[data-theme="dark"] .pill.tendon-pill { background: #4a3d32; color: #f1dcc4; }

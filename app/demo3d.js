@@ -2054,7 +2054,8 @@ export function createDemo(id, { label, paused = false, sex, controls = "full", 
   // живота; стена или дверь перед человеком — сбоку и чуть сзади, чтобы стена не закрывала фигуру
   d.C = character(d.sex);
   const probe = solvePose(M, d.C, { J: M.key(0), Pz: M.keyPz(0) }, null).P;
-  if (Math.min(probe.pelvis[1], probe.neck[1]) < 0.45) d.elev = 20;
+  // лежачие и четвереньки — класс is-low: на сцене плеера им даётся широкий холст
+  if (Math.min(probe.pelvis[1], probe.neck[1]) < 0.45) { d.elev = 20; el.classList.add("is-low"); }
   if (FRONTAL.has(M.pid) || M.pid === "openBook") d.az = 58;
   if (controls === "cover") {
     // повторы целиком: остановка в позе B (середина цикла), не дольше 5 секунд (WCAG 2.2.2)

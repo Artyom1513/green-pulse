@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.5.0";
+const VERSION = "2.6.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -70,8 +70,8 @@ function loadDemo3d() {
 }
 const want3d = () => look.figstyle === "3d" && demo3d !== false;
 // Блок со схемой движения: пока модуль грузится, место под схему уже занято
-function demoBox(id, { mini = false, onExpand = null, cover = false } = {}) {
-  const box = h("div", { class: cover ? "demo demo-cover" : "demo" });
+function demoBox(id, { mini = false, onExpand = null, cover = false, stage = false } = {}) {
+  const box = h("div", { class: cover ? "demo demo-cover" : stage ? "demo demo-stage" : "demo" });
   const label = cover ? `Главное упражнение сегодня: ${EX[id].name}` : undefined;
   const make = () => {
     if (want3d() && demo3d) {
@@ -985,6 +985,7 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
+  "Плеер как сцена: фигура во всю ширину, под ней название и большой таймер, одна главная кнопка; подсказки по технике и «Заменить» — по кнопкам под схемой",
   "Мышцы стали объёмными: у каждой своё выпуклое брюшко и глубокая бороздка по краю — дельты круглые, бицепс и икры с «пиком», на прессе шесть «кубиков», бёдра и спина рельефные",
   "Три головки дельты, части трапеции и грудной теперь читаются как одна мышца с лёгкими разделениями — как у настоящего тела",
   "Студийный свет: тёплый ключевой, холодный заполняющий и контровой свет по силуэту; на атласе мышцы с влажным бликом вдоль волокон и тёплым отсветом в тени",
@@ -4774,7 +4775,7 @@ function startPlayer(session, stepsOverride) {
   unlockAudio();
   player = {
     session, steps, i: 0, timed: false, deadline: null, remaining: 0, paused: false, prep: false, half: false, hold: null, kg: {}, used: {},
-    sets: {}, exDone: {}, prs: [], curReps: null,
+    sets: {}, exDone: {}, prs: [], curReps: null, showCues: false,
     startedAt: Date.now(), pausedAt: 0, pausedTotal: 0, done: 0, pains: [], lastWhole: null, mins: 0,
     timerEl: null, sideEl: null, timer: null,
     el: h("div", { class: "player", role: "dialog", "aria-modal": "true", "aria-label": "Тренировка" })
@@ -4994,6 +4995,24 @@ function renderPlayer() {
   const painBtn = () => h("button", { class: "btn pain", type: "button", onClick: painSheet, text: "Больно" });
   const skipBtn = () => h("button", { class: "btn ghost", type: "button", "aria-label": "Пропустить упражнение", onClick: () => enterStep(P.i + 1) }, icon("next", 18));
   let card, controls;
+  // подсказки по технике — по кнопке, чтобы на сцене были только фигура, название и таймер;
+  // выбор запоминается на всю тренировку
+  const cuesBlock = ex => {
+    const list = h("ul", { class: "cues", id: "player-cues", hidden: !P.showCues }, ex.cues.map(c => h("li", { text: c })));
+    const btn = h("button", {
+      class: `cues-btn${P.showCues ? " on" : ""}`, type: "button", "aria-expanded": String(!!P.showCues), "aria-controls": "player-cues",
+      onClick: () => { P.showCues = !P.showCues; list.hidden = !P.showCues; btn.classList.toggle("on", P.showCues); btn.setAttribute("aria-expanded", String(P.showCues)); }
+    }, icon("info", 16), "Техника");
+    const swap = h("button", { class: "cues-btn", type: "button", onClick: swapSheet }, icon("swap", 15), "Заменить");
+    return [h("div", { class: "stage-tools-row" }, btn, swap), list];
+  };
+  // сцена: схема на всю ширину карточки, название и доза поверх, таймер или повторы под ней
+  const stage = (ex, demo, badge) => [
+    h("div", { class: "stage-wrap" }, demo),
+    h("div", { class: "stage-head" },
+      h("p", { class: "player-block", text: badge }),
+      h("h1", { class: "player-ex", text: ex.name }))
+  ];
 
   if (st.type === "rest") {
     // во время отдыха видно, что дальше: схема движения и доза — можно приготовиться заранее
@@ -5023,24 +5042,20 @@ function renderPlayer() {
       h("button", { class: "btn ghost", type: "button", "aria-label": "Следующий этап", onClick: () => { if (!P.prep) completeStep(st); enterStep(P.i + 1); } }, icon("next", 18)));
   } else {
     const ex = EX[st.item.id];
-    const blockInfo = `${st.block}${st.sets ? ` · подход ${st.set} из ${st.sets}` : st.rounds > 1 ? ` · круг ${st.round} из ${st.rounds}` : ""}`;
-    const demo = demoBox(ex.id, { mini: true, onExpand: () => bigDemo(ex) });
-    const swapBtn = h("button", { class: "swap-btn", type: "button", onClick: swapSheet }, icon("swap", 15), "Заменить");
+    const blockInfo = st.sets ? `${st.block} · подход ${st.set} из ${st.sets}` : st.rounds > 1 ? `${st.block} · круг ${st.round} из ${st.rounds}` : st.block;
+    const demo = demoBox(ex.id, { mini: true, onExpand: () => bigDemo(ex), stage: true });
     if (isHold(st)) {
       const H = P.hold || { rep: 1, side: 1, phase: "prep" };
       const n = st.item.reps;
       const sideText = ex.side ? ` · ${H.side === 1 ? "первая" : "вторая"} сторона` : "";
-      card = h("section", { class: `player-card glass hold-card is-${H.phase}` },
-        h("p", { class: "player-block", text: blockInfo }),
-        h("h1", { class: "player-ex", text: ex.name }),
-        swapBtn,
-        demo,
+      card = h("section", { class: `player-card glass is-stage hold-card is-${H.phase}` },
+        stage(ex, demo, blockInfo),
         h("p", { class: "hold-phase", text: HOLD_PHASE[H.phase] }),
         timerNode(),
         h("p", { class: "player-dose", text: `${H.phase === "relax" ? "Далее повтор" : "Повтор"} ${H.rep} из ${n}${sideText}` }),
         h("div", { class: "hold-dots", "aria-hidden": "true" },
           Array.from({ length: n }, (_, k) => h("i", { class: k < H.rep - 1 ? "done" : k === H.rep - 1 && H.phase === "hold" ? "now" : "" }))),
-        h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c }))));
+        cuesBlock(ex));
       controls = h("div", { class: "player-controls" }, painBtn(), pauseBtn("primary"), skipBtn());
     } else {
       let main;
@@ -5048,13 +5063,10 @@ function renderPlayer() {
       else if (st.item.sec) main = [timerNode(), ex.side ? (P.sideEl = h("p", { class: "player-dose", text: P.half ? "Вторая сторона" : "Первая сторона" })) : null];
       else if (ex.weighted) main = [h("p", { class: "player-dose", text: `Цель: ${E.doseText(st.item)}` }), weightControl(ex, st)];
       else main = [h("div", { class: "big-reps", text: `×${st.item.reps}` }), h("p", { class: "player-dose", text: ex.side ? "на каждую сторону · нажмите «Готово», когда закончите" : "нажмите «Готово», когда закончите" })];
-      card = h("section", { class: `player-card glass${P.prep ? " is-prep" : ""}` },
-        h("p", { class: "player-block", text: blockInfo }),
-        h("h1", { class: "player-ex", text: ex.name }),
-        swapBtn,
-        demo,
+      card = h("section", { class: `player-card glass is-stage${P.prep ? " is-prep" : ""}` },
+        stage(ex, demo, blockInfo),
         main,
-        h("ul", { class: "cues" }, ex.cues.map(c => h("li", { text: c }))));
+        cuesBlock(ex));
       const primary = st.item.reps
         ? h("button", {
           class: "btn primary", type: "button",
