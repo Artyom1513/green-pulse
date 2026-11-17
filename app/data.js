@@ -158,9 +158,9 @@ export const HOTSPOTS = [
 
 export const SEVERITY = [
   { v: 0, name: "Всё в порядке", desc: "Зона не ограничивает тренировки." },
-  { v: 1, name: "Дискомфорт", desc: "Иногда напоминает о себе или давняя травма. Уберём упражнения с заметной нагрузкой на зону." },
-  { v: 2, name: "Ограничение", desc: "Больно при некоторых движениях или идёт восстановление. Зону не нагружаем." },
-  { v: 3, name: "Острая боль", desc: "Зону не нагружаем, вся тренировка — щадящая. Острая или усиливающаяся боль — повод обратиться к врачу." }
+  { v: 1, name: "Дискомфорт", desc: "Иногда напоминает о себе. Уберём заметную нагрузку." },
+  { v: 2, name: "Ограничение", desc: "Больно при некоторых движениях. Зону не нагружаем." },
+  { v: 3, name: "Острая боль", desc: "Зону не нагружаем, тренировка щадящая. Сильная боль — к врачу." }
 ];
 
 // Что чувствуете — для описания проблемы. flag: true — признак, при котором стоит показаться врачу
@@ -597,79 +597,79 @@ export const MORNING = [
 // unit: reps — повторы, sec — секунды, walk — минуты ходьбы, routine — короткий комплекс
 export const CHALLENGES = [
   { id: "squat30", name: "30 дней приседаний", icon: "🦵", unit: "reps", ex: "squat", start: 10, step: 2, max: 60, rest: 4,
-    desc: "С 10 до 60 приседаний: каждый день немного больше, каждый 4-й день — отдых." },
+    desc: "С 10 до 60 приседаний, каждый 4-й день — отдых." },
   { id: "plank30", name: "30 дней планки", icon: "🧱", unit: "sec", ex: "plank", start: 20, step: 5, max: 150, rest: 4,
-    desc: "С 20 секунд до 2,5 минуты. Дышите ровно — техника важнее секунд." },
+    desc: "С 20 секунд до 2,5 минуты." },
   { id: "pushup30", name: "30 дней отжиманий", icon: "💪", unit: "reps", ex: ["wallPush", "inclinePush", "kneePush", "pushUp"], start: 6, step: 1, max: 20, rest: 4,
-    desc: "От стены — к столу, коленям и полу. Каждую неделю — следующий шаг." },
+    desc: "От стены — к столу, коленям и полу." },
   { id: "stretch30", name: "Гибкость за 30 дней", icon: "🧘", unit: "routine", rest: 0,
     items: [["neckStretch", "chestStretch", "catCow", "hamStretch", "calfStretch"], ["openBook", "hipFlexor", "quadStretch", "figure4", "childPose"],
       ["sunFlow", "seatedFold", "butterfly", "latStretch", "cobra"], ["downDog", "worldStretch", "strapHam", "tricepsStretch", "bellyBreath"]],
-    desc: "7 минут растяжки в день. Каждую неделю — новые упражнения." },
+    desc: "7 минут растяжки в день." },
   { id: "posture30", name: "Осанка за 30 дней", icon: "🧍", unit: "routine", rest: 0, what: "для осанки",
     items: [["shoulderRolls", "chinTuck", "wallAngel", "chestBehind", "catCow"], ["chinTuck", "thoracicReach", "reverseSnowAngel", "openBook", "chestStretch"],
       ["shoulderRolls", "thread", "proneYT", "birdDog", "latStretch"], ["chinTuck", "proneSwim", "wallAngel", "sphinx", "chestBehind"]],
-    desc: "5–7 минут в день для шеи, плеч и спины. Каждую неделю — новые упражнения." },
+    desc: "5–7 минут в день для шеи, плеч и спины." },
   { id: "balance30", name: "30 дней равновесия", icon: "🦩", unit: "routine", rest: 0, what: "на равновесие",
     items: [["weightShift", "tandemStand", "heelToeRock", "singleLeg", "calfRaise"], ["tandemStand", "kneeLiftHold", "backLegRaise", "heelToe", "toeRaise"],
       ["singleLeg", "clockReach", "legSwingSide", "heelWalk", "toeWalk"], ["grapevine", "starReach", "pillowBalance", "kneeLiftHold", "tree"]],
-    desc: "5 минут в день: от опоры — к уверенной стойке. Особенно полезно после 60." },
+    desc: "5 минут в день: от опоры — к уверенной стойке." },
   { id: "walk30", name: "30 дней ходьбы", icon: "🚶", unit: "walk", start: 15, step: 1, max: 40, rest: 0,
-    desc: "Прогулка каждый день: с 15 до 40 минут. Отмечайте выполнение — можно гулять без телефона." }
+    desc: "Прогулка каждый день: с 15 до 40 минут." }
 ];
 
 // Программы: kind — rehab (восстановление) или strength (сила); этапы по дням,
 // k — множитель дозировки, rounds и rest — круги и отдых в каждом занятии
 export const PROGRAMS = [
   { id: "knees", name: "Крепкие колени", icon: "🦵", days: 14, guide: "knee-front",
-    desc: "Две недели укрепляем мышцы бедра и ягодиц — они разгружают колено. Без прыжков и глубоких приседаний.",
+    desc: "Бёдра и ягодицы разгружают колено. Без прыжков и глубоких приседаний.",
     phases: [
       { until: 4, k: 0.8, items: ["quadSet", "gluteSqueeze", "bridge", "sideLeg", "calfRaise", "singleLeg"] },
       { until: 9, k: 1, items: ["quadSet", "bridge", "sideLeg", "abductorPress", "chairSquat", "wallSitShort", "singleLeg"] },
       { until: 14, k: 1.15, items: ["bridgeHold", "bandWalk", "chairSquat", "stepUp", "wallSitShort", "calfRaise", "pillowBalance"] }
     ] },
   { id: "back", name: "Здоровая спина", icon: "🧘", days: 14, guide: "back-pain",
-    desc: "Мягкая подвижность и мышцы корпуса для поясницы, которая устаёт от сидения.",
+    desc: "Подвижность и корпус для поясницы, уставшей от сидения.",
     phases: [
       { until: 4, k: 0.8, items: ["catCow", "kneesToChest", "deadBug", "bridge", "bellyBreath"] },
       { until: 9, k: 1, items: ["catCow", "birdDog", "deadBug", "bridge", "sidePlank", "openBook"] },
       { until: 14, k: 1.1, items: ["birdDog", "deadBugHold", "bridgeMarch", "sidePlank", "proneYT", "sphinx", "childPose"] }
     ] },
   { id: "ankles", name: "Связки голеностопа", icon: "🦶", days: 10, guide: "ankle-sprain",
-    desc: "Подвижность, изометрия и равновесие — так связки голеностопа восстанавливаются и реже травмируются снова.",
+    desc: "Подвижность, изометрия и равновесие для голеностопа.",
     phases: [
       { until: 3, k: 0.8, items: ["ankleAlphabet", "ankleIsoOut", "ankleIsoIn", "towelScrunch", "calfHold"] },
       { until: 7, k: 1, items: ["ankleAlphabet", "calfRaise", "heelWalk", "toeWalk", "singleLeg", "ankleIsoOut"] },
       { until: 10, k: 1.1, items: ["singleCalf", "pillowBalance", "starReach", "heelToe", "calfStretch"] }
     ] },
   { id: "shoulders", name: "Плечи и осанка", icon: "💪", days: 10, guide: "shoulder-pain",
-    desc: "Изометрия вращательной манжеты, мышцы лопаток и растяжка груди для свободных плеч.",
+    desc: "Манжета плеча, лопатки и растяжка груди.",
     phases: [
       { until: 3, k: 0.8, items: ["armCircles", "shoulderER", "shoulderIR", "shoulderAbd", "scapHold", "chestStretch"] },
       { until: 7, k: 1, items: ["wallAngel", "proneYT", "shoulderER", "pullApart", "bandRow", "chestStretch"] },
       { until: 10, k: 1.1, items: ["wallAngel", "proneW", "bandRow", "pullApart", "lateralRaise", "latStretch"] }
     ] },
   { id: "iso", name: "Изометрия для связок", icon: "🛡️", days: 7, guide: "soft-tissue",
-    desc: "Неделя статических упражнений: сухожилия и связки любят дозированное напряжение без резких движений.",
+    desc: "Неделя статики: связкам нужно напряжение без рывков.",
     phases: [
       { until: 7, k: 1, items: ["quadSet", "adductorSqueeze", "abductorPress", "calfHold", "shoulderER", "gripIso", "deadBugHold", "bridgeHold"] }
     ] },
   { id: "bodyweight", kind: "strength", name: "Сила без железа", icon: "🤸", days: 12, rounds: 3, rest: 30, guide: "weights-start",
-    desc: "4 недели по 3 занятия: приседания, отжимания, тяги и планки с весом своего тела. Занимайтесь через день.",
+    desc: "Приседания, отжимания, тяги и планки — через день.",
     phases: [
       { until: 4, k: 0.9, items: ["chairSquat", "wallPush", "doorRow", "bridge", "deadBug", "kneePlank"] },
       { until: 8, k: 1, items: ["squat", "kneePush", "doorRow", "reverseLunge", "birdDog", "plank"] },
       { until: 12, k: 1.1, items: ["splitSquat", "pushUp", "doorRow", "singleBridge", "sidePlank", "hollowHold"] }
     ] },
   { id: "dumbbells", kind: "strength", name: "Гантели с нуля", icon: "🏋️", days: 12, rounds: 3, rest: 45, equip: ["dumbbell"], guide: "weights-start",
-    desc: "4 недели по 3 занятия: учимся базовым движениям с гантелями и постепенно прибавляем вес. Занимайтесь через день.",
+    desc: "Базовые движения с гантелями, вес растёт постепенно.",
     phases: [
       { until: 4, k: 0.9, items: ["gobletSquat", "floorPress", "dbRow", "dbHipThrust", "dbDeadBug", "farmerCarry"] },
       { until: 8, k: 1, items: ["gobletSquat", "rdl", "floorPress", "bentRow", "standPress", "dbLunge", "suitcaseCarry"] },
       { until: 12, k: 1.1, items: ["bulgarian", "rdl", "dbBench", "bentRow", "standPress", "dbHipThrust", "renegadeRow"] }
     ] },
   { id: "kettlebell", kind: "strength", name: "Гиря: базовый курс", icon: "⚡", days: 10, rounds: 3, rest: 40, equip: ["kettlebell"], guide: "weights-start",
-    desc: "10 занятий: становая тяга, гоблет-присед, жим и махи гирей — сила и выносливость всего тела.",
+    desc: "Тяга, гоблет-присед, жим и махи гирей.",
     phases: [
       { until: 3, k: 0.9, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbRow", "kbCarry"] },
       { until: 7, k: 1, items: ["kbHalo", "kbDeadlift", "kbGoblet", "kbPress", "kbRow", "kbSwing"] },
@@ -712,27 +712,27 @@ export const BADGES = [
 export const RECORD_EX = ["plank", "sidePlank", "wallSit", "hollowHold", "bridgeHold"];
 
 export const TIPS = [
-  "Разминка 5–10 минут снижает риск травм и делает тренировку приятнее.",
-  "Боль — это сигнал, а не испытание. Лёгкая усталость мышц — нормально, острая боль — нет.",
-  "Регулярность важнее интенсивности: три короткие тренировки лучше одной изнурительной.",
-  "Не задерживайте дыхание при усилии: выдох — на самой тяжёлой части движения.",
+  "Разминка 5–10 минут снижает риск травм.",
+  "Боль — сигнал, а не испытание. Усталость мышц — норма, острая боль — нет.",
+  "Три короткие тренировки лучше одной изнурительной.",
+  "Не задерживайте дыхание: выдох — на самом тяжёлом месте.",
   "Сон 7–9 часов — лучшая «добавка» для восстановления.",
-  "Пейте воду до, во время и после тренировки, особенно в жару.",
-  "Мышечная боль через день после нагрузки проходит сама. Боль в суставе — повод сбавить темп.",
-  "Каждые 30–60 минут сидячей работы вставайте хотя бы на пару минут.",
-  "Силовые упражнения два раза в неделю — рекомендация ВОЗ для всех взрослых.",
-  "Связки и сухожилия крепнут медленнее мышц: прибавляйте нагрузку постепенно, неделя за неделей.",
-  "Изометрия — удержание без движения — помогает тренироваться даже при болезненном суставе.",
-  "Тренировка равновесия снижает риск повторного растяжения голеностопа.",
-  "Плохо спали и нет сил? Лёгкая тренировка или прогулка сегодня — тоже победа.",
-  "Вес подобран верно, если последние 2–3 повтора даются тяжело, но техника не ломается.",
-  "Прибавляйте вес понемногу — на 2,5–5%, когда легко делаете верхнюю границу повторов.",
-  "Перед подходами с весом сделайте 1–2 разминочных подхода с лёгким весом.",
-  "Мышцам нужно 48 часов на восстановление: силовые на одну группу — через день.",
-  "Пропустили день — не страшно: один пропуск не мешает привычке сложиться. Главное — вернуться.",
-  "Решите заранее, когда и где будете заниматься: «в пн, ср, пт после работы, дома». Так проще не пропускать.",
-  "Боль на следующее утро сильнее, чем до тренировки, — знак, что нагрузку на эту зону пора уменьшить.",
-  "Любое движение лучше, чем никакого: даже 2–5 минут ходьбы каждые полчаса сидения полезны для сосудов и сахара крови."
+  "Пейте воду до, во время и после тренировки.",
+  "Мышцы болят через день — это пройдёт. Болит сустав — сбавьте темп.",
+  "Каждые 30–60 минут сидения вставайте на пару минут.",
+  "ВОЗ советует взрослым силовые два раза в неделю.",
+  "Связки крепнут медленнее мышц — прибавляйте постепенно.",
+  "Изометрия — удержание без движения — бережёт больной сустав.",
+  "Равновесие снижает риск повторного растяжения голеностопа.",
+  "Нет сил? Лёгкая тренировка или прогулка — тоже победа.",
+  "Верный вес: последние 2–3 повтора тяжело, но чисто.",
+  "Легко на верхней границе повторов — прибавьте 2,5–5%.",
+  "Перед весом — 1–2 разминочных подхода полегче.",
+  "Силовые на одни мышцы — через день: им нужно 48 часов.",
+  "Пропустили день — не страшно. Главное — вернуться.",
+  "Решите заранее, когда и где заниматься, — так проще не пропускать.",
+  "Утром болит сильнее, чем до тренировки? Уменьшите нагрузку на зону.",
+  "Любое движение лучше никакого: даже 2–5 минут ходьбы."
 ];
 
 // ----- Бег с нуля: 9 недель по 3 занятия -----

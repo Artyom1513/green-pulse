@@ -316,7 +316,7 @@ export function buildSession(state, { variant = 0 } = {}) {
   };
   if (r.block) return pausedSession(s, r);
   if (r.acute.length) {
-    s.notes.unshift(`Отмечена острая боль (${r.acute.join(", ").toLowerCase()}): эту зону не нагружаем, тренировка — щадящая. Если боль сильная, нарастает или не проходит несколько дней, обратитесь к врачу.`);
+    s.notes.unshift(`Острая боль (${r.acute.join(", ").toLowerCase()}): зону не нагружаем. Боль сильная, нарастает или не проходит — к врачу.`);
   }
 
   const k = LEVEL_K[level] * MODES[mode].k * state.progress.factor;
@@ -331,7 +331,7 @@ export function buildSession(state, { variant = 0 } = {}) {
     if (!used.has("bellyBreath") && fits(EX.bellyBreath, r, p)) items.push(makeItem(EX.bellyBreath, 1));
     s.blocks.push({ kind: "main", name: "Мягкая мобильность", rounds: 1, items });
     s.rest = 10;
-    s.notes.unshift("Самочувствие сегодня на нуле — делаем мягкую мобильность, немного изометрии и дыхание. Если есть силы, добавьте спокойную прогулку.");
+    s.notes.unshift("Сил нет — сегодня мягкая подвижность и дыхание. Можно погулять.");
     explain(s, r, ["warm", "mobility", "iso", "cool"]);
     return finalize(s);
   }
@@ -405,9 +405,9 @@ export function buildSession(state, { variant = 0 } = {}) {
   if (cool.length) s.blocks.push({ kind: "cool", name: "Заминка", rounds: 1, items: cool });
   s.title = `${goal.short}: ${MODES[mode].name.toLowerCase()} тренировка`;
   for (const g of skipped) {
-    s.adaptations.push(`Группа «${GROUPS[g]}» пропущена: с вашими ограничениями и инвентарём подходящих упражнений сейчас нет.`);
+    s.adaptations.push(`Группа «${GROUPS[g]}» пропущена: нет подходящих упражнений.`);
   }
-  if (tired.length) s.adaptations.push(`Даём восстановиться мышцам после недавних тренировок: ${tired.map(k => KEY_NAME[k]).join(", ")}.`);
+  if (tired.length) s.adaptations.push(`Восстанавливаются: ${tired.map(k => KEY_NAME[k]).join(", ")}.`);
   explain(s, r, [...new Set(["warm", ...groups, "cool", "mobility", ...(r.balance ? ["balance"] : [])])]);
   return finalize(s);
 }

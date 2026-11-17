@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.6.0";
+const VERSION = "2.7.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -563,10 +563,10 @@ const stat = (v, label) => h("div", { class: "stat" }, h("b", { text: String(v) 
 // По нему выбираются ограничения нагрузки (до 18 и после 65 лет) и недельные ориентиры ВОЗ
 const ageWord = n => `${n} ${E.plural(n, "год", "года", "лет")}`;
 const AGE_NOTE = {
-  teen: "До 18 лет — без тяжёлых весов; ориентир ВОЗ — в среднем 60 минут движения в день.",
-  adult: "Ориентир ВОЗ для взрослых: 150–300 минут движения и 2 силовые тренировки в неделю.",
-  mature: "Ориентир ВОЗ для взрослых: 150–300 минут движения и 2 силовые тренировки в неделю.",
-  senior: "После 65 лет в тренировки добавлено равновесие, а прыжков и тяжёлых весов нет."
+  teen: "До 18 лет — без тяжёлых весов. ВОЗ: 60 минут движения в день.",
+  adult: "ВОЗ для взрослых: 150–300 минут движения и 2 силовые в неделю.",
+  mature: "ВОЗ для взрослых: 150–300 минут движения и 2 силовые в неделю.",
+  senior: "После 65 лет — упражнения на равновесие, без прыжков и тяжёлых весов."
 };
 let ageFieldN = 0;
 // onSave(возраст) — когда введено допустимое число; onDone — когда поле покинули (можно перерисовать экран)
@@ -665,7 +665,7 @@ function heroCard(plan, r, ci, done) {
   const ready = ci
     ? h("button", { class: "ready-chip", type: "button", onClick: checkinSheet, "aria-label": `Готовность ${ci.score} из 100, ${mode}. Изменить отметку самочувствия` },
       h("b", { text: String(ci.score) }), h("span", { text: `готовность · ${mode}` }), icon("chevron", 14))
-    : h("button", { class: "ready-chip ask", type: "button", onClick: checkinSheet }, icon("heart", 16), h("span", { text: "Как самочувствие? Отметьте за 30 секунд" }), icon("chevron", 14));
+    : h("button", { class: "ready-chip ask", type: "button", onClick: checkinSheet }, icon("heart", 16), h("span", { text: "Как самочувствие?" }), icon("chevron", 14));
   if (plan.blocked) {
     return h("section", { class: "card glass warn hero" },
       h("p", { class: "eyebrow", text: "Тренировка на сегодня" }),
@@ -705,7 +705,7 @@ function checkinSheet() {
   const close = sheet({
     title: "Как вы сегодня?",
     body: [
-      h("p", { class: "muted small", text: "30 секунд — и тренировка подстроится под ваше состояние." }),
+      h("p", { class: "muted small", text: "Тренировка подстроится под ваше состояние." }),
       SCALES.map(sc => h("div", { class: "q" },
         h("b", { text: sc.q }),
         choice({
@@ -747,7 +747,7 @@ function todayTasks() {
     if (items.length) {
       const open = () => sessionSheet(s, { title: s.title, info: `${roundsInfo(s)} · каждый день новый набор`, actions: close => [h("button", { class: "btn primary", type: "button", onClick: () => { close(); startPlayer(s); } }, icon("play", 18), "Начать зарядку")] });
       rows.push(h("button", { class: "row row-btn task-row", type: "button", onClick: open },
-        line(lead("today"), "Утренняя зарядка", morningDone ? "Сделана — бодрого дня!" : `${s.est} мин без инвентаря · каждый день новая`, morningDone ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 16))));
+        line(lead("today"), "Утренняя зарядка", morningDone ? "Сделана — бодрого дня!" : `${s.est} мин без инвентаря`, morningDone ? h("span", { class: "pill", text: "✓" }) : icon("chevron", 16))));
     }
   }
   // Челленджи
@@ -808,7 +808,7 @@ function greeting() {
 function acuteCard(r) {
   return h("section", { class: "card glass alert", role: "note" },
     h("h2", { text: `Острая боль: ${r.acute.join(", ").toLowerCase()}` }),
-    h("p", { text: "Эту зону не нагружаем, тренировки — щадящие. Если боль сильная, нарастает или держится несколько дней — обратитесь к врачу." }),
+    h("p", { text: "Зону не нагружаем. Боль сильная, нарастает или не проходит — покажитесь врачу." }),
     h("button", { class: "link-btn", type: "button", text: "Когда нужна срочная помощь", onClick: redFlagsSheet }));
 }
 
@@ -816,7 +816,7 @@ function redFlagsSheet() {
   sheet({
     title: "Когда сразу остановиться",
     body: [
-      h("p", { text: "Прекратите тренировку и обратитесь за медицинской помощью, если появились:" }),
+      h("p", { text: "Остановитесь и обратитесь к врачу, если появились:" }),
       h("ul", { class: "bullets" }, RED_FLAGS.map(t => h("li", { text: t }))),
       h("p", {}, h("b", { text: "Боль в груди, обморок, сильная одышка — звоните 112." }))
     ]
@@ -878,7 +878,7 @@ function weekCard() {
       h("button", { class: "link-btn", type: "button", text: "Тренировка на равновесие", onClick: () => quickSheet("balance") })) : null,
     p.planTime
       ? h("p", { class: "small plan-line" }, h("span", { class: "muted", text: "Мой план: " }), planText(p), " ", h("button", { class: "link-btn", type: "button", text: "Изменить", onClick: planSheet }))
-      : h("p", { class: "small plan-line" }, "Решите заранее, когда и где будете заниматься, — так проще не пропускать. ",
+      : h("p", { class: "small plan-line" }, "Решите, когда и где заниматься. ",
         h("button", { class: "link-btn", type: "button", text: "Составить план", onClick: planSheet })),
     h("div", { class: "btn-row" }, h("button", { class: "btn small ghost", type: "button", text: "+ Прогулка или другая активность", onClick: addActivitySheet })));
 }
@@ -893,14 +893,14 @@ function planSheet() {
   const close = sheet({
     title: "Мой план тренировок",
     body: [
-      h("p", { class: "muted small", text: "Когда, где и после чего вы будете заниматься. Исследования показывают: заранее продуманный план помогает чаще доводить дело до конца." }),
+      h("p", { class: "muted small", text: "Когда, где и после чего вы будете заниматься. С планом проще не пропускать." }),
       h("div", { class: "q" }, h("b", { text: "Дни" }), choice({ multiple: true, label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; } })),
       h("label", { class: "field" }, h("span", { text: "Время" }), time),
       h("div", { class: "q" }, h("b", { text: "Где" }), choice({ label: "Место", value: draft.place, options: Object.entries(PLACE_WORD).map(([id, word]) => ({ value: id, label: word[0].toUpperCase() + word.slice(1) })), onChange: v => { draft.place = v; } })),
       h("div", { class: "q" }, h("b", { text: "После чего (привычка-якорь)" }),
         choice({ label: "Привычка-якорь", value: PLAN_CUES.includes(draft.cue) ? draft.cue : "", options: PLAN_CUES.map(c => ({ value: c, label: c })), onChange: v => { draft.cue = v; custom.value = ""; } })),
       h("label", { class: "field" }, h("span", { text: "Или своя привычка" }), custom),
-      h("div", { class: "note-box ok small", text: "Запасной план: если день не задался, сделайте хотя бы утреннюю зарядку или разминку на 3 минуты — привычка не прервётся. Один пропуск не страшен, главное — вернуться." }),
+      h("div", { class: "note-box ok small", text: "Запасной план: не успели — сделайте зарядку на 3 минуты. Один пропуск не страшен." }),
       err
     ],
     actions: [h("button", {
@@ -915,7 +915,7 @@ function planSheet() {
         persist();
         close();
         refresh();
-        toast("План сохранён. Добавьте его в календарь: «Профиль» → «План и напоминания»");
+        toast("План сохранён");
       }
     })]
   });
@@ -934,7 +934,7 @@ function followupCard() {
     planCache.key = "";
     persist();
     refresh();
-    toast(v === "worse" ? "Бережём зону ещё неделю. Если боль не проходит или усиливается — покажитесь врачу" : v === "same" ? "Понятно. Тренер продолжит беречь эту зону" : "Отлично! Продолжаем по плану");
+    toast(v === "worse" ? "Бережём зону ещё неделю. Не проходит — покажитесь врачу" : v === "same" ? "Понятно. Тренер продолжит беречь эту зону" : "Отлично! Продолжаем по плану");
   };
   return h("section", { class: "card glass followup" },
     h("div", { class: "followup-head" },
@@ -979,18 +979,15 @@ function rescreenCard() {
   return h("section", { class: "card glass warn" },
     h("p", { class: "eyebrow", text: "Безопасность" }),
     h("h2", { text: "Обновите анкету о здоровье" }),
-    h("p", { class: "muted small", text: `Вы заполняли её ${fmtDate(at, { day: "numeric", month: "long", year: "numeric" })}. Ответы стоит обновлять раз в год и при любых изменениях здоровья. Тренировки и дневник сохранятся.` }),
+    h("p", { class: "muted small", text: `Заполнена ${fmtDate(at, { day: "numeric", month: "long", year: "numeric" })}. Обновляйте раз в год и при изменениях здоровья.` }),
     h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", text: "Пройти анкету", onClick: () => { state.profile.onboarded = false; onb = null; onbStep = 0; persist(); render(); } })));
 }
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Плеер как сцена: фигура во всю ширину, под ней название и большой таймер, одна главная кнопка; подсказки по технике и «Заменить» — по кнопкам под схемой",
-  "Мышцы стали объёмными: у каждой своё выпуклое брюшко и глубокая бороздка по краю — дельты круглые, бицепс и икры с «пиком», на прессе шесть «кубиков», бёдра и спина рельефные",
-  "Три головки дельты, части трапеции и грудной теперь читаются как одна мышца с лёгкими разделениями — как у настоящего тела",
-  "Студийный свет: тёплый ключевой, холодный заполняющий и контровой свет по силуэту; на атласе мышцы с влажным бликом вдоль волокон и тёплым отсветом в тени",
-  "Атлас красивее: насыщенные оттенки мышц, тёплые бежевые сухожилия, голова, кисти и стопы — как фарфоровая скульптура",
-  "На гладкой модели мышцы видны как у анатомической скульптуры, а цвета боли и нагрузки остаются главными; фигуры в схемах — с мягким рельефом под одеждой"
+  "Короче тексты: на экранах только главное, подробности — по нажатию",
+  "Плеер как сцена: крупная фигура, большой таймер и одна кнопка",
+  "Объёмные мышцы и студийный свет на модели тела"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1018,9 +1015,9 @@ function backupCard() {
   return h("section", { class: "card glass" },
     h("p", { class: "eyebrow", text: "Сохранность данных" }),
     h("h2", { text: st.lastBackup ? "Пора обновить резервную копию" : "Сохраните резервную копию" }),
-    h("p", { class: "muted small", text: `Ваши данные хранятся только на этом устройстве${st.lastBackup ? `, последняя копия — ${fmtDate(st.lastBackup)}` : ""}. Если браузер очистит память, история пропадёт, а файл копии вернёт всё за минуту.` }),
+    h("p", { class: "muted small", text: `Данные хранятся только здесь${st.lastBackup ? `, копия — ${fmtDate(st.lastBackup)}` : ""}. Файл копии вернёт их, если браузер очистит память.` }),
     h("div", { class: "btn-row" },
-      h("button", { class: "btn primary", type: "button", onClick: () => { saveBackup(); refresh(); toast("Копия сохранена — храните файл в надёжном месте"); } }, icon("download", 18), "Сохранить копию"),
+      h("button", { class: "btn primary", type: "button", onClick: () => { saveBackup(); refresh(); toast("Копия сохранена"); } }, icon("download", 18), "Сохранить копию"),
       h("button", { class: "btn ghost", type: "button", text: "Позже", onClick: () => { st.backupSnooze = E.shiftDay(d, 14); persist(); refresh(); } })));
 }
 // Просим браузер не удалять данные при нехватке места (без запроса, если браузер решает сам)
@@ -1125,12 +1122,12 @@ function catalogView() {
 function cardioSection() {
   const walk = CHALLENGES.find(c => c.id === "walk30");
   return [
-    h("p", { class: "lead", text: "Выносливость, сердце и настроение: от прогулки до 30 минут бега без остановки." }),
+    h("p", { class: "lead", text: "От прогулки до 30 минут бега." }),
     h("div", { class: "quick" },
       runCard(),
       h("a", { class: "quick-item glass", href: "#more/gps" },
         h("span", { class: "fi" }, icon("today", 20)),
-        h("span", { class: "row-text" }, h("b", { text: "Прогулка или пробежка с GPS" }), h("span", { class: "muted small", text: "Дистанция, время и темп — координаты не сохраняются" })),
+        h("span", { class: "row-text" }, h("b", { text: "Прогулка или пробежка с GPS" }), h("span", { class: "muted small", text: "Дистанция, время и темп" })),
         icon("chevron", 18)),
       challengeCard(walk),
       ...["quietCardio", "hiit"].map(id => QUICK.find(q => q.id === id)).filter(Boolean).map(quickCard),
@@ -1142,20 +1139,20 @@ function cardioSection() {
 }
 function challengesSection() {
   return [
-    h("p", { class: "lead", text: "Каждый день немного больше. Один день челленджа — один календарный день, отдых тоже засчитывается." }),
+    h("p", { class: "lead", text: "30 дней, каждый день чуть больше." }),
     h("div", { class: "covers" }, CHALLENGES.map(challengeCard))
   ];
 }
 function stretchSection() {
   const ids = ["yoga", "stretchAll", "evening", "posture", "back", "desk", "snack"];
   return [
-    h("p", { class: "lead", text: "Мягкие тренировки для гибкости, спины и хорошего сна." }),
+    h("p", { class: "lead", text: "Для гибкости, спины и сна." }),
     h("div", { class: "quick" }, ids.map(id => QUICK.find(q => q.id === id)).filter(Boolean).map(quickCard), challengeCard(CHALLENGES.find(c => c.id === "stretch30")))
   ];
 }
 function weightsSection() {
   return [
-    h("p", { class: "lead", text: "Гантели, гиря или штанга. Отметьте свой инвентарь в профиле — тогда упражнения не придётся заменять." }),
+    h("p", { class: "lead", text: "Гантели, гиря или штанга." }),
     h("h2", { class: "section-title", text: "Тренировки" }),
     h("div", { class: "quick" }, QUICK.filter(q => q.cat === "weights").map(quickCard)),
     h("h2", { class: "section-title", text: "Силовые программы" }),
@@ -1180,13 +1177,12 @@ function planView() {
   const goal = GOALS.find(g => g.id === p.goal);
   const hasWeights = p.equipment.some(e => WEIGHT_EQUIP.includes(e));
   const out = [
-    h("p", { class: "lead", text: "План собран под вашу цель, самочувствие и особенности тела. Меняйте настройки — план пересоберётся." }),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Длительность" }),
         choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { p.minutes = v; persist(); refresh(); } })),
       h("div", { class: "q" }, h("b", { text: "Цель" }),
         choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); refresh(); } })),
-      goal && goal.weights && !hasWeights ? h("p", { class: "note-box small", text: "Для этой цели пригодятся гантели или гиря. Отметьте их в профиле — или тренер подберёт силовые упражнения с весом тела." }) : null,
+      goal && goal.weights && !hasWeights ? h("p", { class: "note-box small", text: "Для этой цели пригодятся гантели или гиря — отметьте их в профиле." }) : null,
       plan.blocked ? null : h("div", { class: "q" }, h("b", { text: "Интенсивность сегодня" }),
         choice({ className: "seg", label: "Интенсивность", value: plan.mode, options: Object.entries(E.MODES).map(([id, m]) => ({ value: id, label: m.short })), onChange: v => { state.modeOverride = { d, mode: v }; persist(); refresh(); } })))
   ];
@@ -1214,10 +1210,10 @@ function planView() {
   }
   const setsBlock = plan.blocks.find(b => b.sets);
   if (!plan.blocked && plan.rest > 10) {
-    out.push(h("p", { class: "muted small center", text: `≈ ${plan.est} мин · отдых ${setsBlock ? "между подходами" : "между упражнениями основной части"} — ${plan.rest} сек` }));
+    out.push(h("p", { class: "muted small center", text: `≈ ${plan.est} мин · отдых ${plan.rest} сек` }));
   }
   if (setsBlock && setsBlock.items.some(it => EX[it.id].weighted)) {
-    out.push(h("p", { class: "muted small center", text: "Вес подбирайте так, чтобы последние 2–3 повтора давались тяжело, но без потери техники. В плеере его можно записать." }));
+    out.push(h("p", { class: "muted small center", text: "Вес — такой, чтобы последние 2–3 повтора давались тяжело, но чисто." }));
   }
 
   // кнопка запуска «плывёт» над нижним меню, пока список упражнений не докручен до неё:
@@ -1230,7 +1226,7 @@ function planView() {
       onClick: () => { state.planVariant = { d, n: variant() + 1 }; persist(); refresh(); toast("Собрали другой вариант"); }
     }, icon("refresh", 18), "Другой вариант")));
   }
-  out.push(h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#workout/ready", text: "Готовые тренировки, в том числе с весами →" })));
+  out.push(h("p", { class: "center", style: { marginTop: "18px" } }, h("a", { href: "#workout/ready", text: "Готовые тренировки →" })));
   return out;
 }
 
@@ -1322,7 +1318,7 @@ function readyWorkouts() {
   const rest = QUICK.filter(q => q.cat !== "weights" && !listed.has(q.id));
   const group = (title, list) => list.length ? [h("h2", { class: "group-title", text: title }), h("div", { class: "covers" }, list.map(quickRow))] : [];
   return [
-    h("p", { class: "lead", text: "Комплексы на любой случай. Неподходящие вам упражнения тренер заменит безопасными." }),
+    h("p", { class: "lead", text: "Неподходящие упражнения заменятся безопасными." }),
     ...READY_GROUPS.flatMap(([title, ids]) => group(title, ids.map(id => QUICK.find(q => q.id === id)).filter(Boolean))),
     ...group("Другие", rest),
     ...group("С весами", QUICK.filter(q => q.cat === "weights"))
@@ -1334,7 +1330,7 @@ function sessionSheet(s, { title, info, extra, actions }) {
   const close = sheet({
     title,
     body: [
-      h("p", { class: "muted", text: s.blocked ? "Сейчас тренировки на паузе — доступна только дыхательная практика." : info }),
+      h("p", { class: "muted", text: s.blocked ? "Тренировки на паузе — доступно только дыхание." : info }),
       extra || null,
       exRows(items),
       s.adaptations.length ? h("ul", { class: "adapt", style: { marginTop: "12px" } }, s.adaptations.map(a => h("li", { text: a }))) : null
@@ -1346,7 +1342,7 @@ function sessionSheet(s, { title, info, extra, actions }) {
 function roundsInfo(s) {
   const b = s.blocks[0];
   const rounds = b ? b.rounds : 1;
-  return `≈ ${s.est} мин${rounds > 1 ? ` · ${rounds} ${E.plural(rounds, "круг", "круга", "кругов")}` : ""}${s.rest ? ` · отдых ${s.rest} сек` : " · упражнения идут друг за другом"}`;
+  return `≈ ${s.est} мин${rounds > 1 ? ` · ${rounds} ${E.plural(rounds, "круг", "круга", "кругов")}` : ""}${s.rest ? ` · отдых ${s.rest} сек` : " · без отдыха"}`;
 }
 function quickSheet(id) {
   const q = QUICK.find(x => x.id === id);
@@ -1356,7 +1352,7 @@ function quickSheet(id) {
     title: s.title,
     info: roundsInfo(s),
     extra: missing.length ? h("div", { class: "note-box" },
-      h("p", { class: "small" }, `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}. Без этого упражнения заменятся похожими — или `,
+      h("p", { class: "small" }, `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}. Иначе заменим похожими — или `,
         h("a", { href: "#more/profile", text: "отметьте инвентарь в профиле" }), ".")) : null,
     actions: close => [favButton(id), h("button", { class: "btn primary", type: "button", onClick: () => { close(); startPlayer(s); } }, icon("play", 18), "Начать")]
   });
@@ -1383,7 +1379,7 @@ const customSession = w => E.buildCustom(state, { title: w.name, ids: w.items, r
 function myWorkouts() {
   const list = state.custom;
   return [
-    h("p", { class: "lead", text: "Соберите тренировку из любых упражнений библиотеки. Тренер всё равно проверит её на безопасность и заменит то, что вам сейчас нельзя." }),
+    h("p", { class: "lead", text: "Из любых упражнений. Тренер проверит её на безопасность." }),
     h("div", { class: "btn-row", style: { margin: "0 0 16px" } }, h("a", { class: "btn primary", href: "#builder" }, icon("plus", 18), "Собрать тренировку")),
     favCard(),
     list.length
@@ -1393,7 +1389,7 @@ function myWorkouts() {
           h("b", { text: w.name }),
           h("span", { class: "muted small", text: `${w.items.length} ${E.plural(w.items.length, "упражнение", "упражнения", "упражнений")} · ${w.rounds} ${E.plural(w.rounds, "круг", "круга", "кругов")} · ≈ ${customSession(w).est} мин` })),
         icon("chevron", 18))))
-      : h("section", { class: "card glass" }, h("p", { class: "muted", text: "Своих тренировок пока нет. Нажмите «Собрать тренировку», выберите упражнения, число кругов и отдых — тренировка сохранится здесь." }))
+      : h("section", { class: "card glass" }, h("p", { class: "muted", text: "Своих тренировок пока нет." }))
   ];
 }
 function customSheet(id) {
@@ -1442,10 +1438,10 @@ function viewBuilder(sub) {
         h("button", { class: "icon-btn mini", type: "button", "aria-label": `Выше: ${EX[id].name}`, disabled: i === 0, onClick: () => move(i, -1) }, icon("up", 16)),
         h("button", { class: "icon-btn mini", type: "button", "aria-label": `Ниже: ${EX[id].name}`, disabled: i === D.items.length - 1, onClick: () => move(i, 1) }, icon("down", 16)),
         h("button", { class: "icon-btn mini", type: "button", "aria-label": `Убрать: ${EX[id].name}`, onClick: () => { D.items.splice(i, 1); fill(); } }, icon("close", 16)))))
-      : [h("p", { class: "muted", text: "Добавьте 5–8 упражнений: разминку, основные и растяжку в конце." })]));
+      : [h("p", { class: "muted", text: "5–8 упражнений: разминка, основная часть, растяжка." })]));
     if (D.items.length) {
       const s = draftSession();
-      est.textContent = `≈ ${s.est} мин${s.adaptations.length ? ` · ${s.adaptations.length} ${E.plural(s.adaptations.length, "упражнение тренер заменит", "упражнения тренер заменит", "упражнений тренер заменит")} ради безопасности` : ""}`;
+      est.textContent = `≈ ${s.est} мин${s.adaptations.length ? ` · ${s.adaptations.length} ${E.plural(s.adaptations.length, "упражнение тренер заменит", "упражнения тренер заменит", "упражнений тренер заменит")}` : ""}`;
     } else est.textContent = "";
   };
   const name = h("input", { class: "input", maxlength: 40, placeholder: "Например: Ноги и спина", "aria-label": "Название тренировки" });
@@ -1574,8 +1570,8 @@ function exerciseSheet(id) {
         ex.equip.map(e => h("span", { class: "pill muted-pill", text: equipName(e) }))),
       h("p", { style: { marginTop: "12px" }, text: `Обычная доза: ${E.doseText(E.makeItem(ex, 1))}` }),
       ex.weighted ? h("p", { class: "small", text: w
-        ? `Рабочий вес: ${fmtKg(w.kg)}${w.d ? ` (${fmtDate(w.d)})` : ""}, лучший — ${fmtKg(w.best)}${w.e1rm ? `, расчётный максимум на 1 повтор ≈ ${fmtKg(w.e1rm)}` : ""}.`
-        : "Вес подбирайте так, чтобы последние 2–3 повтора давались тяжело, но без потери техники. В плеере можно записать вес и повторы каждого подхода." }) : null,
+        ? `Рабочий вес: ${fmtKg(w.kg)}${w.d ? ` (${fmtDate(w.d)})` : ""}, лучший — ${fmtKg(w.best)}${w.e1rm ? `, 1ПМ ≈ ${fmtKg(w.e1rm)}` : ""}.`
+        : "Вес — такой, чтобы последние 2–3 повтора давались тяжело, но чисто." }) : null,
       ex.weighted && w && w.hist.length > 1 ? h("div", { class: "spark-row" }, weightSpark(w.hist), h("span", { class: "muted small", text: `${w.hist.length} ${E.plural(w.hist.length, "запись", "записи", "записей")}` })) : null,
       h("h3", { class: "sub-title", text: "Как выполнять" }),
       h("ul", { class: "bullets" }, ex.cues.map(c => h("li", { text: c }))),
@@ -1584,7 +1580,7 @@ function exerciseSheet(id) {
         h("div", { class: "tags" },
           ms.main.map(m => h("span", { class: "pill mus-pill", text: m.name })),
           ms.helpers.map(m => h("span", { class: "pill muted-pill", text: m.name }))),
-        h("p", { class: "muted small", style: { marginTop: "6px" }, text: ms.helpers.length ? "Цветом — главные мышцы, серым — те, что помогают." : "Главные мышцы упражнения." })] : null,
+        h("p", { class: "muted small", style: { marginTop: "6px" }, text: ms.helpers.length ? "Цветом — главные мышцы, серым — помощники." : "Главные мышцы упражнения." })] : null,
       h("h3", { class: "sub-title", text: "Нагрузка на суставы и спину" }),
       loads.length ? h("ul", { class: "bullets" }, loads.map(([reg, l]) => h("li", { text: `${REGION[reg].name} — ${LOAD_WORD[l]}` })))
         : h("p", { class: "muted small", text: "Почти не нагружает суставы." }),
@@ -1607,10 +1603,10 @@ const painWord = v => (v === 0 ? "не болит" : v <= 3 ? "слабая" : v
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const STAGE_HINT = {
-  rotate: "Ведите пальцем по фигуре, чтобы повернуть её. Коснитесь зоны, чтобы отметить её.",
-  muscles: "Ведите пальцем, чтобы повернуть фигуру. Коснитесь мышцы — расскажем, что она делает и какие упражнения её тренируют.",
-  load: "Чем ярче мышца, тем сильнее она нагружена за последние 3 дня. Коснитесь мышцы, чтобы узнать подробнее.",
-  lasso: "Обведите пальцем место, которое беспокоит, — потом опишите, что там происходит."
+  rotate: "Поверните фигуру пальцем, коснитесь зоны, чтобы отметить.",
+  muscles: "Поверните фигуру пальцем, коснитесь мышцы.",
+  load: "Чем ярче мышца, тем сильнее нагрузка за 3 дня.",
+  lasso: "Обведите пальцем место, которое болит."
 };
 const stageHint = () => (figureMode === "lasso" ? STAGE_HINT.lasso : bodyLayer === "pain" ? STAGE_HINT.rotate : STAGE_HINT[bodyLayer]);
 const STAGE_VIEWS = [["front", "Спереди"], ["back", "Сзади"], ["side", "Сбоку"]];
@@ -1627,7 +1623,7 @@ function bodyStage({ layers = true } = {}) {
     return h("div", { class: "stage-loading", role: "status" }, h("span", { class: "spinner", "aria-hidden": "true" }), "Загружаем 3D-модель…");
   }
   if (!fig) {
-    return [bodyMap(), h("p", { class: "muted small center", text: "Объёмная модель не поддерживается этим браузером, поэтому показана простая карта. Все зоны есть в списке ниже." })];
+    return [bodyMap(), h("p", { class: "muted small center", text: "Объёмная модель здесь не работает — показана простая карта. Все зоны — в списке ниже." })];
   }
   fig.setMode(figureMode);
   const hint = h("p", { class: "stage-hint", "aria-live": "polite", text: stageHint() });
@@ -1683,7 +1679,7 @@ function bodyStage({ layers = true } = {}) {
     muscleLegend,
     painLegend,
     loadLegend,
-    h("p", { class: "muted small center", text: "Модель стоит к вам лицом: её правая сторона — слева от вас." }),
+    h("p", { class: "muted small center", text: "Модель лицом к вам: её правая сторона — слева." }),
     sexSeg || null);
 }
 
@@ -1697,7 +1693,7 @@ function recoveryCard() {
     h("div", { class: "card-head" },
       h("div", {}, h("p", { class: "eyebrow", text: "После тренировок" }), h("h2", { text: "Восстановление мышц" })),
       figure ? h("button", { class: "btn small ghost", type: "button", text: "На модели", onClick: () => { bodyLayer = "load"; bodyLayerPicked = true; render(); const card = document.querySelector(".stage-card"); if (card) card.scrollIntoView({ block: "start", behavior: reducedMotion() ? "auto" : "smooth" }); } }) : null),
-    h("p", { class: "muted small", text: "Мышцам нужно 48–72 часа, чтобы восстановиться. Тренер сам ставит в план тех, кто уже отдохнул." }),
+    h("p", { class: "muted small", text: "Мышцам нужно 48–72 часа на отдых — тренер это учитывает." }),
     h("div", { class: "recovery-list" }, list.slice(0, 8).map(m => {
       const pct = Math.round((1 - f[m.id]) * 100);
       const word = pct >= 85 ? "почти готова" : pct >= 50 ? "восстанавливается" : "сильно нагружена";
@@ -1736,12 +1732,12 @@ function muscleSheet(mid, side = "") {
       h("p", { style: { marginTop: "12px" }, text: m.does }),
       load >= 0.05
         ? h("div", { class: "recovery-item" },
-          h("div", { class: "recovery-head" }, h("b", { text: "Восстановление" }), h("span", { class: "muted small", text: `${pct}% · нагружалась за последние 3 дня` })),
+          h("div", { class: "recovery-head" }, h("b", { text: "Восстановление" }), h("span", { class: "muted small", text: `${pct}% нагрузки за 3 дня` })),
           h("span", { class: "progress slim recovery-bar", role: "img", "aria-label": `Восстановлено на ${pct}%` }, h("i", { style: { width: `${pct}%` } })))
-        : h("p", { class: "muted small", text: "За последние 3 дня тренировки её почти не нагружали — мышца отдохнула." }),
+        : h("p", { class: "muted small", text: "За 3 дня почти без нагрузки — мышца отдохнула." }),
       sev ? h("div", { class: "note-box" },
         h("b", { text: `Зона «${REGION[reg].name}» отмечена: ${SEVERITY[sev].name.toLowerCase()}.` }),
-        h("p", { class: "small", text: "Упражнения, которые её нагружают, тренер убрал или облегчил." })) : null,
+        h("p", { class: "small", text: "Тренер убрал или облегчил упражнения на неё." })) : null,
       exs.length ? [
         h("h3", { class: "sub-title", text: "Какие упражнения её тренируют" }),
         h("div", { class: "list" }, exs.map(ex => {
@@ -1751,7 +1747,7 @@ function muscleSheet(mid, side = "") {
             why.length ? h("span", { class: "pill muted-pill", text: "сейчас не подходит" }) : null,
             icon("chevron", 18));
         }))] : null,
-      reg ? h("p", { class: "muted small", style: { marginTop: "12px" }, text: `Мышца относится к зоне «${REGION[reg].name}». Если здесь болит, отметьте зону — тренер уберёт опасные упражнения.` }) : null
+      reg ? h("p", { class: "muted small", style: { marginTop: "12px" }, text: `Зона «${REGION[reg].name}». Болит — отметьте её, и опасные упражнения уйдут.` }) : null
     ],
     actions: [
       reg ? h("button", { class: "btn ghost", type: "button", text: sev ? "Изменить зону боли" : "Здесь болит", onClick: () => { close(); regionSheet(reg, side); } }) : null,
@@ -1767,7 +1763,7 @@ function musclesCard() {
   const list = MUSCLES.filter(m => !m.bone);
   return h("section", { class: "card glass" },
     h("h2", { text: "Все мышцы" }),
-    h("p", { class: "muted small", text: `${list.length} ${E.plural(list.length, "мышца", "мышцы", "мышц")} на модели — что делает каждая, как восстановилась и какие упражнения её тренируют.` }),
+    h("p", { class: "muted small", text: `${list.length} ${E.plural(list.length, "мышца", "мышцы", "мышц")}: что делает каждая и как её тренировать.` }),
     MUSCLE_GROUPS.map(g => {
       const ms = list.filter(m => m.group === g.id);
       const busy = ms.filter(m => f[m.id] >= 0.05).length;
@@ -1794,7 +1790,6 @@ function viewBody(sub) {
   return [
     h("h1", { class: "page-title", text: "Тело" }),
     bodyTabs(""),
-    h("p", { class: "lead", text: "Мышцы на модели — как в анатомическом атласе: коснитесь любой, чтобы узнать, что она делает. Если что-то болит, отметьте зону или обведите место — тренер уберёт опасные упражнения." }),
     h("section", { class: "card glass stage-card" }, bodyStage()),
     recoveryCard(),
     marksCard(),
@@ -1808,19 +1803,18 @@ function bodyHealth(r) {
   const notes = [...new Set(r.notes)];
   const pains = state.sessions.slice().reverse().flatMap(x => x.pains.map(p => ({ d: x.d, ex: p.ex, region: p.region }))).slice(0, 8);
   return [
-    h("p", { class: "lead", text: "Дневник боли, особенности здоровья и всё, что стоит показать врачу. Данные остаются на этом устройстве." }),
     painCard(),
     pains.length ? h("section", { class: "card glass" },
       h("h2", { text: "Боль во время тренировок" }),
       h("div", { class: "list" }, pains.map(p => h("div", { class: "row" },
         h("span", { class: "row-text" }, h("b", { text: REGION[p.region].name }), h("span", { class: "muted small", text: `${fmtDate(p.d)} · ${own(EX, p.ex) ? EX[p.ex].name : "упражнение"}` }))))),
-      h("p", { class: "muted small", text: "Если одна и та же зона болит снова и снова — покажитесь врачу или реабилитологу." })) : null,
+      h("p", { class: "muted small", text: "Болит снова и снова — покажитесь врачу." })) : null,
     h("section", { class: "card glass" },
-      h("div", { class: "card-head" }, h("div", {}, h("h2", { text: "Отчёт для врача" }), h("p", { class: "muted small", text: "Зоны, дневник боли и нагрузка на одной странице — распечатайте или сохраните в PDF." })),
+      h("div", { class: "card-head" }, h("div", {}, h("h2", { text: "Отчёт для врача" }), h("p", { class: "muted small", text: "Зоны, боль и нагрузка — для приёма у врача." })),
         h("a", { class: "btn small ghost", href: "#report" }, icon("print", 16), "Открыть"))),
     h("section", { class: "card glass" },
       h("h2", { text: "Особенности здоровья" }),
-      h("p", { class: "muted small", text: "Выберите всё, что к вам относится, — уберём неподходящие типы нагрузки." }),
+      h("p", { class: "muted small", text: "Уберём неподходящую вам нагрузку." }),
       choice({
         multiple: true, label: "Особенности здоровья",
         value: state.profile.conditions.filter(c => c !== "caution"),
@@ -1833,7 +1827,7 @@ function bodyHealth(r) {
         h("button", {
           class: "btn small ghost", type: "button", text: "Врач разрешил обычные нагрузки",
           onClick: async () => {
-            const ok = await confirmSheet({ title: "Выключить бережный режим?", message: "Делайте это, только если врач разрешил обычные тренировки.", ok: "Выключить" });
+            const ok = await confirmSheet({ title: "Выключить бережный режим?", message: "Только если это разрешил врач.", ok: "Выключить" });
             if (ok) { state.profile.conditions = state.profile.conditions.filter(c => c !== "caution"); persist(); refresh(); }
           }
         })) : null,
@@ -1846,11 +1840,11 @@ function bodyHealth(r) {
     h("details", { class: "card glass details-card" },
       h("summary", { text: "Как тренер учитывает боль" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "«Дискомфорт» убирает упражнения с заметной нагрузкой на зону, «ограничение» и «острая боль» — все упражнения, которые её нагружают." }),
-        h("li", { text: "Обведённая область работает так же: тренер учитывает каждую зону внутри обводки." }),
-        h("li", { text: "Особенности здоровья исключают опасные типы нагрузки: прыжки, высокую интенсивность, положения вниз головой и другие." }),
-        h("li", { text: "Кнопка «Больно» во время тренировки сразу заменяет упражнение и 7 дней бережёт эту зону, а на следующий день приложение спросит, как она." }),
-        h("li", { text: "Это общие правила безопасности, а не диагноз. Если что-то болит долго или сильно — покажитесь врачу." })))
+        h("li", { text: "«Дискомфорт» убирает сильную нагрузку на зону, «ограничение» и «острая боль» — любую." }),
+        h("li", { text: "Обводка работает так же: учитывается каждая зона внутри." }),
+        h("li", { text: "Особенности здоровья убирают опасное: прыжки, высокую интенсивность, позы вниз головой." }),
+        h("li", { text: "«Больно» в плеере заменяет упражнение и бережёт зону 7 дней." }),
+        h("li", { text: "Это не диагноз. Болит долго или сильно — покажитесь врачу." })))
   ];
 }
 
@@ -1888,7 +1882,7 @@ function marksCard() {
         h("span", { class: "row-text" }, h("b", { text: markLabel(m) }), h("span", { class: "muted small", text: markSub(m) })),
         h("span", { class: `pill sev-${m.sev}`, text: SEVERITY[m.sev].name }),
         icon("chevron", 18))))
-      : h("p", { class: "muted small", text: "Нажмите «Обвести» и проведите пальцем вокруг места, которое болит, — например, внутренней части колена или области под лопаткой. Областей может быть несколько." }));
+      : h("p", { class: "muted small", text: "Обведите пальцем место, которое болит. Можно несколько." }));
 }
 
 // ----- Дневник боли -----
@@ -1922,7 +1916,7 @@ function painCard() {
   return h("section", { class: "card glass" },
     h("p", { class: "eyebrow", text: "Дневник боли" }),
     h("h2", { text: "Как меняется боль" }),
-    h("p", { class: "muted small", text: "Отмечайте силу боли от 0 до 10 раз в день — по линии видно, идёт ли восстановление. Нажмите на зону, чтобы записать." }),
+    h("p", { class: "muted small", text: "Раз в день отмечайте боль от 0 до 10 — так видно восстановление." }),
     h("div", { class: "list" }, ids.slice(0, 12).map(id => {
       const t = E.painTrend(state, id, 30);
       const tr = trendText(t);
@@ -1964,7 +1958,7 @@ function painLogSheet(id) {
   const close = sheet({
     title: reg.name,
     body: [
-      h("p", { class: "muted small", text: "Насколько болит сейчас? Запись за сегодня можно исправить в любой момент." }),
+      h("p", { class: "muted small", text: "Насколько болит сейчас?" }),
       painRange(draft),
       recent.length ? [
         h("h3", { class: "sub-title", text: "Последние записи" }),
@@ -1972,7 +1966,7 @@ function painLogSheet(id) {
           h("span", { class: "row-text" }, h("b", { text: fmtDate(p.d) })),
           h("span", { class: `pain-level lvl-${painTier(p.level)}`, text: String(p.level) }))))
       ] : null,
-      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Боль, которая нарастает, будит ночью или идёт вместе с отёком, онемением или температурой, — повод показаться врачу." })
+      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Боль нарастает, будит ночью, есть отёк, онемение или температура — покажитесь врачу." })
     ],
     actions: [h("button", {
       class: "btn primary", type: "button", text: "Записать",
@@ -1997,8 +1991,8 @@ async function suggestSeverity(id, pain) {
   const ok = await confirmSheet({
     title: want === 3 ? "Похоже на сильную боль" : "Боль заметная",
     message: want === 3
-      ? `${pain} из 10. Отметить зону «${zone}» как острую боль? Тренер исключит любую нагрузку на неё. Сильная боль — повод обратиться к врачу.`
-      : `${pain} из 10. Отметить зону «${zone}» как ограничение? Тренер перестанет её нагружать.`,
+      ? `${pain} из 10. Отметить «${zone}» как острую боль? Нагрузку уберём. Сильная боль — повод к врачу.`
+      : `${pain} из 10. Отметить «${zone}» как ограничение? Нагружать не будем.`,
     ok: "Да, учесть", cancel: "Не нужно"
   });
   if (!ok || !state) return;
@@ -2014,11 +2008,11 @@ function problemFields(draft) {
   const warn = h("div", { class: "note-box", role: "status", hidden: true });
   const update = () => {
     const msgs = [];
-    if (draft.pain >= 7) msgs.push("Боль 7 из 10 и сильнее — повод показаться врачу. Пока выберите «Острая боль»: тренер уберёт любую нагрузку на зону.");
+    if (draft.pain >= 7) msgs.push("Боль от 7 из 10 — повод показаться врачу. Пока выберите «Острая боль».");
     const flags = draft.symptoms.map(id => SYMPTOMS.find(x => x.id === id)).filter(x => x && x.flag);
-    if (flags.length) msgs.push(`${flags.map(x => x.name).join(", ")} — с такими признаками лучше показаться врачу, особенно если они появились недавно или нарастают.`);
+    if (flags.length) msgs.push(`${flags.map(x => x.name).join(", ")} — лучше показаться врачу.`);
     if (draft.onset === "days" && ["swelling", "bruise", "sprain"].some(x => draft.symptoms.includes(x))) {
-      msgs.push("Свежая травма: первые 1–3 дня берегите зону и держите её приподнятой, холод через ткань — до 15–20 минут. Потом — осторожное движение без сильной боли.");
+      msgs.push("Свежая травма: 1–3 дня берегите зону, держите её повыше, холод через ткань до 15–20 минут. Потом — осторожное движение.");
     }
     warn.hidden = !msgs.length;
     warn.replaceChildren(...msgs.map(m => h("p", { class: "small", text: m })));
@@ -2049,7 +2043,7 @@ function guideFor(regionIds) {
 function guideRow(a, beforeGo) {
   return h("a", { class: "row", href: `#guide/${a.id}`, onClick: () => { if (beforeGo) beforeGo(); } },
     h("span", { class: "fi" }, icon("book", 18)),
-    h("span", { class: "row-text" }, h("b", { text: a.title }), h("span", { class: "muted small", text: a.short })),
+    h("span", { class: "row-text" }, h("b", { text: a.title })),
     state.guideRead.includes(a.id) ? h("span", { class: "pill muted-pill", text: "прочитано" }) : null,
     icon("chevron", 18));
 }
@@ -2063,7 +2057,7 @@ function guideLinks(regionIds, beforeGo) {
 function regionsCard(r) {
   return h("section", { class: "card glass" },
     h("h2", { text: "Все зоны" }),
-    h("p", { class: "muted small", text: `${REGIONS.length} ${E.plural(REGIONS.length, "зона", "зоны", "зон")} — от головы до стопы. Откройте группу и выберите зону.` }),
+    h("p", { class: "muted small", text: `${REGIONS.length} ${E.plural(REGIONS.length, "зона", "зоны", "зон")} — от головы до стопы.` }),
     REGION_GROUPS.map(g => {
       const regs = REGIONS.filter(x => x.group === g.id);
       const top = Math.max(0, ...regs.map(x => r.regionSev[x.id] || 0));
@@ -2090,7 +2084,7 @@ function regionRow(reg, r) {
   if (E.markSeverity(state, reg.id) && !(b && b.sev)) bits.push("обведено на модели");
   return h("button", { class: "row row-btn", type: "button", onClick: () => regionSheet(reg.id) },
     h("span", { class: "row-text" }, h("b", { text: reg.name }), bits.length ? h("span", { class: "muted small", text: bits.join(" · ") }) : null),
-    h("span", { class: `pill ${sev ? `sev-${sev}` : "muted-pill"}`, text: sev ? SEVERITY[sev].name : "в порядке" }),
+    sev ? h("span", { class: `pill sev-${sev}`, text: SEVERITY[sev].name }) : null,
     icon("chevron", 18));
 }
 
@@ -2186,7 +2180,7 @@ function regionSheet(id, tappedSide = "") {
     body: [
       reg.sided ? h("div", { class: "q" }, h("b", { text: "Сторона" }),
         choice({ multiple: true, label: "Сторона", value: draft.sides, options: SIDES.map(x => ({ value: x.id, label: x.name })), onChange: v => { draft.sides = v; } }),
-        h("p", { class: "muted small", style: { marginTop: "6px" }, text: "Не выбрано ничего — значит, обе стороны." })) : null,
+        h("p", { class: "muted small", style: { marginTop: "6px" }, text: "Не выбрано — значит, обе." })) : null,
       h("div", { class: "q" }, h("b", { text: "Состояние зоны" }),
         choice({ label: "Состояние зоны", value: draft.sev, options: SEVERITY.map(x => ({ value: x.v, label: x.name })), onChange: v => { draft.sev = v; updateInfo(); } })),
       desc, effect,
@@ -2196,7 +2190,7 @@ function regionSheet(id, tappedSide = "") {
           class: "btn small ghost", type: "button", text: "Уже не болит — снять защиту",
           onClick: e => { draft.clearTemp = true; e.currentTarget.disabled = true; e.currentTarget.textContent = "Снимем после сохранения"; }
         })) : null,
-      marksHere.length ? h("p", { class: "small", style: { marginTop: "10px" }, text: `Эта зона есть в ${marksHere.length} ${E.plural(marksHere.length, "обведённой области", "обведённых областях", "обведённых областях")} — их тренер тоже учитывает.` }) : null,
+      marksHere.length ? h("p", { class: "small", style: { marginTop: "10px" }, text: `Есть в ${marksHere.length} ${E.plural(marksHere.length, "обведённой области", "обведённых областях", "обведённых областях")}.` }) : null,
       h("details", { class: "more", open: described },
         h("summary", { text: "Описать проблему подробнее" }),
         problemFields(draft)),
@@ -2323,14 +2317,14 @@ function markSheet(result, existing) {
     title: existing ? "Обведённая область" : "Что беспокоит здесь?",
     onClose: () => { if (figure) figure.clearSelection(); },
     body: [
-      h("p", { class: "muted small", text: existing ? `Отмечено ${existing.d ? fmtDate(existing.d) : "раньше"}. Можно поменять описание или удалить область.` : "Мы нашли эти зоны внутри обводки. Лишнее уберите касанием, недостающее добавьте из списка." }),
+      h("p", { class: "muted small", text: existing ? `Отмечено ${existing.d ? fmtDate(existing.d) : "раньше"}.` : "Зоны внутри обводки. Лишнее уберите касанием." }),
       zones, addSel,
       h("div", { class: "q", style: { marginTop: "16px" } }, h("b", { text: "Насколько мешает" }),
         choice({ label: "Насколько мешает", value: draft.sev, options: SEVERITY.filter(x => x.v).map(x => ({ value: x.v, label: x.name })), onChange: v => { draft.sev = v; updateEffect(); } })),
       desc, effect,
       problemFields(draft),
       guideLinks([...new Set(draft.regions.map(z => z.id))], () => { if (commit()) toast("Область сохранена"); }),
-      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Описание остаётся на этом устройстве и нужно только для подбора упражнений. Это не диагноз." }),
+      h("p", { class: "muted small", style: { marginTop: "12px" }, text: "Нужно только для подбора упражнений. Это не диагноз." }),
       err
     ],
     actions
@@ -2351,7 +2345,7 @@ function addActivitySheet() {
     body: [
       h("button", { class: "quick-item glass gps-start", type: "button", onClick: () => { close(); startTracker(draft.title === "Бег" ? "run" : "walk"); } },
         h("span", { class: "fi" }, icon("today", 20)),
-        h("span", { class: "row-text" }, h("b", { text: "Записать с GPS" }), h("span", { class: "muted small", text: "Дистанция, время и темп прогулки или пробежки" })),
+        h("span", { class: "row-text" }, h("b", { text: "Записать с GPS" }), h("span", { class: "muted small", text: "Дистанция, время и темп" })),
         icon("chevron", 18)),
       h("p", { class: "muted small", text: "Или добавьте вручную:" }),
       h("div", { class: "q" }, h("b", { text: "Что делали?" }),
@@ -2422,7 +2416,7 @@ async function shareText(textValue) {
   }
   try {
     await navigator.clipboard.writeText(textValue);
-    toast("Текст скопирован — вставьте его в сообщение");
+    toast("Текст скопирован");
   } catch (e) {
     toast("Не удалось поделиться в этом браузере");
   }
@@ -2475,7 +2469,7 @@ function calendarCard() {
       h("span", {}, h("i", { class: "w" }), "тренировка"),
       h("span", {}, h("i", { class: "a" }), "активность"),
       h("span", {}, h("i", { class: "p" }), "боль")),
-    h("p", { class: "muted small", text: `За месяц: ${workouts} ${E.plural(workouts, "день", "дня", "дней")} с тренировками, всего активных дней — ${active}.` }));
+    h("p", { class: "muted small", text: `За месяц: ${workouts} ${E.plural(workouts, "день", "дня", "дней")} с тренировками, активных — ${active}.` }));
 }
 const sessionLine = x => [fmtDate(x.d), `${x.mins} мин`, x.km ? `${fmtNum(x.km)} км` : "", x.rpe ? `тяжесть ${x.rpe}/10` : ""].filter(Boolean).join(" · ");
 const paceText = (mins, km) => {
@@ -2503,7 +2497,7 @@ function historySheet(id) {
       s.goal !== "activity" ? h("div", { class: "q" }, h("b", { text: "Тяжесть от 1 до 10" }),
         choice({ className: "rpe", label: "Тяжесть тренировки", value: rpe, options: Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: String(i + 1) })), onChange: v => { rpe = v; } })) : null,
       err,
-      h("p", { class: "muted small", text: "Удаление записи не меняет отметки программ, челленджей и журнал весов." })
+      h("p", { class: "muted small", text: "Отметки программ и журнал весов не изменятся." })
     ],
     actions: [
       h("button", {
@@ -2592,7 +2586,7 @@ function bodyWeightCard() {
       first && delta ? ` · ${delta > 0 ? "+" : "−"}${fmtNum(Math.abs(delta))} кг с ${fmtDate(first[0])}` : "") : null,
     waistNote(),
     list.length > 1 ? bwChart(list.slice(-30)) : null,
-    h("p", { class: "muted small", text: "Взвешивайтесь утром, до завтрака, раз в неделю — так видна настоящая динамика, а не колебания воды." }));
+    h("p", { class: "muted small", text: "Взвешивайтесь раз в неделю, утром до завтрака." }));
 }
 // Обхват талии: последнее измерение и ориентир риска (для взрослых, если указан пол)
 const lastWaist = () => { for (let i = state.bodyWeight.length - 1; i >= 0; i--) if (state.bodyWeight[i][2]) return state.bodyWeight[i]; return null; };
@@ -2622,7 +2616,7 @@ function bodyWeightSheet() {
     body: [
       h("label", { class: "field" }, h("span", { text: "Вес, кг" }), kg),
       h("label", { class: "field" }, h("span", { text: "Обхват талии, см" }), waist),
-      h("p", { class: "muted small", text: "Талию измеряйте на выдохе, посередине между нижним ребром и тазовой костью." }),
+      h("p", { class: "muted small", text: "Талию — на выдохе, посередине между ребром и тазовой костью." }),
       h("label", { class: "field" }, h("span", { text: "Дата" }), date),
       err
     ],
@@ -2731,7 +2725,7 @@ async function shareCard(card, textValue) {
     if (e && e.name === "AbortError") return;
   }
   download("listopuls.png", blob, "image/png");
-  toast("Картинка сохранена — отправьте её друзьям");
+  toast("Картинка сохранена");
 }
 function shareWeek() {
   const w = weekStats();
@@ -2783,19 +2777,19 @@ function progressOverview() {
       h("div", { class: "card-head" },
         h("h2", { text: "Последние 7 дней" }),
         h("button", { class: "btn small ghost", type: "button", onClick: shareWeek }, icon("share", 16), "Поделиться")),
-      h("p", { class: "muted small", text: `${who.done} из ${who.mins} мин по норме ВОЗ · силовых дней: ${who.strengthDays} из ${who.strength}${who.balance ? ` · равновесие: ${who.balanceDays} из ${who.balance}` : ""}${w.avg !== null ? ` · средняя готовность ${w.avg}` : ""}` }),
+      h("p", { class: "muted small", text: `${who.done} из ${who.mins} мин · силовых дней: ${who.strengthDays} из ${who.strength}${who.balance ? ` · равновесие: ${who.balanceDays} из ${who.balance}` : ""}` }),
       h("div", { class: "bars", role: "img", "aria-label": days.map(x => `${fmtDate(x.d, { weekday: "short" })}: ${x.mins} мин`).join(", ") },
         days.map(x => h("div", { class: `bar${x.mins ? "" : " zero"}` },
           x.mins ? h("small", { text: String(x.mins) }) : null,
           h("i", { style: { height: `${Math.max(4, Math.round((x.mins / max) * 96))}px` } }),
           h("span", { text: fmtDate(x.d, { weekday: "short" }) })))),
       h("p", { class: "muted small", text: who.teen
-        ? "Подросткам ВОЗ советует в среднем 60 минут движения в день, а силовые и интенсивные занятия — 3 дня в неделю."
-        : "ВОЗ советует 150–300 минут умеренной активности в неделю (интенсивная минута идёт за две) и силовые не реже 2 дней." })),
+        ? "ВОЗ для подростков: 60 минут движения в день, силовые — 3 дня в неделю."
+        : "ВОЗ: 150–300 минут в неделю (интенсивная минута — за две) и силовые 2 дня." })),
     calendarCard(),
     recent.length >= 2 ? h("section", { class: "card glass" },
       h("h2", { text: "Готовность за 2 недели" }),
-      h("p", { class: "muted small", text: "По отметкам самочувствия: чем выше, тем лучше сон, энергия и восстановление." }),
+      h("p", { class: "muted small", text: "Чем выше, тем лучше сон, энергия и восстановление." }),
       sparkline(recent)) : null,
     h("section", { class: "card glass" },
       h("h2", { text: "История" }),
@@ -2805,8 +2799,7 @@ function progressOverview() {
           h("span", { class: "muted small", text: sessionLine(x) })),
         x.pains.length ? h("span", { class: "pill sev-2", text: "боль" }) : null,
         icon("chevron", 16))))
-        : h("p", { class: "muted", text: "Пока пусто. Первая тренировка — на вкладке «Сегодня»." }),
-      hist.length ? h("p", { class: "muted small", text: "Нажмите на запись, чтобы исправить или удалить её." }) : null)
+        : h("p", { class: "muted", text: "Пока пусто. Первая тренировка — на вкладке «Сегодня»." }))
   ];
 }
 function badgesCard() {
@@ -2826,7 +2819,7 @@ function recordsCard() {
       ? h("div", { class: "list" }, recs.map(([id, rec]) => h("div", { class: "row" },
         h("span", { class: "row-text" }, h("b", { text: EX[id].name }), h("span", { class: "muted small", text: `${fmtDate(rec.d)} · попыток: ${rec.tries}` })),
         h("b", { class: "rec-time", text: mmss(rec.best) }))))
-      : h("p", { class: "muted small", text: "Сколько продержитесь в планке или «стульчике»? Засеките время — рекорды появятся здесь." }));
+      : h("p", { class: "muted small", text: "Засеките планку или «стульчик» — рекорды появятся здесь." }));
 }
 function calcCard() {
   const p = state.profile;
@@ -2866,25 +2859,24 @@ function viewMore(sub) {
       avatarEl(),
       h("span", { class: "row-text" },
         h("b", { text: p.name || "Ваш профиль" }),
-        h("span", { class: "muted small", text: `${goal ? goal.short : ""} · ${level ? level.name.toLowerCase() : ""} · ${p.days.length} ${E.plural(p.days.length, "день", "дня", "дней")} в неделю` }),
-        h("span", { class: "small accent-text", text: "Цели, уровень, инвентарь" })),
+        h("span", { class: "muted small", text: `${goal ? goal.short : ""} · ${level ? level.name.toLowerCase() : ""} · ${p.days.length} ${E.plural(p.days.length, "день", "дня", "дней")} в неделю` })),
       icon("chevron", 18)),
     ...group("Тренировки", [
-      row("#more/calendar", "calendar", "План и напоминания", p.planTime ? planText(p) : "Когда и где тренироваться, напоминания в календаре")
+      row("#more/calendar", "calendar", "План и напоминания", p.planTime ? planText(p) : "Время, место и календарь")
     ]),
     ...group("Здоровье", [
-      row("#body/health", "heart", "Боль и особенности здоровья", "Дневник боли, бережный режим, возраст"),
-      row("#report", "print", "Отчёт для врача", "Боль и нагрузка на одной странице"),
-      row("#more/calc", "calc", "Калькуляторы", "ИМТ, талия, калории, пульс, 1ПМ")
+      row("#body/health", "heart", "Боль и особенности здоровья"),
+      row("#report", "print", "Отчёт для врача"),
+      row("#more/calc", "calc", "Калькуляторы", "ИМТ, калории, пульс, 1ПМ")
     ]),
     ...group("Приложение", [
-      row("#more/look", "palette", "Персонализация", "Цвет, фон, шрифт, главный экран, аватар"),
-      row("#more/settings", "sliders", "Настройки", "Звук, голос, вибрация"),
-      row("#more/data", "shield", "Данные и защита", "Пароль, резервная копия, таблицы"),
-      row("#more/install", "phone", "Установить на телефон", "Иконка на экране, работа без интернета"),
+      row("#more/look", "palette", "Персонализация"),
+      row("#more/settings", "sliders", "Настройки"),
+      row("#more/data", "shield", "Данные и защита", "Пароль и резервная копия"),
+      row("#more/install", "phone", "Установить на телефон"),
       h("button", { class: "row row-btn lg-row", type: "button", onClick: inviteFriend },
-        h("span", { class: "fi" }, icon("share", 18)), h("span", { class: "row-text" }, h("b", { text: "Пригласить друга" }), h("span", { class: "muted small", text: "Бесплатно и без регистрации" })), icon("chevron", 16)),
-      row("#more/about", "doc", "О приложении", "Документы и безопасность")
+        h("span", { class: "fi" }, icon("share", 18)), h("span", { class: "row-text" }, h("b", { text: "Пригласить друга" })), icon("chevron", 16)),
+      row("#more/about", "doc", "О приложении")
     ]),
     h("p", { class: "muted small center", style: { marginTop: "18px" } }, `Листопульс ${VERSION} · 12+ · `, h("a", { href: "../index.html", text: "сайт о здоровье" }))
   ];
@@ -2899,7 +2891,7 @@ async function inviteFriend() {
   }
   try {
     await navigator.clipboard.writeText(`${textValue} ${url}`);
-    toast("Ссылка скопирована — вставьте её в сообщение");
+    toast("Ссылка скопирована");
   } catch (e) {
     toast(url);
   }
@@ -2910,15 +2902,15 @@ function subGps() {
   const km = Math.round(list.reduce((a, x) => a + x.km, 0) * 10) / 10;
   return [
     h("h1", { class: "page-title", text: "Прогулка с GPS" }),
-    h("p", { class: "lead", text: "Запишите прогулку или пробежку: дистанция, время и темп. Минуты сразу попадут в недельную норму ВОЗ." }),
+    h("p", { class: "lead", text: "Дистанция, время и темп. Минуты идут в норму недели." }),
     h("section", { class: "card glass" },
       h("div", { class: "btn-row" },
         h("button", { class: "btn primary", type: "button", onClick: () => startTracker("walk") }, icon("play", 18), "Прогулка"),
         h("button", { class: "btn ghost", type: "button", onClick: () => startTracker("run") }, icon("play", 18), "Пробежка")),
       h("ul", { class: "bullets small" },
-        h("li", { text: "Браузер спросит разрешение на геолокацию — оно нужно только во время записи." }),
-        h("li", { text: "Держите экран включённым: в фоне браузер не записывает маршрут." }),
-        h("li", { text: "Координаты не сохраняются и никуда не отправляются: в дневник попадают только дистанция и время." }))),
+        h("li", { text: "Геолокация нужна только во время записи." }),
+        h("li", { text: "Не выключайте экран: в фоне запись не идёт." }),
+        h("li", { text: "Координаты не сохраняются — только дистанция и время." }))),
     h("section", { class: "card glass" },
       h("h2", { text: "За 30 дней" }),
       list.length
@@ -2946,7 +2938,7 @@ function subLibrary() {
       const ok = E.fits(ex, r, state.profile);
       return h("button", { class: "row row-btn", type: "button", onClick: () => exerciseSheet(ex.id) },
         h("span", { class: "row-text" }, h("b", { text: ex.name }), h("span", { class: "muted small", text: `${GROUPS[ex.group]} · ${LEVELS[ex.level - 1].name}` })),
-        h("span", { class: `pill${ok ? "" : " muted-pill"}`, text: ok ? "подходит" : "не сейчас" }));
+        ok ? null : h("span", { class: "pill muted-pill", text: "не сейчас" }));
     }) : [h("p", { class: "muted", text: "Ничего не нашлось" })]));
   };
   const search = h("input", { class: "input", type: "search", placeholder: "Поиск упражнения", "aria-label": "Поиск упражнения", maxlength: 60 });
@@ -2992,20 +2984,20 @@ function subTimer() {
   };
   return [
     h("h1", { class: "page-title", text: "Интервальный таймер" }),
-    h("p", { class: "lead", text: "Чередуйте работу и отдых в любых упражнениях. Сигнал прозвучит на каждой смене." }),
+    h("p", { class: "lead", text: "Работа и отдых по кругу, сигнал на каждой смене." }),
     h("section", { class: "card glass" },
       h("p", { class: "eyebrow", text: "Готовые режимы" }),
       h("div", { class: "chips" }, TIMER_PRESETS.filter(pr => !(pr.hi && banned.has("hi"))).map(pr => h("button", {
         class: "chip", type: "button", "aria-pressed": timerCfg.work === pr.work && timerCfg.rest === pr.rest && timerCfg.rounds === pr.rounds ? "true" : "false",
         onClick: () => { timerCfg.work = pr.work; timerCfg.rest = pr.rest; timerCfg.rounds = pr.rounds; refresh(); }
       }, `${pr.name} ${pr.rounds}×${pr.work}/${pr.rest}`))),
-      h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Изометрия и связки — длинные спокойные удержания: упражнения из раздела «Статика и связки» или любые позы, которые держите без боли." })),
+      h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Долгие спокойные удержания в позах без боли." })),
     h("section", { class: "card glass" }, h("div", { class: "list" },
       stepper("Работа", "work", 10, 300, 5, " с"),
       stepper("Отдых", "rest", 0, 300, 5, " с"),
       stepper("Раунды", "rounds", 1, 30, 1, ""))),
     h("button", { class: "btn primary block", type: "button", onClick: startInterval }, icon("play", 18), "Старт"),
-    h("p", { class: "muted small center", style: { marginTop: "12px" }, text: "Высокая интенсивность подходит не всем: при болезнях сердца и давлении выбирайте спокойный темп." })
+    h("p", { class: "muted small center", style: { marginTop: "12px" }, text: "При болезнях сердца и давлении — спокойный темп." })
   ];
 }
 
@@ -3061,8 +3053,8 @@ function subBreath() {
   });
   return [
     h("h1", { class: "page-title", text: "Дыхание" }),
-    h("p", { class: "lead", text: "Медленное дыхание с длинным выдохом помогает успокоиться и восстановиться после тренировки." }),
-    noHolds ? h("div", { class: "note-box", style: { marginBottom: "14px" } }, "Показаны практики без задержки дыхания — так безопаснее при ваших особенностях здоровья.") : null,
+    h("p", { class: "lead", text: "Длинный выдох успокаивает и помогает восстановиться." }),
+    noHolds ? h("div", { class: "note-box", style: { marginBottom: "14px" } }, "Без задержки дыхания — так безопаснее для вас.") : null,
     h("section", { class: "card glass" },
       choice({ label: "Техника", value: pattern.id, options: options.map(p => ({ value: p.id, label: p.name })), onChange: v => { pattern = options.find(p => p.id === v); stop("Готовы?"); } }),
       h("div", { class: "breath-stage" }, ball, h("div", { class: "breath-text", "aria-live": "polite" }, phase, count)),
@@ -3079,9 +3071,9 @@ function subCalendar() {
     h("h1", { class: "page-title", text: "План и напоминания" }),
     h("section", { class: "card glass" },
       h("h2", { text: "Мой план" }),
-      h("p", { class: "muted small", text: state.profile.planTime ? planText(state.profile) : "Когда, где и после чего вы тренируетесь. Заранее принятое решение помогает не пропускать." }),
+      h("p", { class: "muted small", text: state.profile.planTime ? planText(state.profile) : "Когда, где и после чего вы тренируетесь." }),
       h("button", { class: "btn ghost", type: "button", text: state.profile.planTime ? "Изменить план" : "Составить план", onClick: planSheet })),
-    h("p", { class: "lead", text: "Сохраните расписание в календарь телефона — он сам напомнит за 10 минут. Приложению не нужны уведомления и доступ к календарю." }),
+    h("p", { class: "lead", text: "Календарь телефона напомнит за 10 минут до тренировки." }),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Дни тренировок" }),
         choice({ multiple: true, label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; state.profile.days = v.length ? v.slice().sort() : state.profile.days; persist(); } })),
@@ -3094,15 +3086,15 @@ function subCalendar() {
           if (!/^\d{2}:\d{2}$/.test(time.value)) { err.textContent = "Укажите время"; return; }
           err.textContent = "";
           download("listopuls-trenirovki.ics", E.makeICS(draft.days.slice().sort(), time.value, state.profile.minutes), "text/calendar");
-          toast("Файл сохранён — откройте его, чтобы добавить в календарь");
+          toast("Файл сохранён — откройте его");
         }
       }, icon("download", 18), "Скачать файл для календаря")),
-    h("section", { class: "card glass" },
-      h("h2", { text: "Как добавить" }),
+    h("details", { class: "card glass details-card" },
+      h("summary", { text: "Как добавить в календарь" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "iPhone: откройте скачанный файл и нажмите «Добавить все»." }),
-        h("li", { text: "Android: откройте файл из уведомления о загрузке — он откроется в приложении «Календарь»." }),
-        h("li", { text: "Чтобы изменить расписание, удалите старое событие в календаре и скачайте новый файл." })))
+        h("li", { text: "iPhone: откройте файл и нажмите «Добавить все»." }),
+        h("li", { text: "Android: откройте файл из загрузок — он откроется в «Календаре»." }),
+        h("li", { text: "Новое расписание: удалите старое событие и скачайте файл заново." })))
   ];
 }
 
@@ -3123,16 +3115,16 @@ function subProfile() {
       h("div", { class: "q" }, h("b", { text: "Дни тренировок" }), choice({ multiple: true, label: "Дни", value: p.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { if (v.length) { p.days = v.slice().sort(); persist(); } } }))),
     h("section", { class: "card glass" },
       h("h2", { text: "Для калькуляторов" }),
-      h("p", { class: "muted small", text: "Необязательно. Нужно только для расчёта ИМТ, калорий и пульсовых зон — остаётся на устройстве." }),
+      h("p", { class: "muted small", text: "Необязательно — для ИМТ, калорий и пульса." }),
       h("div", { class: "q" }, h("b", { text: "Пол" }), choice({ className: "seg", label: "Пол", value: p.sex, options: [{ value: "", label: "Не указан" }, { value: "f", label: "Женский" }, { value: "m", label: "Мужской" }], onChange: v => { p.sex = v; persist(); applyLookNow(); } })),
       heightField()),
     h("section", { class: "card glass" },
       h("h2", { text: "Мой план" }),
-      h("p", { class: "muted small", text: p.planTime ? planText(p) : "Когда, где и после чего вы тренируетесь — так проще не пропускать." }),
+      h("p", { class: "muted small", text: p.planTime ? planText(p) : "Когда, где и после чего вы тренируетесь." }),
       h("button", { class: "btn ghost", type: "button", text: p.planTime ? "Изменить план" : "Составить план", onClick: planSheet })),
     h("section", { class: "card glass" },
       h("h2", { text: "Анкета безопасности" }),
-      h("p", { class: "muted small", text: `${p.screenedAt ? `Заполнена ${fmtDate(p.screenedAt, { day: "numeric", month: "long", year: "numeric" })}. ` : ""}Обновляйте её раз в год и когда меняется здоровье — ответы обновят бережный режим. Тренировки и дневник сохранятся.` }),
+      h("p", { class: "muted small", text: `${p.screenedAt ? `Заполнена ${fmtDate(p.screenedAt, { day: "numeric", month: "long", year: "numeric" })}. ` : ""}Обновляйте раз в год и при изменениях здоровья.` }),
       h("button", {
         class: "btn ghost", type: "button", text: "Пройти знакомство заново",
         onClick: () => { p.onboarded = false; onb = null; onbStep = 0; persist(); render(); }
@@ -3175,7 +3167,7 @@ function pickImage(kind, onDone) {
       if (data.length > store.MEDIA_MAX) throw new Error("Картинка слишком большая — выберите поменьше");
       const next = { ...media, [kind]: data };
       const ok = await store.saveMedia(next);
-      if (!ok) throw new Error("Не хватило места в памяти браузера — выберите картинку поменьше");
+      if (!ok) throw new Error("Мало памяти — выберите картинку поменьше");
       media = next;
       setMediaUrls();
       onDone();
@@ -3200,7 +3192,7 @@ function subLook() {
   const body = lookTab === "text" ? lookText() : lookTab === "screens" ? lookScreens() : lookTab === "demo" ? lookDemo() : lookStyle();
   return [
     h("h1", { class: "page-title", text: "Персонализация" }),
-    h("p", { class: "lead", text: "Настройте приложение под себя: изменения видны сразу и сохраняются только на этом устройстве." }),
+    h("p", { class: "lead", text: "Изменения видны сразу." }),
     tabs,
     ...body
   ];
@@ -3270,32 +3262,32 @@ function lookStyle() {
   const photoControls = look.bg === "photo" && media.bg ? [
     range("Размытие", look.blur, 0, 24, 1, " px", (v, done) => changeLook({ blur: v }, { rerender: done })),
     range("Затемнение под текстом", look.dim, 20, 85, 5, " %", (v, done) => changeLook({ dim: v }, { rerender: done })),
-    lookHint("Чем сильнее затемнение, тем лучше читается текст поверх фото.")
+    lookHint("Сильнее затемнение — лучше читается текст.")
   ] : [];
 
   return [
-    lookCard("Готовые стили", h("p", { class: "muted small", text: "Цвет, фон, шрифт и форма — одним касанием. Потом любую деталь можно поменять." }), h("div", { class: "preset-grid" }, presets)),
+    lookCard("Готовые стили", h("p", { class: "muted small", text: "Всё оформление одним касанием." }), h("div", { class: "preset-grid" }, presets)),
     lookCard("Цвет акцента",
-      h("p", { class: "muted small", text: "Кнопки, ссылки, кольца и подсветка мышц. Оттенки подбираются так, чтобы текст хорошо читался в светлой и тёмной теме." }),
+      h("p", { class: "muted small", text: "Кнопки, ссылки, кольца и подсветка мышц." }),
       h("div", { class: "swatches", role: "group", "aria-label": "Цвет акцента" }, swatches, custom),
       lookHint(look.accent === "custom" ? "Свой цвет: яркость подстроена для читаемости." : `Сейчас: ${(L.PALETTES.find(p => p.id === look.accent) || L.PALETTES[0]).name}.`)),
     lookCard("Тема",
       choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Авто" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); applyLookNow(); refresh(); } }),
       lookHint("«Авто» — как в настройках телефона."),
-      h("div", { class: "list" }, toggle({ label: "Стеклянные панели", desc: "Полупрозрачные карточки. Выключите, чтобы фон был сплошным: легче читать и бережёт батарею", checked: look.glass, onChange: v => { changeLook({ glass: v }); state.settings.lessGlass = !v; persist(); } }))),
+      h("div", { class: "list" }, toggle({ label: "Стеклянные панели", desc: "Полупрозрачные карточки. Без них легче читать.", checked: look.glass, onChange: v => { changeLook({ glass: v }); state.settings.lessGlass = !v; persist(); } }))),
     lookCard("Фон",
       h("div", { class: "bg-tiles" }, bgTiles, photoTile),
       ...photoControls,
       media.bg ? h("div", { class: "btn-row" },
         h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("bg", () => changeLook({ bg: "photo" })) }, icon("image", 16), "Другое фото"),
         h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("bg", () => changeLook({ bg: look.bg === "photo" ? "soft" : look.bg })) }, icon("trash", 16), "Убрать фото")) : null,
-      lookHint("Фото уменьшается и хранится только на этом устройстве, без геометки. С паролем оно шифруется вместе с данными.")),
+      lookHint("Фото хранится только здесь, без геометки.")),
     lookCard("Форма",
       h("div", { class: "q" }, h("b", { text: "Углы" }), choice({ className: "seg", label: "Углы", value: look.radius, options: L.RADII, onChange: v => changeLook({ radius: v }) })),
       h("div", { class: "q" }, h("b", { text: "Плотность" }), choice({ className: "seg", label: "Плотность", value: look.density, options: L.DENSITY, onChange: v => changeLook({ density: v }) }))),
     lookShareCard(),
     lookCard("Сбросить",
-      h("p", { class: "muted small", text: "Вернуть оформление по умолчанию. Данные, фото и избранное останутся." }),
+      h("p", { class: "muted small", text: "Данные, фото и избранное останутся." }),
       h("button", {
         class: "btn ghost", type: "button", text: "Вернуть как было",
         onClick: async () => {
@@ -3318,7 +3310,7 @@ function lookShareCard() {
   const code = L.lookCode(look);
   const input = h("input", { class: "input", type: "text", placeholder: "Вставьте код стиля LP1-…", "aria-label": "Код стиля", maxlength: 4000, autocomplete: "off", spellcheck: "false" });
   return lookCard("Поделиться стилем",
-    h("p", { class: "muted small", text: "Код содержит только оформление — без фото, имени и сведений о здоровье." }),
+    h("p", { class: "muted small", text: "Только оформление — без фото, имени и здоровья." }),
     h("details", { class: "more" }, h("summary", { text: "Показать код" }), h("p", { class: "code-box", text: code })),
     h("div", { class: "btn-row" },
       h("button", {
@@ -3363,12 +3355,12 @@ function lookText() {
   size.addEventListener("input", () => { out.textContent = `${size.value} %`; changeLook({ scale: Number(size.value) }, { rerender: false }); });
   size.addEventListener("change", () => changeLook({ scale: Number(size.value) }));
   return [
-    lookCard("Шрифт", h("div", { class: "list" }, fontRows), lookHint("Шрифты встроены в приложение и работают без интернета.")),
+    lookCard("Шрифт", h("div", { class: "list" }, fontRows), lookHint("Работают без интернета.")),
     lookCard("Заголовки", heads),
     lookCard("Размер текста",
       h("div", { class: "range-row" }, size, out),
       h("p", { class: "size-sample", text: "Так будет выглядеть текст: «Сделайте 10 приседаний, спина ровная»." }),
-      lookHint("Кнопки и отступы не меняются — растёт только текст.")),
+      lookHint("Растёт только текст.")),
     h("section", { class: "card glass" }, h("div", { class: "list" },
       toggle({ label: "Жирный текст", desc: "Плотнее начертание — легче читать на солнце", checked: look.bold, onChange: v => changeLook({ bold: v }) }),
       toggle({ label: "Удобное чтение", desc: "Больше расстояние между буквами, словами и строками", checked: look.reading, onChange: v => changeLook({ reading: v }) })))
@@ -3415,7 +3407,7 @@ function lookScreens() {
   const favs = state.favs.map(id => QUICK.find(q => q.id === id)).filter(Boolean);
   return [
     lookCard("Главный экран",
-      h("p", { class: "muted small", text: "Порядок блоков и что показывать. Предупреждения о боли и важные подсказки всегда остаются сверху." }),
+      h("p", { class: "muted small", text: "Порядок и видимость блоков. Предупреждения о боли — всегда сверху." }),
       h("div", {}, homeRows)),
     lookCard("Мой девиз",
       h("label", { class: "field" }, h("span", { text: "Фраза на главном экране" }), motto),
@@ -3425,7 +3417,7 @@ function lookScreens() {
         ? h("div", { class: "list" }, favs.map(q => h("div", { class: "row" },
           h("span", { class: "row-text" }, h("b", { text: q.name })),
           h("button", { class: "icon-btn mini", type: "button", "aria-label": `Убрать из избранного: ${q.name}`, onClick: () => { state.favs = state.favs.filter(x => x !== q.id); persist(); refresh(); } }, icon("close", 16)))))
-        : h("p", { class: "muted small", text: "Откройте любую готовую тренировку и нажмите «В избранное» — она появится на главном экране." }),
+        : h("p", { class: "muted small", text: "Нажмите «В избранное» у тренировки — она будет на главном экране." }),
       h("div", { class: "btn-row" }, h("a", { class: "btn small ghost", href: "#workout/ready" }, icon("star", 16), "К готовым тренировкам"))),
     lookCard("Нижняя панель",
       h("p", { class: "muted small", text: "Порядок вкладок." }),
@@ -3492,7 +3484,7 @@ function subSettings() {
       toggle({ label: "Звуковые сигналы", desc: "Смена упражнений и отсчёт 3-2-1", checked: st.sound, onChange: v => { st.sound = v; persist(); } }),
       toggle({ label: "Голосовые подсказки", desc: "Название упражнения и отдых — вслух", checked: st.voice, onChange: v => { st.voice = v; persist(); if (v) speak("Голосовые подсказки включены"); } }),
       toggle({ label: "Вибрация", desc: "На телефонах с Android", checked: st.vibrate, onChange: v => { st.vibrate = v; persist(); } }),
-      toggle({ label: "Меньше прозрачности", desc: "Сплошной фон вместо стекла: легче читать и бережёт батарею", checked: !look.glass, onChange: v => { changeLook({ glass: !v }, { rerender: false }); st.lessGlass = v; persist(); } })))
+      toggle({ label: "Меньше прозрачности", desc: "Сплошной фон вместо стекла", checked: !look.glass, onChange: v => { changeLook({ glass: !v }, { rerender: false }); st.lessGlass = v; persist(); } })))
   ];
 }
 
@@ -3508,7 +3500,7 @@ function passwordSheet(change) {
       h("p", { class: "muted small", text: "Минимум 8 символов. Надёжнее всего — фраза из нескольких слов." }),
       field("Пароль", p1),
       field("Ещё раз", p2),
-      h("div", { class: "note-box" }, h("b", { text: "Пароль нельзя восстановить. " }), "Если забудете его, данные придётся удалить. Сначала сохраните резервную копию."),
+      h("div", { class: "note-box" }, h("b", { text: "Пароль нельзя восстановить. " }), "Забудете пароль — данные не восстановить. Сначала сделайте копию."),
       err
     ],
     actions: [btn]
@@ -3570,7 +3562,7 @@ function subData() {
   try {
     if (navigator.storage && navigator.storage.persisted) {
       navigator.storage.persisted().then(p => {
-        persistNote.textContent = p ? "Браузер не удалит данные при нехватке места: хранилище защищено." : "Браузер может удалить данные сайта при нехватке места или если долго не открывать приложение (особенно Safari). Установите приложение на главный экран и делайте копии.";
+        persistNote.textContent = p ? "Хранилище защищено от очистки." : "Браузер может сам стереть данные — делайте копии.";
       }).catch(() => {});
     }
   } catch (e) { /* не поддерживается */ }
@@ -3603,12 +3595,12 @@ function subData() {
     h("section", { class: "card glass" },
       h("h2", { text: "Где хранятся данные" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "Только на этом устройстве, в памяти браузера." }),
-        h("li", { text: "Мы их не получаем: в приложении нет серверов, аналитики, рекламы и cookie." }),
-        h("li", { text: "Если очистить данные браузера или удалить приложение, всё сотрётся — делайте резервные копии." }))),
+        h("li", { text: "Только на этом устройстве." }),
+        h("li", { text: "Нет серверов, аналитики, рекламы и cookie." }),
+        h("li", { text: "Очистка браузера сотрёт всё — делайте копии." }))),
     h("section", { class: "card glass" },
       h("div", { class: "card-head" }, h("h2", { text: "Пароль" }), h("span", { class: `pill${enc ? "" : " muted-pill"}`, text: enc ? "зашифровано" : "не задан" })),
-      h("p", { class: "muted small", text: "С паролем все данные шифруются алгоритмом AES-256. Без пароля их не прочитать, даже скопировав память браузера. Приложение само блокируется, если свернуть его больше чем на 5 минут." }),
+      h("p", { class: "muted small", text: "С паролем данные шифруются (AES-256). Свёрнутое приложение блокируется через 5 минут." }),
       enc ? h("div", { class: "btn-row" },
         h("button", { class: "btn ghost", type: "button", text: "Заблокировать сейчас", onClick: lockNow }),
         h("button", { class: "btn ghost", type: "button", text: "Сменить пароль", onClick: () => passwordSheet(true) }),
@@ -3622,22 +3614,22 @@ function subData() {
         : h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", onClick: () => passwordSheet(false) }, icon("lock", 18), "Задать пароль"))),
     h("section", { class: "card glass" },
       h("h2", { text: "Резервная копия" }),
-      h("p", { class: "muted small", text: "Файл со всеми вашими данными. В нём есть сведения о здоровье — храните его в надёжном месте и не пересылайте посторонним." }),
+      h("p", { class: "muted small", text: "Файл со всеми данными, включая здоровье. Не пересылайте его посторонним." }),
       h("div", { class: "btn-row" },
         h("button", { class: "btn ghost", type: "button", onClick: () => { saveBackup(); refresh(); toast("Копия сохранена"); } }, icon("download", 18), "Сохранить копию"),
         h("button", { class: "btn ghost", type: "button", text: "Загрузить копию", onClick: () => file.click() })),
-      h("p", { class: "muted small", text: state.settings.lastBackup ? `Последняя копия: ${fmtFull(state.settings.lastBackup)}.` : "Копию ещё не сохраняли. Напомним через месяц занятий." }),
+      h("p", { class: "muted small", text: state.settings.lastBackup ? `Последняя копия: ${fmtFull(state.settings.lastBackup)}.` : "Копию ещё не сохраняли." }),
       persistNote,
       file),
     h("section", { class: "card glass" },
       h("h2", { text: "Таблицы для Excel" }),
-      h("p", { class: "muted small", text: "Выгрузка в CSV: откроется в Excel, Google Таблицах или «Мой Офис». Удобно, чтобы вести свой учёт или показать тренеру." }),
+      h("p", { class: "muted small", text: "Таблица для Excel, Google Таблиц или «Мой Офис»." }),
       h("div", { class: "btn-row" },
         [["sessions", "Тренировки"], ["weights", "Подходы с весом"], ["pain", "Дневник боли"], ["body", "Вес тела"]].map(([kind, label]) =>
           h("button", { class: "btn small ghost", type: "button", onClick: () => exportCSV(kind) }, icon("download", 16), label)))),
     h("section", { class: "card glass alert" },
       h("h2", { text: "Удалить всё" }),
-      h("p", { class: "small", text: "Профиль, отметки, тренировки и награды будут удалены с этого устройства без возможности восстановления." }),
+      h("p", { class: "small", text: "Профиль, отметки, тренировки и награды удалятся навсегда." }),
       h("button", {
         class: "btn danger", type: "button", text: "Удалить все данные",
         onClick: async () => {
@@ -3690,7 +3682,7 @@ function subInstall() {
         h("li", { text: "Откройте приложение в Chrome или Яндекс Браузере." }),
         h("li", { text: "Откройте меню ⋮." }),
         h("li", { text: "Выберите «Установить приложение» или «Добавить на главный экран»." }))),
-    h("section", { class: "card glass" }, h("p", { text: "После установки Листопульс работает и без интернета: тренировки, таймеры и дневник доступны офлайн." }))
+    h("section", { class: "card glass" }, h("p", { text: "После установки работает и без интернета." }))
   ];
 }
 
@@ -3699,15 +3691,15 @@ function subAbout() {
     h("h1", { class: "page-title", text: "О приложении" }),
     h("section", { class: "card glass" },
       h("h2", { text: "Тренер, который слушает тело" }),
-      h("p", { text: "Бесплатное веб-приложение для домашних тренировок. Подбирает упражнения с учётом травм, болезненных зон, особенностей здоровья и самочувствия." }),
+      h("p", { text: "Бесплатные домашние тренировки с учётом травм, боли и самочувствия." }),
       h("p", { class: "muted small", text: `Версия ${VERSION} · возрастная маркировка 12+` })),
     h("section", { class: "card glass warn" },
       h("h2", { text: "Важно о здоровье" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "Листопульс не является медицинским изделием, не ставит диагнозов и не назначает лечение." }),
-        h("li", { text: "Рекомендации общие и строятся по данным, которые вы указали сами." }),
-        h("li", { text: "При заболеваниях, после травм и операций, во время беременности посоветуйтесь с врачом до начала тренировок." }),
-        h("li", { text: "Острая или усиливающаяся боль — повод остановиться и обратиться к врачу." }))),
+        h("li", { text: "Листопульс — не медицинское изделие: не ставит диагнозов и не лечит." }),
+        h("li", { text: "Советы общие, по вашим же отметкам." }),
+        h("li", { text: "При болезнях, после травм и операций, при беременности — сначала к врачу." }),
+        h("li", { text: "Острая или нарастающая боль — остановитесь и обратитесь к врачу." }))),
     h("section", { class: "card glass" },
       h("h2", { text: "Документы" }),
       h("div", { class: "list" },
@@ -3716,7 +3708,7 @@ function subAbout() {
         h("a", { class: "row", href: "privacy.html" }, h("span", { class: "row-text" }, h("b", { text: "Конфиденциальность" })), icon("chevron", 18)))),
     h("section", { class: "card glass" },
       h("h2", { text: "Авторские права" }),
-      h("p", { class: "small", text: "Код, тексты, описания упражнений и иллюстрации созданы для Листопульса. Внешние шрифты, библиотеки и счётчики не используются." }))
+      h("p", { class: "small", text: "Код, тексты и иллюстрации — свои. Без внешних шрифтов, библиотек и счётчиков." }))
   ];
 }
 
@@ -3772,7 +3764,7 @@ function subCalc() {
     if (cm && kg) {
       const bmi = kg / (cm / 100) ** 2;
       out.bmi.textContent = bmi.toFixed(1).replace(".", ",");
-      out.bmiNote.textContent = teen ? "До 18 лет ИМТ оценивают по возрастным таблицам — покажите результат врачу." : `${bmiWord(bmi)}. ИМТ не учитывает мышцы: у тех, кто занимается силовыми, он бывает завышен.`;
+      out.bmiNote.textContent = teen ? "До 18 лет ИМТ оценивают по возрастным таблицам — покажите результат врачу." : `${bmiWord(bmi)}. При большой мышечной массе ИМТ завышен.`;
     } else {
       out.bmi.textContent = "—";
       out.bmiNote.textContent = "Укажите рост и вес.";
@@ -3790,11 +3782,11 @@ function subCalc() {
       const bmr = 10 * kg + 6.25 * cm - 5 * age + (p.sex === "m" ? 5 : -161);
       const tdee = bmr * calcDraft.act;
       out.kcal.textContent = `${fmtInt(tdee)} ккал`;
-      out.kcalNote.textContent = `Столько нужно в день, чтобы вес не менялся. Базовый обмен — ${fmtInt(bmr)} ккал. Для плавного снижения веса: ${fmtInt(Math.max(bmr, tdee - 500))}–${fmtInt(Math.max(bmr, tdee - 300))} ккал, не ниже базового обмена.`;
+      out.kcalNote.textContent = `Чтобы вес не менялся. Базовый обмен — ${fmtInt(bmr)} ккал, для снижения — ${fmtInt(Math.max(bmr, tdee - 500))}–${fmtInt(Math.max(bmr, tdee - 300))} ккал.`;
     } else {
       out.kcal.textContent = "—";
-      out.kcalNote.textContent = teen ? "Подросткам не стоит считать калории и садиться на диеты без врача: организм растёт."
-        : pregnant ? "Во время беременности потребность в энергии меняется — её подскажет врач."
+      out.kcalNote.textContent = teen ? "До 18 лет — без диет и подсчёта калорий без врача."
+        : pregnant ? "При беременности норму подскажет врач."
           : "Укажите пол, возраст, рост и вес.";
     }
     // Белок и вода
@@ -3816,10 +3808,10 @@ function subCalc() {
       const r = calcDraft.reps;
       const one = r === 1 ? calcDraft.lift : (calcDraft.lift * (1 + r / 30) + (calcDraft.lift * 36) / (37 - r)) / 2;
       out.orm.textContent = fmtKg(E.roundWeight(one));
-      out.ormNote.textContent = `Рабочий вес на 8–12 повторов — примерно ${fmtNum(E.roundWeight(one * 0.7))}–${fmtKg(E.roundWeight(one * 0.8))}. Проверять максимум на практике не нужно: это опасно без страховки и тренера.`;
+      out.ormNote.textContent = `Рабочий вес на 8–12 повторов — ${fmtNum(E.roundWeight(one * 0.7))}–${fmtKg(E.roundWeight(one * 0.8))}. Проверять максимум не нужно.`;
     } else {
       out.orm.textContent = "—";
-      out.ormNote.textContent = "Укажите вес снаряда и сколько раз подняли его без потери техники (до 12).";
+      out.ormNote.textContent = "Вес снаряда и число чистых повторов (до 12).";
     }
   }
 
@@ -3829,7 +3821,7 @@ function subCalc() {
   const waistInput = numInput(calcDraft.waist, 40, 200, 0.5, v => { calcDraft.waist = v; });
   const view = [
     h("h1", { class: "page-title", text: "Калькуляторы" }),
-    h("p", { class: "lead", text: "Ориентиры по общепринятым формулам. Это не медицинская рекомендация: при болезнях нормы подбирает врач." }),
+    h("p", { class: "lead", text: "Ориентиры по формулам. При болезнях нормы подбирает врач." }),
     h("section", { class: "card glass" },
       h("h2", { text: "Ваши данные" }),
       h("div", { class: "q" }, h("b", { text: "Пол" }), choice({ className: "seg", label: "Пол", value: p.sex, options: [{ value: "f", label: "Женский" }, { value: "m", label: "Мужской" }], onChange: v => { p.sex = v; persist(); update(); } })),
@@ -3852,7 +3844,7 @@ function subCalc() {
     h("section", { class: "card glass" },
       h("h2", { text: "Обхват талии" }),
       result("waist", "см"), note("waistNote"),
-      h("p", { class: "muted small", text: "Жир на животе опаснее для сердца и обмена веществ, чем вес сам по себе. Измеряйте на выдохе, посередине между нижним ребром и тазовой костью." })),
+      h("p", { class: "muted small", text: "Измеряйте на выдохе, посередине между ребром и тазовой костью." })),
     h("section", { class: "card glass" },
       h("h2", { text: "Индекс массы тела" }),
       result("bmi", "кг/м²"), note("bmiNote")),
@@ -3864,16 +3856,16 @@ function subCalc() {
     h("section", { class: "card glass" },
       h("h2", { text: "Белок и вода" }),
       h("div", { class: "calc-pair" }, result("protein", "белка в день, если вы тренируетесь"), result("water", "жидкости в день, включая чай и суп")),
-      h("p", { class: "muted small", text: "Белок: 1,2–1,6 г на кг веса для тех, кто тренируется (минимум для всех — 0,8 г/кг). Вода: 30–35 мл на кг, в жару и на тренировках — больше. При болезнях почек и сердца нормы определяет врач." })),
+      h("p", { class: "muted small", text: "В жару и на тренировках воды нужно больше. При болезнях почек и сердца нормы задаёт врач." })),
     h("section", { class: "card glass" },
       h("h2", { text: "Пульсовые зоны" }),
-      heart ? h("div", { class: "note-box small", text: "При болезнях сердца и повышенном давлении пульс на тренировке подбирает врач: таблетки от давления меняют частоту пульса." }) : null,
+      heart ? h("div", { class: "note-box small", text: "При болезнях сердца и давлении пульс подбирает врач." }) : null,
       result("hrMax", "максимальный пульс (208 − 0,7 × возраст)"),
       h("div", { class: "list hr-zones" }, HR_ZONES.map((z, i) => h("div", { class: "row" },
         h("span", { class: `hr-dot hr-${i + 1}`, "aria-hidden": "true" }),
         h("span", { class: "row-text" }, h("b", { text: z[2] }), h("span", { class: "muted small", text: `${Math.round(z[0] * 100)}–${Math.round(z[1] * 100)}% · ${z[3]}` })),
         val(`z${i}`)))),
-      h("p", { class: "muted small", text: "Для здоровья сердца большую часть времени тренируйтесь во 2-й и 3-й зоне: дыхание учащённое, но можно говорить." })),
+      h("p", { class: "muted small", text: "Больше всего — во 2-й и 3-й зоне: можно говорить." })),
     h("section", { class: "card glass" },
       h("h2", { text: "Максимум на 1 повтор (1ПМ)" }),
       teen ? h("div", { class: "note-box small", text: "До 18 лет тяжёлые веса не рекомендуются — занимайтесь с тренером." }) : null,
@@ -3993,7 +3985,7 @@ function viewReport() {
   return [
     h("a", { class: "back-link no-print", href: "#more" }, icon("back", 18), "Ещё"),
     h("h1", { class: "page-title", text: "Отчёт для врача" }),
-    h("p", { class: "lead no-print", text: "Сводка по вашим отметкам: зоны, боль, нагрузка. Распечатайте, сохраните в PDF или покажите с экрана на приёме." }),
+    h("p", { class: "lead no-print", text: "Зоны, боль и нагрузка — для приёма у врача." }),
     h("div", { class: "no-print report-tools" },
       choice({ className: "seg", label: "Период отчёта", value: reportDays, options: [14, 30, 90].map(n => ({ value: n, label: `${n} дней` })), onChange: v => { reportDays = v; refresh(); } }),
       h("div", { class: "btn-row" },
@@ -4024,7 +4016,7 @@ function weightSpark(hist) {
 function subWeights() {
   return [
     h("h1", { class: "page-title", text: "Рабочие веса" }),
-    h("p", { class: "lead", text: "Листопульс запоминает вес, с которым вы делали упражнения, и подсказывает его в следующий раз." }),
+    h("p", { class: "lead", text: "Вес запоминается и подсказывается в следующий раз." }),
     ...weightsBlocks()
   ];
 }
@@ -4040,20 +4032,20 @@ function weightsBlocks() {
           h("span", { class: "row-text" },
             h("b", { text: `${w.prD && w.prD >= E.shiftDay(E.dayKey(), -13) ? "🥇 " : ""}${EX[id].name}` }),
             h("span", { class: "muted small", text: `${fmtKg(w.kg)}${w.d ? ` · ${fmtDate(w.d)}` : ""}${last}${grow > 0 ? ` · +${grow}% с начала` : ""}` }),
-            w.e1rm ? h("span", { class: "muted small", text: `Расчётный максимум на 1 повтор ≈ ${fmtKg(w.e1rm)}${w.prD ? ` · рекорд ${fmtDate(w.prD)}` : ""}` }) : null,
+            w.e1rm ? h("span", { class: "muted small", text: `1ПМ ≈ ${fmtKg(w.e1rm)}${w.prD ? ` · рекорд ${fmtDate(w.prD)}` : ""}` }) : null,
             // График и лучший вес — под текстом: на узком экране название не ломается на три строки
             h("span", { class: "spark-row" }, w.hist.length > 1 ? weightSpark(w.hist) : null, h("span", { class: "pill", text: `лучший ${fmtKg(w.best)}` }))),
           icon("chevron", 16));
       })))
-      : h("section", { class: "card glass" }, h("p", { class: "muted", text: "Пока пусто. В плеере у упражнений с гантелями, гирей или штангой укажите вес и число повторов — подходы сохранятся вместе с тренировкой, а тренер подскажет, когда прибавить вес." })),
-    h("section", { class: "card glass" },
-      h("h2", { text: "Как прибавлять вес" }),
+      : h("section", { class: "card glass" }, h("p", { class: "muted", text: "Пока пусто. Вес и повторы записываются в плеере." })),
+    h("details", { class: "card glass details-card" },
+      h("summary", { text: "Как прибавлять вес" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "Работайте в диапазоне повторов, например 8–12. Сначала добавляйте повторы." }),
-        h("li", { text: "Когда во всех подходах легко выходит верхняя граница — прибавьте 2,5–5% веса и вернитесь к нижней. Плеер сам подскажет, когда пора." }),
-        h("li", { text: "Расчётный максимум на 1 повтор (1ПМ) считается по формуле Эпли — проверять его на практике не нужно, это опасно без страховки." }),
+        h("li", { text: "Работайте в диапазоне, например 8–12 повторов. Сначала растут повторы." }),
+        h("li", { text: "Легко во всех подходах — прибавьте 2,5–5% веса. Плеер подскажет." }),
+        h("li", { text: "1ПМ — расчёт по формуле Эпли, проверять его не нужно." }),
         h("li", { text: "Техника важнее килограммов: если движение «поплыло», вес великоват." }),
-        h("li", { text: "Боль в суставе — не повод терпеть. Нажмите «Больно» в плеере, и тренер заменит упражнение." })),
+        h("li", { text: "Болит сустав — не терпите, нажмите «Больно»." })),
       h("p", {}, h("a", { href: "#guide/weights-start", text: "Статья: как безопасно начать с весами →" }))),
     entries.length ? h("p", { class: "center" }, h("button", {
       class: "link-btn small", type: "button", text: "Очистить журнал весов",
@@ -4083,7 +4075,7 @@ function viewGuide(sub) {
       ? GUIDE_AREAS.filter(ar => items.some(a => a.area === ar.id)).map(ar => h("section", { class: "card glass" },
         h("h2", { text: ar.name }),
         h("div", { class: "list" }, items.filter(a => a.area === ar.id).map(a => guideRow(a)))))
-      : [h("section", { class: "card glass" }, h("p", { class: "muted", text: "Ничего не нашлось. Попробуйте другое слово, например «колено» или «спина»." }))]));
+      : [h("section", { class: "card glass" }, h("p", { class: "muted", text: "Ничего не нашлось." }))]));
   };
   const search = h("input", { class: "input", type: "search", placeholder: "Поиск: колено, растяжение, спина…", "aria-label": "Поиск по справочнику", maxlength: 60 });
   search.value = guideFilter.q;
@@ -4093,10 +4085,10 @@ function viewGuide(sub) {
     h("h1", { class: "page-title", text: "Тело" }),
     bodyTabs("guide"),
     h("h2", { class: "section-title", text: "Справочник травм" }),
-    h("p", { class: "lead", text: "Что делать при частых травмах и боли: первая помощь, тревожные признаки, когда идти к врачу и как безопасно вернуться к нагрузке." }),
+    h("p", { class: "lead", text: "Первая помощь, тревожные признаки и возвращение к нагрузке." }),
     h("section", { class: "card glass warn" },
       h("p", { class: "small" }, h("b", { text: "Это не замена врачу. " }),
-        "Статьи пересказывают открытые рекомендации медицинских организаций (NHS, NICE) и консенсусы спортивных врачей — источники указаны в каждой статье. Диагноз и лечение назначает только врач после осмотра.")),
+        "По рекомендациям NHS, NICE и спортивных врачей. Диагноз ставит только врач.")),
     mine.length ? h("section", { class: "card glass" },
       h("p", { class: "eyebrow", text: "Для ваших зон" }),
       h("div", { class: "list" }, mine.slice(0, 5).map(a => guideRow(a)))) : null,
@@ -4148,22 +4140,22 @@ function guideArticle(a) {
     h("section", { class: "card glass" },
       h("h2", { text: "Источники" }),
       h("ul", { class: "bullets small sources" }, a.sources.map(([title, url]) => h("li", {}, h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: title })))),
-      h("p", { class: "muted small", text: "Тексты написаны своими словами по открытым материалам. Это общие сведения, а не консультация: при травме обратитесь к врачу." }))
+      h("p", { class: "muted small", text: "Общие сведения, а не консультация. При травме — к врачу." }))
   ];
 }
 
 function guideExercises(a, exs, r) {
   return h("section", { class: "card glass" },
     h("h2", { text: "Упражнения для восстановления" }),
-    h("p", { class: "muted small", text: "Начинайте, когда острая боль прошла и врач не запретил нагрузку. Двигайтесь в пределах лёгкого дискомфорта, без резкой боли." }),
+    h("p", { class: "muted small", text: "Когда острая боль прошла и врач не против. Без резкой боли." }),
     exs.map(ex => {
       const ok = E.fits(ex, r, state.profile);
       return h("div", { class: "ex-row" },
         h("div", { class: "row-text" }, h("b", { text: ex.name }), h("span", { class: "muted small", text: E.doseText(E.makeItem(ex, 1)) })),
-        h("span", { class: `pill${ok ? "" : " muted-pill"}`, text: ok ? "подходит" : "не сейчас" }),
+        ok ? null : h("span", { class: "pill muted-pill", text: "не сейчас" }),
         h("button", { class: "icon-btn", type: "button", "aria-label": `Подробнее: ${ex.name}`, onClick: () => exerciseSheet(ex.id) }, icon("info", 20)));
     }),
-    h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Неподходящие сейчас упражнения тренер заменит безопасными или пропустит." }),
+    h("p", { class: "muted small", style: { marginTop: "10px" }, text: "Неподходящие заменятся безопасными." }),
     h("div", { class: "btn-row" },
       h("button", {
         class: "btn primary", type: "button",
@@ -4186,7 +4178,7 @@ function programCard(p) {
 }
 function programsSection() {
   return [
-    h("p", { class: "lead", text: "Курсы по шагам: каждое занятие немного сложнее предыдущего. Упражнения подстраиваются под ваши зоны и инвентарь." }),
+    h("p", { class: "lead", text: "Каждое занятие чуть сложнее предыдущего." }),
     h("h2", { class: "section-title", text: "Восстановление" }),
     h("div", { class: "covers" }, PROGRAMS.filter(p => p.kind !== "strength").map(programCard)),
     h("h2", { class: "section-title", text: "Сила" }),
@@ -4208,7 +4200,7 @@ function runCard() {
   const rs = E.runState(state);
   return coverTile({
     id: "run", theme: "cardio", title: "Бег с нуля: 9 недель",
-    sub: rs.finished ? "Пройдена 🏅" : rs.started ? `Занятие ${rs.next} из ${RUN_DAYS} · ${runPlanText(rs.session)}` : "От минуты бега до 30 минут без остановки, 3 раза в неделю",
+    sub: rs.finished ? "Пройдена 🏅" : rs.started ? `Занятие ${rs.next} из ${RUN_DAYS} · ${runPlanText(rs.session)}` : "От 1 до 30 минут бега, 3 раза в неделю",
     progress: rs.started && !rs.finished ? Math.round((rs.done / RUN_DAYS) * 100) : null,
     href: "#run"
   });
@@ -4236,7 +4228,7 @@ function viewRun() {
   if (rs.blocked) {
     main = h("section", { class: "card glass warn" },
       h("h2", { text: "Сейчас программа на паузе" }),
-      h("p", { text: "При беременности и после недавней операции бег начинают только после разрешения врача. Спокойные прогулки обычно можно — уточните у врача." }));
+      h("p", { text: "При беременности и после операции бег — только с разрешения врача." }));
   } else if (rs.finished) {
     main = h("section", { class: "card glass" },
       h("h2", { text: "30 минут бега без остановки! 🏅" }),
@@ -4248,9 +4240,9 @@ function viewRun() {
         h("h2", { text: `Занятие ${rs.next} · неделя ${s.week}` }),
         h("span", { class: "pill", text: `≈ ${runTotalMin(s)} мин` })),
       h("p", { text: `Разминка: 5 минут бодрой ходьбы. Затем ${runPlanText(s)}. Заминка: 5 минут спокойной ходьбы.` }),
-      rs.walkOnly ? h("div", { class: "note-box", text: `Сейчас вместо бега — быстрая ходьба по той же схеме: ${rs.why}. Когда ограничение снимут, вернётесь к бегу.` }) : null,
-      rs.doneToday ? h("p", { class: "note-box", text: "Сегодня занятие уже было. Следующее — через день: суставам и связкам нужен отдых." })
-        : rs.yesterday ? h("p", { class: "note-box", text: "Вчера была пробежка. Лучше отдохнуть сегодня — между занятиями нужен день отдыха. Можно спокойно погулять." }) : null,
+      rs.walkOnly ? h("div", { class: "note-box", text: `Вместо бега — быстрая ходьба: ${rs.why}.` }) : null,
+      rs.doneToday ? h("p", { class: "note-box", text: "Сегодня занятие уже было. Следующее — через день." })
+        : rs.yesterday ? h("p", { class: "note-box", text: "Вчера была пробежка — сегодня лучше отдохнуть или погулять." }) : null,
       h("div", { class: "btn-row" },
         h("button", { class: "btn primary", type: "button", onClick: () => startRun(rs.next) }, icon("play", 18), `Начать занятие ${rs.next}`),
         rs.next > 1 ? h("button", { class: "btn ghost", type: "button", text: `Повторить занятие ${rs.next - 1}`, onClick: () => startRun(rs.next - 1, true) }) : null));
@@ -4259,21 +4251,21 @@ function viewRun() {
     back,
     h("p", { class: "eyebrow", text: "Программа на 9 недель" }),
     h("h1", { class: "page-title", text: "👟 Бег с нуля" }),
-    h("p", { class: "lead", text: "От минуты бега до 30 минут без остановки. Три занятия в неделю с днём отдыха между ними: бег чередуется с ходьбой, бег постепенно удлиняется." }),
+    h("p", { class: "lead", text: "От 1 до 30 минут бега без остановки, 3 занятия в неделю." }),
     h("section", { class: "card glass" },
       h("div", { class: "card-head" },
         h("h2", { text: rs.finished ? "Пройдено! 🏅" : rs.started ? `Выполнено ${rs.done} из ${RUN_DAYS}` : `${RUN_DAYS} занятий` }),
         h("span", { class: "pill", text: `${rs.done} / ${RUN_DAYS}` })),
       h("div", { class: "day-dots run-dots", role: "img", "aria-label": `Выполнено ${rs.done} из ${RUN_DAYS} занятий` },
         Array.from({ length: RUN_DAYS }, (_, i) => h("i", { class: done.has(i + 1) ? "done" : !rs.finished && i + 1 === rs.next ? "next" : "", text: String(i + 1) }))),
-      h("p", { class: "muted small", text: "Каждая неделя — 3 занятия. Тяжело? Повторите занятие или всю неделю: это нормально и даже полезно." })),
+      h("p", { class: "muted small", text: "Тяжело — повторите занятие или неделю." })),
     main,
     h("section", { class: "card glass" },
       h("h2", { text: "Как бегать безопасно" }),
       h("ul", { class: "bullets small" },
-        h("li", { text: "Темп — разговорный: можно говорить фразами. Задыхаетесь — замедлитесь или перейдите на шаг." }),
-        h("li", { text: "Удобная беговая обувь и ровная мягкая поверхность снижают нагрузку на суставы." }),
-        h("li", { text: "Усталость в мышцах — нормально. Боль в колене, голени, стопе или ахилле — повод перейти на ходьбу и отметить зону в разделе «Тело»." }),
+        h("li", { text: "Темп разговорный. Задыхаетесь — перейдите на шаг." }),
+        h("li", { text: "Беговая обувь и мягкая дорожка берегут суставы." }),
+        h("li", { text: "Боль в колене, голени или стопе — перейдите на шаг и отметьте зону." }),
         h("li", { text: "Боль в груди, сильная одышка, головокружение — сразу остановитесь; при угрозе жизни звоните 112." })),
       h("p", {}, h("a", { href: "#guide/shin-splints", text: "Статья: боль в голени у бегунов →" })),
       rs.started && !rs.finished ? h("button", { class: "link-btn small", type: "button", text: "Сбросить прогресс", onClick: reset }) : null)
@@ -4335,21 +4327,21 @@ function viewChallenge(id) {
   if (cs.finished) {
     todayCard = h("section", { class: "card glass" },
       h("h2", { text: "30 дней позади! 🏆" }),
-      h("p", { text: "Месяц — это уже привычка. Можно пройти челлендж ещё раз или взять другой." }),
+      h("p", { text: "Месяц — это уже привычка!" }),
       h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", text: "Пройти заново", onClick: reset })));
   } else if (cs.doneToday) {
     todayCard = h("section", { class: "card glass" },
       h("h2", { text: `День ${cs.done} выполнен ✓` }),
-      h("p", { class: "muted", text: "Следующий день откроется завтра: мышцы крепнут, пока отдыхают." }));
+      h("p", { class: "muted", text: "Следующий день — завтра." }));
   } else if (cs.rest) {
     todayCard = h("section", { class: "card glass" },
       h("h2", { text: `День ${cs.day} — отдых 😴` }),
-      h("p", { class: "muted", text: "Сегодня без нагрузки: прогуляйтесь или сделайте лёгкую растяжку. Отметьте день — и завтра продолжим." }),
+      h("p", { class: "muted", text: "День отдыха: прогулка или лёгкая растяжка." }),
       h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", onClick: () => markDay() }, icon("check", 18), "Отметить день отдыха")));
   } else if (c.unit === "walk") {
     todayCard = h("section", { class: "card glass" },
       h("h2", { text: `День ${cs.day}: прогулка ${cs.target} мин` }),
-      h("p", { class: "muted", text: "В своём темпе, можно в 2–3 захода. Телефон брать не обязательно — отметьте, когда вернётесь: минуты попадут в дневник." }),
+      h("p", { class: "muted", text: "В своём темпе, можно в 2–3 захода. Отметьте, когда вернётесь." }),
       h("div", { class: "btn-row" }, h("button", {
         class: "btn primary", type: "button",
         onClick: () => markDay(() => {
@@ -4386,13 +4378,13 @@ function viewChallenge(id) {
           const cls = [done.has(n) ? "done" : "", !cs.finished && !cs.doneToday && n === cs.day ? "next" : "", c.rest && n % c.rest === 0 ? "rest" : ""].filter(Boolean).join(" ");
           return h("i", { class: cls, text: String(n) });
         })),
-      c.rest ? h("p", { class: "muted small", text: `Каждый ${c.rest}-й день — отдых (обведён пунктиром).` }) : null),
+      c.rest ? h("p", { class: "muted small", text: "Пунктиром — дни отдыха." }) : null),
     todayCard,
     h("section", { class: "card glass" },
       h("ul", { class: "bullets small" },
-        h("li", { text: "Не получается всё сразу — сделайте сколько можете и сохраните тренировку: день засчитается." }),
-        h("li", { text: "Боль в суставе — повод остановиться: нажмите «Больно», и тренер заменит упражнение." }),
-        h("li", { text: "Если вы восстанавливаетесь после травмы, сначала пройдите программу восстановления." })),
+        h("li", { text: "Не выходит всё — сделайте сколько можете, день засчитается." }),
+        h("li", { text: "Болит сустав — нажмите «Больно»." }),
+        h("li", { text: "После травмы начните с программы восстановления." })),
       cs.started && !cs.finished ? h("button", { class: "link-btn small", type: "button", text: "Сбросить прогресс", onClick: reset }) : null)
   ];
 }
@@ -4429,7 +4421,7 @@ function viewProgram(id) {
     h("h1", { class: "page-title", text: `${prog.icon} ${prog.name}` }),
     h("p", { class: "lead", text: prog.desc }),
     missing.length ? h("div", { class: "note-box", style: { marginBottom: "14px" } },
-      h("p", { class: "small" }, `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}. Без этого упражнения заменятся похожими — или `,
+      h("p", { class: "small" }, `Нужно: ${missing.map(e => equipName(e).toLowerCase()).join(", ")}. Иначе заменим похожими — или `,
         h("a", { href: "#more/profile", text: "отметьте инвентарь в профиле" }), ".")) : null,
     h("section", { class: "card glass" },
       h("div", { class: "card-head" },
@@ -4450,21 +4442,21 @@ function viewProgram(id) {
       h("p", { class: "muted small", text: `${roundsInfo(session)} · ${items.length} ${E.plural(items.length, "упражнение", "упражнения", "упражнений")}` }),
       exRows(items),
       session.adaptations.length ? h("ul", { class: "adapt", style: { marginTop: "12px" } }, session.adaptations.map(x => h("li", { text: x }))) : null,
-      doneToday ? h("p", { class: "note-box", text: prog.kind === "strength" ? "Сегодня вы уже занимались по программе. Следующее занятие — через день: мышцам нужно 48 часов на восстановление." : "Сегодня вы уже занимались по программе. Следующее занятие лучше сделать завтра: мышцам и связкам нужно время на восстановление." }) : null,
+      doneToday ? h("p", { class: "note-box", text: prog.kind === "strength" ? "Сегодня вы уже занимались. Следующее занятие — через день." : "Сегодня вы уже занимались. Следующее занятие — завтра." }) : null,
       h("div", { class: "btn-row" },
         h("button", { class: "btn primary", type: "button", disabled: !items.length, onClick: () => startPlayer(session) }, icon("play", 18), `Начать занятие ${pr.next}`))));
   } else {
     out.push(h("section", { class: "card glass" },
       h("h2", { text: "Отличная работа!" }),
-      h("p", { text: "Все дни пройдены. Можно повторить программу или перейти к обычным тренировкам — тренер продолжит беречь отмеченные зоны." }),
+      h("p", { text: "Все дни пройдены! Повторите программу или переходите к обычным тренировкам." }),
       h("div", { class: "btn-row" }, h("button", { class: "btn primary", type: "button", text: "Пройти заново", onClick: reset }))));
   }
   if (guide) out.push(h("section", { class: "card glass" }, h("p", { class: "eyebrow", text: "Почитать перед началом" }), h("div", { class: "list" }, guideRow(guide))));
   out.push(h("section", { class: "card glass" },
     h("ul", { class: "bullets small" },
-      h("li", { text: "Станет больно во время занятия — нажмите «Больно»: упражнение заменится, а зона будет под защитой." }),
-      h("li", { text: "Острая или нарастающая боль, отёк, онемение — повод остановиться и показаться врачу." }),
-      h("li", { text: "Программа не заменяет лечебную физкультуру, которую назначил врач." })),
+      h("li", { text: "Больно на занятии — нажмите «Больно»." }),
+      h("li", { text: "Острая боль, отёк, онемение — остановитесь и покажитесь врачу." }),
+      h("li", { text: "Не заменяет ЛФК, назначенную врачом." })),
     pr.started && !pr.finished ? h("button", { class: "link-btn small", type: "button", text: "Сбросить прогресс", onClick: reset }) : null));
   return out;
 }
@@ -4476,18 +4468,18 @@ function subRecords() {
   const r = E.restrictions(state);
   const head = [
     h("h1", { class: "page-title", text: "Рекорды статики" }),
-    h("p", { class: "lead", text: "Сколько вы продержитесь? Засекайте время и смотрите, как растёт выносливость мышц, которые держат суставы и спину." })
+    h("p", { class: "lead", text: "Засекайте время — и смотрите, как растёт выносливость." })
   ];
   if (state.profile.conditions.some(c => RECORD_BLOCK.includes(c))) {
     return [...head, h("section", { class: "card glass warn" },
       h("h2", { text: "Испытания на максимум вам сейчас не подходят" }),
-      h("p", { text: "Долгое напряжение «до отказа» повышает давление и нагрузку на сердце. При ваших особенностях здоровья выбирайте обычные тренировки — в них статика дозирована и короткая." }))];
+      h("p", { text: "Удержание «до отказа» повышает давление. Выбирайте обычные тренировки." }))];
   }
   const fitting = RECORD_EX.filter(id => E.fits(EX[id], r, state.profile));
   const unfit = RECORD_EX.filter(id => !fitting.includes(id));
   if (!fitting.length) {
     return [...head, h("section", { class: "card glass warn" },
-      h("p", { text: "Сейчас все упражнения на рекорд нагружают зоны, которые нужно беречь. Вернитесь, когда восстановитесь." }))];
+      h("p", { text: "Все упражнения на рекорд сейчас нагружают ваши зоны." }))];
   }
   if (!fitting.includes(recordPick)) recordPick = fitting[0];
   const clock = h("div", { class: "big-timer record-clock", "aria-live": "off", text: "0:00" });
@@ -4593,9 +4585,9 @@ function subRecords() {
     h("section", { class: "card glass" },
       h("h2", { text: "Правила честного рекорда" }),
       h("ul", { class: "bullets" },
-        h("li", { text: "Техника важнее секунд: как только поза «поплыла» или появилась боль — стоп, это и есть результат." }),
-        h("li", { text: "Дышите ровно, не задерживайте дыхание." }),
-        h("li", { text: "Пробуйте одно упражнение не чаще раза в 2–3 дня — мышцам нужно восстановиться." })))
+        h("li", { text: "Поза «поплыла» или больно — стоп, это и есть результат." }),
+        h("li", { text: "Дышите ровно, без задержки." }),
+        h("li", { text: "Одно упражнение — не чаще раза в 2–3 дня." })))
   ];
 }
 
@@ -4647,16 +4639,16 @@ function onbWelcome() {
     body: [
       h("img", { class: "hero-logo", src: "icon.svg", alt: "" }),
       h("h1", { class: "page-title", text: "Тренер, который слушает тело" }),
-      h("p", { class: "lead", text: "Листопульс подбирает домашние тренировки с учётом травм, болезненных зон и самочувствия — и сразу меняет упражнение, если что-то заболело." }),
+      h("p", { class: "lead", text: "Домашние тренировки с учётом травм, боли и самочувствия." }),
       h("section", { class: "card glass" },
-        feature("body", "Карта тела", "Отметьте, что беспокоит, — опасные упражнения исчезнут из плана."),
+        feature("body", "Карта тела", "Отметьте, что болит, — опасное уйдёт из плана."),
         feature("heart", "Самочувствие каждый день", "Плохо спали или устали — тренировка станет легче."),
-        feature("shield", "Данные только у вас", "Без регистрации, серверов и рекламы. По желанию — пароль и шифрование.")),
+        feature("shield", "Данные только у вас", "Без регистрации и рекламы, данные — только у вас.")),
       h("section", { class: "card glass" },
         h("label", { class: "field" }, h("span", { text: "Как к вам обращаться? (необязательно)" }), name),
-        ageField({ value: onb.age, label: "Ваш возраст, полных лет", hintEmpty: "Приложение рассчитано на возраст от 12 лет; до 14 лет — вместе с родителями.", onSave: (v, raw) => { onb.age = v; onb.ageRaw = raw; } })),
+        ageField({ value: onb.age, label: "Ваш возраст, полных лет", hintEmpty: "Для возраста от 12 лет; до 14 — вместе с родителями.", onSave: (v, raw) => { onb.age = v; onb.ageRaw = raw; } })),
       h("section", { class: "card glass warn" },
-        h("p", {}, h("b", { text: "Важно. " }), "Листопульс не заменяет врача и не является медицинским изделием. Советы общие и строятся по тому, что вы укажете сами. При заболеваниях, после травм и операций посоветуйтесь с врачом."),
+        h("p", {}, h("b", { text: "Важно. " }), "Листопульс не заменяет врача и не медицинское изделие. При болезнях, после травм и операций посоветуйтесь с врачом."),
         h("label", { class: "check-row" }, ack,
           h("span", {}, "Я понимаю это и принимаю ",
             h("a", { href: "terms.html", target: "_blank", rel: "noopener", text: "условия использования" }), " и ",
@@ -4676,11 +4668,11 @@ function onbWelcome() {
 function onbSafety() {
   const info = h("div", { class: "note-box", hidden: !onb.screening.length },
     h("b", { text: "Посоветуйтесь с врачом перед началом тренировок. " }),
-    "Мы включим бережный режим и учтём ваши ответы — изменить это можно в разделе «Тело».");
+    "Включим бережный режим — его можно изменить в разделе «Тело».");
   return {
     body: [
       h("h1", { class: "page-title", text: "Безопасность прежде всего" }),
-      h("p", { class: "lead", text: "Несколько вопросов о здоровье. Ответы остаются только на этом устройстве." }),
+      h("p", { class: "lead", text: "Ответы остаются только на этом устройстве." }),
       h("section", { class: "card glass" }, SCREENING.map(q => h("div", { class: "q" },
         h("b", { text: q.q }),
         choice({
@@ -4700,7 +4692,7 @@ function onbGoal() {
   return {
     body: [
       h("h1", { class: "page-title", text: "Ваша цель" }),
-      h("p", { class: "lead", text: "От цели зависят упражнения в основной части. Её можно сменить в любой момент." }),
+      h("p", { class: "lead", text: "Цель можно сменить в любой момент." }),
       h("section", { class: "card glass" },
         h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ label: "Цель", value: onb.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { onb.goal = v; } })),
         h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "seg", label: "Уровень", value: onb.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { onb.level = v; } })))
@@ -4730,7 +4722,7 @@ function onbBody() {
   return {
     body: [
       h("h1", { class: "page-title", text: "Что беспокоит?" }),
-      h("p", { class: "lead", text: "Коснитесь зоны на модели или обведите место, которое болит, — или пропустите этот шаг. Всё можно изменить позже в разделе «Тело»." }),
+      h("p", { class: "lead", text: "Коснитесь зоны или обведите место, которое болит. Можно пропустить." }),
       h("section", { class: "card glass stage-card" }, bodyStage({ layers: false })),
       h("section", { class: "card glass" },
         h("h2", { text: "Особенности здоровья" }),
@@ -5062,7 +5054,7 @@ function renderPlayer() {
       if (P.prep) main = [h("p", { class: "player-dose", text: `Приготовьтесь · ${E.doseText(st.item)}` }), timerNode()];
       else if (st.item.sec) main = [timerNode(), ex.side ? (P.sideEl = h("p", { class: "player-dose", text: P.half ? "Вторая сторона" : "Первая сторона" })) : null];
       else if (ex.weighted) main = [h("p", { class: "player-dose", text: `Цель: ${E.doseText(st.item)}` }), weightControl(ex, st)];
-      else main = [h("div", { class: "big-reps", text: `×${st.item.reps}` }), h("p", { class: "player-dose", text: ex.side ? "на каждую сторону · нажмите «Готово», когда закончите" : "нажмите «Готово», когда закончите" })];
+      else main = [h("div", { class: "big-reps", text: `×${st.item.reps}` }), ex.side ? h("p", { class: "player-dose", text: "на каждую сторону" }) : null];
       card = h("section", { class: `player-card glass is-stage${P.prep ? " is-prep" : ""}` },
         stage(ex, demo, blockInfo),
         main,
@@ -5124,10 +5116,10 @@ function weightControl(ex, st) {
   };
   const today = P.sets[ex.id] || [];
   let hint;
-  if (sug && sug.up) hint = `В прошлый раз все повторы с ${fmtKg(prev.kg)} — пора прибавить: ${fmtKg(sug.kg)}`;
+  if (sug && sug.up) hint = `Все повторы с ${fmtKg(prev.kg)} — пробуйте ${fmtKg(sug.kg)}`;
   else if (prev && prev.last && prev.last.length) hint = `В прошлый раз: ${setsText(prev.last)} кг`;
   else if (prev) hint = `В прошлый раз ${fmtKg(prev.kg)} · лучший ${fmtKg(prev.best)}`;
-  else hint = "Укажите вес и сделанные повторы — запомню на следующий раз";
+  else hint = "Вес и повторы запомнятся на следующий раз";
   const stepper = (label, value, minus, plus, minusLabel, plusLabel) => h("div", { class: "w-col" },
     h("span", { class: "muted small", text: label }),
     h("div", { class: "w-row" },
@@ -5203,13 +5195,13 @@ function swapSheet() {
   const close = sheet({
     title: "Чем заменить?",
     body: [
-      h("p", { class: "muted small", text: `Похожие упражнения вместо «${ex.name}» — с учётом ваших зон и инвентаря.` }),
+      h("p", { class: "muted small", text: `Похожие на «${ex.name}» — с учётом ваших зон.` }),
       alts.length
         ? h("div", { class: "list" }, alts.map(alt => h("button", { class: "row row-btn", type: "button", onClick: () => { close(); pick(alt); } },
           h("span", { class: "row-text" }, h("b", { text: alt.name }), h("span", { class: "muted small", text: `${GROUPS[alt.group]} · ${LEVELS[alt.level - 1].name}${alt.equip.length ? ` · ${alt.equip.map(e => equipName(e).toLowerCase()).join(", ")}` : ""}` })),
           icon("swap", 18))))
         : h("p", { class: "muted", text: "Подходящей замены не нашлось — упражнение можно пропустить." }),
-      h("p", { class: "muted small", text: "Если упражнение вызывает боль, нажмите «Больно»: тренер не только заменит его, но и побережёт эту зону." })
+      h("p", { class: "muted small", text: "Если больно, нажмите «Больно»: тренер ещё и побережёт зону." })
     ],
     actions: [h("button", { class: "btn ghost", type: "button", text: "Отмена", onClick: () => { close(); resume(); } })],
     onClose: () => { if (player && player.paused && !wasPaused) resume(); }
@@ -5241,7 +5233,7 @@ function painSheet() {
   const close = sheet({
     title: "Где неприятно?",
     body: [
-      h("p", { class: "muted small", text: "Заменим упражнение на безопасное и 7 дней будем беречь эту зону. Ориентир: слабая боль до 3 из 10, которая не нарастает и проходит к утру, при восстановлении допустима; сильнее — меняем упражнение." }),
+      h("p", { class: "muted small", text: "Заменим упражнение и 7 дней будем беречь зону. Слабая боль до 3 из 10, которая проходит к утру, допустима." }),
       h("div", { class: "chips" }, order.map(id => h("button", { class: "chip", type: "button", text: REGION[id].name, onClick: () => { close(); handlePain(id); } }))),
       h("div", { class: "btn-row" }, h("button", { class: "btn ghost", type: "button", text: "Не больно — просто тяжело", onClick: () => { close(); easier(); } })),
       h("div", { class: "note-box" },
@@ -5336,9 +5328,9 @@ function finishPlayer() {
         h("b", { text: "Насколько было тяжело?" }),
         choice({ className: "rpe", label: "Тяжесть тренировки от 1 до 10", value: rpe, options: Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: String(i + 1) })), onChange: v => { rpe = v; } }),
         h("div", { class: "scale-labels" }, h("span", { text: "очень легко" }), h("span", { text: "на пределе" }))),
-      zones.length ? h("p", { class: "small", style: { textAlign: "left" }, text: `Зоны «${zones.join("», «")}» будут под защитой 7 дней. Завтра спросим, как они, — если боль не проходит или усиливается, покажитесь врачу.` }) : null,
+      zones.length ? h("p", { class: "small", style: { textAlign: "left" }, text: `Зоны «${zones.join("», «")}» под защитой 7 дней. Завтра спросим, как они.` }) : null,
       P.session.kind === "program" && P.done ? h("p", { class: "small", style: { textAlign: "left" }, text: `Сохраните — и занятие ${P.session.programDay} программы будет засчитано.` }) : null,
-      Object.keys(P.sets).length ? h("p", { class: "small", style: { textAlign: "left" }, text: `Подходы с весом: ${Object.entries(P.sets).map(([id, list]) => `${EX[id].name.toLowerCase()} — ${setsText(list)} кг`).join("; ")}. Сохраним их в журнал весов.` }) : null,
+      Object.keys(P.sets).length ? h("p", { class: "small", style: { textAlign: "left" }, text: `Подходы с весом: ${Object.entries(P.sets).map(([id, list]) => `${EX[id].name.toLowerCase()} — ${setsText(list)} кг`).join("; ")}.` }) : null,
       P.prs.length ? h("p", { class: "small pr-line", style: { textAlign: "left" }, text: `🥇 Новые рекорды: ${P.prs.map(id => EX[id].name.toLowerCase()).join(", ")}` }) : null,
       P.done ? h("div", { class: "btn-row center-row" }, h("button", {
         class: "btn small ghost", type: "button",
@@ -5349,7 +5341,7 @@ function finishPlayer() {
             [E.streak(state) || 1, E.plural(E.streak(state) || 1, "день подряд", "дня подряд", "дней подряд")], [P.prs.length || Object.keys(P.exDone).length, P.prs.length ? E.plural(P.prs.length, "рекорд", "рекорда", "рекордов") : E.plural(Object.keys(P.exDone).length, "упражнение", "упражнения", "упражнений")]]
         }, `Тренировка «${P.session.title}» в Листопульсе: ${P.mins} ${E.plural(P.mins, "минута", "минуты", "минут")} 🌿`)
       }, icon("share", 16), "Поделиться")) : null,
-      h("p", { class: "muted small", style: { textAlign: "left" }, text: "По вашей оценке тренер подстроит нагрузку в следующий раз." }),
+      h("p", { class: "muted small", style: { textAlign: "left" }, text: "Подстроим нагрузку в следующий раз." }),
       h("div", { class: "btn-row" },
         h("button", { class: "btn ghost", type: "button", text: "Не сохранять", onClick: () => closePlayer() }),
         h("button", { class: "btn primary", type: "button", text: "Сохранить", onClick: () => saveWorkout(rpe) })))));
@@ -5410,7 +5402,7 @@ function startTracker(kind = "walk") {
   if (!("geolocation" in navigator)) { toast("Этот браузер не умеет определять местоположение"); return; }
   tracker = {
     kind, status: "idle", pts: [], dist: 0, startedAt: 0, pausedAt: 0, pausedTotal: 0, paused: false, watch: null, timer: null,
-    acc: null, last: null, msg: "Нажмите «Старт», когда будете готовы. Первые секунды телефон ищет спутники.",
+    acc: null, last: null, msg: "Первые секунды телефон ищет спутники.",
     el: h("div", { class: "player tracker", role: "dialog", "aria-modal": "true", "aria-label": "Запись маршрута" }), nodes: {}
   };
   document.body.append(tracker.el);
@@ -5581,7 +5573,7 @@ function renderTracker() {
       h("span", {}, h("span", { class: "muted small", text: "темп" }), n.pace)),
     n.msg,
     n.route,
-    h("p", { class: "muted small", text: "Держите экран включённым: в фоне браузер не записывает маршрут. Координаты не сохраняются — в дневник попадут только дистанция и время." }));
+    h("p", { class: "muted small", text: "Не выключайте экран: в фоне запись не идёт." }));
   let controls;
   if (T.status === "idle") {
     controls = h("div", { class: "player-controls track-controls" },
