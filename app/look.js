@@ -49,6 +49,7 @@ export const FONTS = [
   { id: "mono", name: "Моноширинный", stack: '"LP JetBrains Mono", ui-monospace, Menlo, Consolas, monospace' }
 ];
 export const HEAD_FONTS = [
+  { id: "brand", name: "Фирменный", stack: '"LP Montserrat", system-ui, sans-serif' },
   { id: "same", name: "Как текст" },
   ...FONTS.filter(f => f.id !== "system"),
   { id: "playful", name: "Игривый", stack: '"LP Comfortaa", system-ui, sans-serif' },
@@ -90,19 +91,19 @@ export const EMOJI = ["🌿", "🍃", "🌳", "🌸", "🍀", "🌞", "🌙", "�
 
 // Готовые стили: один нажатием меняют сразу цвет, фон, шрифты и форму
 export const PRESETS = [
-  { id: "classic", name: "Листопульс", desc: "Зелёный, мягкое стекло", set: { accent: "forest", bg: "soft", font: "system", head: "same", radius: "soft", density: "normal", glass: true } },
+  { id: "classic", name: "Листопульс", desc: "Зелёный, мягкое стекло", set: { accent: "forest", bg: "soft", font: "system", head: "brand", radius: "soft", density: "normal", glass: true } },
   { id: "ocean", name: "Океан", desc: "Синий, округлый шрифт", set: { accent: "ocean", bg: "cool", font: "rounded", head: "same", radius: "soft", density: "normal", glass: true } },
   { id: "sunset", name: "Закат", desc: "Тёплые тона, игривые заголовки", set: { accent: "sunset", bg: "warm", font: "rounded", head: "playful", radius: "soft", density: "normal", glass: true } },
   { id: "lavender", name: "Лаванда", desc: "Фиолетовое сияние", set: { accent: "lavender", bg: "aurora", font: "modern", head: "same", radius: "soft", density: "normal", glass: true } },
   { id: "notebook", name: "Блокнот", desc: "Бумага, засечки, рукописные заголовки", set: { accent: "graphite", bg: "paper", font: "serif", head: "hand", radius: "calm", density: "normal", glass: false } },
-  { id: "minimal", name: "Минимализм", desc: "Без стекла, прямые углы, плотно", set: { accent: "graphite", bg: "plain", font: "system", head: "same", radius: "sharp", density: "compact", glass: false } },
-  { id: "contrast", name: "Чёткий", desc: "Крупный жирный текст, без прозрачности", set: { accent: "ocean", bg: "plain", font: "system", head: "same", radius: "calm", density: "airy", glass: false, bold: true, reading: true, scale: 115 } }
+  { id: "minimal", name: "Минимализм", desc: "Без стекла, прямые углы, плотно", set: { accent: "graphite", bg: "plain", font: "system", head: "brand", radius: "sharp", density: "compact", glass: false } },
+  { id: "contrast", name: "Чёткий", desc: "Крупный жирный текст, без прозрачности", set: { accent: "ocean", bg: "plain", font: "system", head: "brand", radius: "calm", density: "airy", glass: false, bold: true, reading: true, scale: 115 } }
 ];
 const PRESET_IDS = PRESETS.map(p => p.id);
 
 export const defaultLook = () => ({
-  v: 2, preset: "classic", accent: "forest", custom: "", bg: "soft", blur: 6, dim: 45,
-  font: "system", head: "same", scale: 100, bold: false, reading: false,
+  v: 3, preset: "classic", accent: "forest", custom: "", bg: "soft", blur: 6, dim: 45,
+  font: "system", head: "brand", scale: 100, bold: false, reading: false,
   radius: "soft", density: "normal", glass: true,
   tabs: [...TAB_IDS], labels: true, start: "today",
   home: HOME_IDS.map(id => [id, true]),
@@ -129,6 +130,8 @@ export function sanitizeLook(raw) {
   d.dim = intIn(raw.dim, 20, 85, d.dim);
   d.font = oneOf(raw.font, FONT_IDS, d.font);
   d.head = oneOf(raw.head, HEAD_IDS, d.head);
+  // До версии 3 фирменного шрифта не было: при системном тексте заголовки «как текст» стали фирменными
+  if (raw.v !== 3 && d.font === "system" && d.head === "same") d.head = "brand";
   d.scale = intIn(raw.scale, 85, 130, d.scale);
   d.bold = bool(raw.bold, d.bold);
   d.reading = bool(raw.reading, d.reading);
@@ -257,7 +260,7 @@ export function seedOf(look) {
 
 // ----- Применение -----
 const VARS = ["accent", "accent-text", "accent-ink", "accent-soft", "bg", "bg2", "blob-a", "blob-b", "blob-c", "demo-body", "demo-far", "demo-shorts", "demo-skin", "demo-hair"];
-const ROOT_CLASSES = ["less-glass", "bg-photo", "r-calm", "r-sharp", "d-airy", "d-compact", "bold-text", "read-ease", "head-hand", "tabs-icons", "no-muscles", "no-fx", "still", "demo-flat"];
+const ROOT_CLASSES = ["less-glass", "bg-photo", "r-calm", "r-sharp", "d-airy", "d-compact", "bold-text", "read-ease", "head-hand", "head-brand", "tabs-icons", "no-muscles", "no-fx", "still", "demo-flat"];
 
 // photoUrl — адрес blob: картинки фона, если она есть
 export function applyLook(look, { photoUrl = "" } = {}) {
@@ -331,6 +334,7 @@ export function applyLook(look, { photoUrl = "" } = {}) {
   if (look.bold) want.add("bold-text");
   if (look.reading) want.add("read-ease");
   if (look.head === "hand") want.add("head-hand");
+  if (look.head === "brand") want.add("head-brand");
   if (!look.labels) want.add("tabs-icons");
   if (!look.muscles) want.add("no-muscles");
   if (!look.fx) want.add("no-fx");

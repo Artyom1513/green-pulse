@@ -1,10 +1,11 @@
 // ===== Листопульс: офлайн-режим =====
 // Кэширует только файлы самого приложения. Ничего не отправляет и не загружает со сторонних сайтов.
-const VERSION = "lpapp-2.7.0";
+const VERSION = "lpapp-2.8.0";
 const ASSETS = [
   "./", "./index.html", "./app.css", "./boot.js", "./app.js", "./ui.js", "./store.js", "./engine.js", "./data.js", "./guide.js", "./body3d.js", "./muscles.js", "./anim.js", "./demo3d.js", "./look.js",
   "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png",
-  "./terms.html", "./privacy.html", "./recommendations.html"
+  "./terms.html", "./privacy.html", "./recommendations.html",
+  "./fonts/montserrat-cyrillic.woff2", "./fonts/montserrat-latin.woff2"
 ];
 const SCOPE = new URL("./", self.location).pathname;
 

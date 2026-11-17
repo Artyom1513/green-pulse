@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.7.0";
+const VERSION = "2.8.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -985,9 +985,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
+  "Свой шрифт: заголовки и цифры набраны фирменным Montserrat, таймер больше не дрожит",
   "Короче тексты: на экранах только главное, подробности — по нажатию",
-  "Плеер как сцена: крупная фигура, большой таймер и одна кнопка",
-  "Объёмные мышцы и студийный свет на модели тела"
+  "Плеер как сцена: крупная фигура, большой таймер и одна кнопка"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;

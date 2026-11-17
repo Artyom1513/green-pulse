@@ -1,6 +1,6 @@
 Шрифты в этой папке распространяются по лицензии SIL Open Font License 1.1 (OFL).
 Файлы взяты из пакетов Fontsource (https://fontsource.org) без изменений: наборы кириллицы и латиницы.
-Nunito, Rubik, PT Serif, JetBrains Mono, Caveat, Comfortaa.
+Nunito, Rubik, PT Serif, JetBrains Mono, Caveat, Comfortaa, Montserrat.
 
 Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito) Nunito-Italic[wght].ttf: Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito)
 Copyright 2015 The Rubik Project Authors (https://github.com/googlefonts/rubik) Rubik-Italic[wght].ttf: Copyright 2015 The Rubik Project Authors (https://github.com/googlefonts/rubik)
@@ -8,6 +8,7 @@ Copyright © 2010 ParaType Ltd. All rights reserved. PT_Serif-Web-Italic.ttf: Co
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) JetBrainsMono-Italic[wght].ttf: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
 Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
 Copyright 2011 The Comfortaa Project Authors (https://github.com/alexeiva/comfortaa), with Reserved Font Name "Comfortaa".
+Copyright 2011 The Montserrat Project Authors (https://github.com/JulietaUla/Montserrat)
 
 -----
 
