@@ -231,14 +231,27 @@ export function toggle({ label, desc, checked, onChange }) {
 }
 
 // ----- Кольцо прогресса -----
-export function ring(value, max, { size = 120, stroke = 12, label, sub } = {}) {
+// Можно ли анимировать: не просили «меньше движения» ни в телефоне, ни в персонализации
+export const motionOK = () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches && !document.documentElement.classList.contains("still");
+// Кольцо с ключом помнит прошлое значение: при первом показе заполняется от нуля, при изменении —
+// плавно дорастает до нового, а при простой перерисовке экрана стоит на месте
+const ringMemory = new Map();
+export function ring(value, max, { size = 120, stroke = 12, label, sub, key } = {}) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const part = Math.max(0, Math.min(1, max ? value / max : 0));
+  const arc = part > 0 ? s("circle", { class: "ring-value", cx: size / 2, cy: size / 2, r, "stroke-width": stroke, fill: "none", "stroke-linecap": "round", "stroke-dasharray": `${c * part} ${c}`, transform: `rotate(-90 ${size / 2} ${size / 2})` }) : null;
+  if (key) {
+    const prev = ringMemory.has(key) ? ringMemory.get(key) : 0;
+    ringMemory.set(key, part);
+    if (arc && prev !== part && motionOK() && typeof arc.animate === "function") {
+      try { arc.animate([{ strokeDasharray: `${c * Math.min(prev, part)} ${c}` }, { strokeDasharray: `${c * part} ${c}` }], { duration: 950, easing: "cubic-bezier(.22, .8, .24, 1)" }); } catch (e) { /* без анимации */ }
+    }
+  }
   return h("div", { class: "ring", style: { width: `min(${size}px, 23vw)`, height: `min(${size}px, 23vw)` } },
     s("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}`, "aria-hidden": "true" },
       s("circle", { class: "ring-track", cx: size / 2, cy: size / 2, r, "stroke-width": stroke, fill: "none" }),
-      part > 0 ? s("circle", { class: "ring-value", cx: size / 2, cy: size / 2, r, "stroke-width": stroke, fill: "none", "stroke-linecap": "round", "stroke-dasharray": `${c * part} ${c}`, transform: `rotate(-90 ${size / 2} ${size / 2})` }) : null
+      arc
     ),
     h("div", { class: "ring-label" }, h("b", { text: label }), sub ? h("span", { text: sub }) : null)
   );
@@ -269,6 +282,28 @@ export function beep(freq = 660, length = 0.25) {
 }
 export function buzz(pattern) {
   try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* не поддерживается */ }
+}
+// Тактильный отклик на нажатие. Android: короткая вибрация. iPhone (iOS 18 и новее): у Safari нет
+// вибрации, но системный переключатель «щёлкает» мотором при каждом переключении — поэтому на миг
+// создаём скрытый переключатель и нажимаем его подпись. Работает только внутри обработчика нажатия.
+const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const HAPTIC = { tap: 10, success: [14, 70, 26], warn: [28, 60, 28] };
+export function haptic(kind = "tap") {
+  try {
+    if (typeof navigator.vibrate === "function" && !IS_IOS) { navigator.vibrate(HAPTIC[kind] || HAPTIC.tap); return; }
+    if (!IS_IOS) return;
+    const label = document.createElement("label");
+    label.setAttribute("aria-hidden", "true");
+    label.style.display = "none";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.tabIndex = -1;
+    input.setAttribute("switch", "");
+    label.append(input);
+    document.head.append(label);
+    label.click();
+    label.remove();
+  } catch (e) { /* не поддерживается */ }
 }
 export function speak(textValue) {
   try {

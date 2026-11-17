@@ -1,6 +1,6 @@
 // ===== Листопульс: приложение «Тренер, который слушает тело» =====
 // Одностраничное приложение без сервера: всё считается и хранится на устройстве.
-import { h, s, icon, toast, sheet, confirmSheet, choice, toggle, ring, unlockAudio, beep, buzz, speak, keepAwake, confetti, download, mmss, fmtDate } from "./ui.js";
+import { h, s, icon, toast, sheet, confirmSheet, choice, toggle, ring, unlockAudio, beep, buzz, haptic, motionOK, speak, keepAwake, confetti, download, mmss, fmtDate } from "./ui.js";
 import * as store from "./store.js";
 import {
   REGIONS, REGION_GROUPS, SIDES, HOTSPOTS, SEVERITY, SYMPTOMS, ONSET, TRIGGERS, CONDITIONS, AGE_GROUPS, AGE_MIN, AGE_MAX, ageGroupOf, GOALS, LEVELS,
@@ -11,13 +11,15 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.8.0";
+const VERSION = "2.9.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const clean = (v, max) => String(v || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, max);
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => b.toString(36).padStart(2, "0")).join("").slice(0, 12);
+// Тактильный отклик на нажатие, если он не выключен в настройках
+const feel = kind => { if (state && state.settings && state.settings.vibrate) haptic(kind); };
 
 let state = null;
 let started = false;
@@ -517,8 +519,11 @@ function render() {
   const key = `${name}/${sub || ""}`;
   const y = window.scrollY;
   const keep = key === lastRoute;
+  const moved = !keep && lastRoute !== "";
   lastRoute = key;
   const main = h("main", { class: "view", id: "main" }, ROUTES[name](sub));
+  // Новый экран мягко появляется; при перерисовке того же экрана — без анимации
+  if (moved && motionOK()) main.classList.add("view-in");
   app.replaceChildren(h("div", { class: "shell" }, topbar(), main), tabbar(tabOf(name, sub)));
   window.scrollTo(0, keep ? y : 0);
   runPostRender();
@@ -724,6 +729,7 @@ function checkinSheet() {
         state.checkins = state.checkins.filter(c => c.d !== d).concat(entry).slice(-400);
         if (state.modeOverride && state.modeOverride.d === d) state.modeOverride = null;
         const nb = E.newBadges(state);
+        feel("success");
         persist();
         close();
         refresh();
@@ -781,6 +787,7 @@ function waterRow() {
   const setCount = v => {
     const before = count;
     count = Math.max(0, Math.min(12, v));
+    if (count !== before) feel();
     state.water = { d: E.dayKey(), n: count };
     update();
     if (count >= goal && before < goal) {
@@ -863,7 +870,7 @@ function weekCard() {
   const left = Math.max(0, goal - wk);
   const st = E.streak(state);
   const ws = E.weekStreak(state);
-  const ringCol = (v, max, label, sub, caption) => h("div", { class: "ring-col" }, ring(v, max, { size: 78, stroke: 8, label, sub }), h("span", { class: "muted small", text: caption }));
+  const ringCol = (v, max, label, sub, caption) => h("div", { class: "ring-col" }, ring(v, max, { size: 78, stroke: 8, label, sub, key: `week-${caption}` }), h("span", { class: "muted small", text: caption }));
   return h("section", { class: "card glass" },
     h("div", { class: "card-head" },
       h("p", { class: "eyebrow", text: "Неделя" }),
@@ -985,9 +992,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Свой шрифт: заголовки и цифры набраны фирменным Montserrat, таймер больше не дрожит",
-  "Короче тексты: на экранах только главное, подробности — по нажатию",
-  "Плеер как сцена: крупная фигура, большой таймер и одна кнопка"
+  "Живее: экраны появляются плавно, кольца недели заполняются, кнопки отзываются на нажатие",
+  "Праздник после тренировки: значок с галочкой, конфетти и прогресс недели",
+  "Лёгкая вибрация на «Готово», «Больно» и сохранение — на Android и на iPhone с iOS 18"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1362,6 +1369,7 @@ function favButton(id) {
   const btn = h("button", { class: "btn ghost icon-only", type: "button", "aria-label": label(), title: label(), "aria-pressed": state.favs.includes(id) ? "true" : "false" }, icon("star", 20));
   const text = { set textContent(v) { btn.setAttribute("aria-label", v); btn.title = v; } };
   btn.addEventListener("click", () => {
+    feel();
     if (state.favs.includes(id)) state.favs = state.favs.filter(x => x !== id);
     else if (state.favs.length < 12) state.favs = [...state.favs, id];
     else { toast("В избранном уже 12 тренировок"); return; }
@@ -2205,7 +2213,7 @@ function regionSheet(id, tappedSide = "") {
         const nb = commit();
         close();
         refresh();
-        toast(nb.length ? badgeToast(nb) : draft.sev ? `Сохранено. Тренировки подстроены под зону «${reg.name.toLowerCase()}»` : "Сохранено");
+        feel(); toast(nb.length ? badgeToast(nb) : draft.sev ? `Сохранено. Тренировки подстроены под зону «${reg.name.toLowerCase()}»` : "Сохранено");
       }
     })]
   });
@@ -3483,7 +3491,7 @@ function subSettings() {
     h("section", { class: "card glass" }, h("div", { class: "list" },
       toggle({ label: "Звуковые сигналы", desc: "Смена упражнений и отсчёт 3-2-1", checked: st.sound, onChange: v => { st.sound = v; persist(); } }),
       toggle({ label: "Голосовые подсказки", desc: "Название упражнения и отдых — вслух", checked: st.voice, onChange: v => { st.voice = v; persist(); if (v) speak("Голосовые подсказки включены"); } }),
-      toggle({ label: "Вибрация", desc: "На телефонах с Android", checked: st.vibrate, onChange: v => { st.vibrate = v; persist(); } }),
+      toggle({ label: "Вибрация", desc: "Отклик на нажатия и сигналы таймера", checked: st.vibrate, onChange: v => { st.vibrate = v; persist(); } }),
       toggle({ label: "Меньше прозрачности", desc: "Сплошной фон вместо стекла", checked: !look.glass, onChange: v => { changeLook({ glass: !v }, { rerender: false }); st.lessGlass = v; persist(); } })))
   ];
 }
@@ -4309,6 +4317,7 @@ function viewChallenge(id) {
     if (!ch.done.includes(cs.day)) ch.done = ch.done.concat(cs.day).sort((a, b) => a - b);
     ch.last = today;
     if (extra) extra();
+    feel("success");
     const nb = E.newBadges(state);
     persist();
     refresh();
@@ -4510,6 +4519,7 @@ function subRecords() {
       confetti();
       if (state.settings.sound) beep(990, 0.35);
     }
+    feel(best ? "success" : "tap");
     say(best ? "Новый рекорд!" : "Готово");
     toast(nb.length ? badgeToast(nb) : best ? (prev ? `Новый рекорд: ${mmss(sec)}! Было ${mmss(prev.best)}` : `Первый результат: ${mmss(sec)}`) : `${mmss(sec)}. Рекорд — ${mmss(prev.best)}`);
     refresh();
@@ -5065,6 +5075,7 @@ function renderPlayer() {
           onClick: () => {
             if (ex.weighted && P.kg[ex.id] !== null && P.kg[ex.id] !== undefined) { logSet(ex, P.kg[ex.id], P.curReps || st.item.reps); st.logged = true; }
             completeStep(st);
+            feel();
             if (state.settings.sound) beep(880, 0.2);
             enterStep(P.i + 1);
           }
@@ -5260,6 +5271,7 @@ function handlePain(region) {
   const P = player;
   const ex = EX[P.steps[P.i].item.id];
   E.reportPain(state, region);
+  feel("warn");
   P.pains.push({ ex: ex.id, region });
   planCache.key = "";
   const r = E.restrictions(state);
@@ -5317,13 +5329,19 @@ function finishPlayer() {
   say("Тренировка завершена. Отличная работа!");
   let rpe = 6;
   const zones = [...new Set(P.pains.map(p => REGION[p.region].name.toLowerCase()))];
+  // Сколько тренировочных дней будет на неделе вместе с этой (если её сохранить)
+  const today = E.dayKey();
+  const addsDay = P.done > 0 && P.session.goal !== "activity" && !state.sessions.some(x => x.d === today && x.goal !== "activity");
+  const weekNow = E.weekWorkouts(state) + (addsDay ? 1 : 0), weekGoal = Math.max(1, state.profile.days.length);
+  const name = clean(state.profile.name, 40);
   P.el.replaceChildren(h("div", { class: "summary" },
-    h("section", { class: "player-card glass" },
+    h("section", { class: "player-card glass finish-card" },
+      P.done ? doneBadge() : null,
       h("p", { class: "player-block", text: P.session.title }),
-      h("h1", { class: "player-ex", text: "Готово! 🎉" }),
-      h("div", { class: "stats", style: { margin: "16px 0" } }, stat(P.mins, E.plural(P.mins, "минута", "минуты", "минут")),
+      h("h1", { class: "player-ex", text: P.done ? `Отличная работа${name ? `, ${name}` : ""}!` : "Тренировка завершена" }),
+      h("div", { class: "stats celebrate", style: { margin: "16px 0" } }, stat(P.mins, E.plural(P.mins, "минута", "минуты", "минут")),
         stat(P.done, P.session.kind === "timer" ? E.plural(P.done, "раунд", "раунда", "раундов") : P.session.kind === "run" ? E.plural(P.done, "интервал", "интервала", "интервалов") : E.plural(P.done, "подход", "подхода", "подходов")),
-        stat(P.pains.length, E.plural(P.pains.length, "сигнал боли", "сигнала боли", "сигналов боли"))),
+        stat(`${weekNow}/${weekGoal}`, "за неделю")),
       h("div", { class: "q", style: { textAlign: "left" } },
         h("b", { text: "Насколько было тяжело?" }),
         choice({ className: "rpe", label: "Тяжесть тренировки от 1 до 10", value: rpe, options: Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: String(i + 1) })), onChange: v => { rpe = v; } }),
@@ -5346,6 +5364,15 @@ function finishPlayer() {
         h("button", { class: "btn ghost", type: "button", text: "Не сохранять", onClick: () => closePlayer() }),
         h("button", { class: "btn primary", type: "button", text: "Сохранить", onClick: () => saveWorkout(rpe) })))));
   P.el.scrollTop = 0;
+  // Праздник: значок с галочкой, конфетти и отклик — если хоть что-то сделано
+  if (P.done) { feel("success"); confetti(); }
+}
+
+// Значок «готово»: круг появляется с пружинкой, галочка прорисовывается, от круга расходится волна
+function doneBadge() {
+  return h("div", { class: "done-badge", "aria-hidden": "true" },
+    s("svg", { viewBox: "0 0 64 64", width: 64, height: 64 },
+      s("path", { class: "done-check", d: "M19 33.5l8.5 8.5L45 24", fill: "none" })));
 }
 
 function saveWorkout(rpe) {
@@ -5381,7 +5408,8 @@ function saveWorkout(rpe) {
   persist();
   requestPersistence();
   closePlayer();
-  confetti();
+  feel("success");
+  if (nb.length || prs.length) confetti();
   toast(nb.length ? badgeToast(nb) : prs.length ? `🥇 Новый рекорд: ${EX[prs[0]].name.toLowerCase()}!` : "Тренировка сохранена в дневник");
 }
 
