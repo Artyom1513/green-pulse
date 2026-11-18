@@ -60,7 +60,7 @@ const HEAD_IDS = HEAD_FONTS.map(f => f.id);
 
 // Тело на 3D-модели и фигуры в схемах: как в профиле, мужское или женское
 export const SEXES = [{ value: "auto", label: "Как в профиле" }, { value: "m", label: "Мужское" }, { value: "f", label: "Женское" }];
-export const RADII = [{ value: "soft", label: "Мягкие" }, { value: "calm", label: "Сдержанные" }, { value: "sharp", label: "Прямые" }];
+export const RADII = [{ value: "soft", label: "Мягкие" }, { value: "calm", label: "Средние" }, { value: "sharp", label: "Прямые" }];
 export const DENSITY = [{ value: "airy", label: "Просторно" }, { value: "normal", label: "Обычно" }, { value: "compact", label: "Компактно" }];
 export const FIGURES = [
   { id: "auto", name: "Как у темы" },
@@ -100,6 +100,9 @@ export const PRESETS = [
   { id: "contrast", name: "Чёткий", desc: "Крупный жирный текст, без прозрачности", set: { accent: "ocean", bg: "plain", font: "system", head: "brand", radius: "calm", density: "airy", glass: false, bold: true, reading: true, scale: 115 } }
 ];
 const PRESET_IDS = PRESETS.map(p => p.id);
+// «Мой стиль»: последнее своё сочетание запоминается, чтобы к нему можно было вернуться после готовых стилей
+export const STYLE_KEYS = ["accent", "custom", "bg", "font", "head", "radius", "density", "glass", "bold", "reading", "scale"];
+export const pickStyle = look => Object.fromEntries(STYLE_KEYS.map(k => [k, look[k]]));
 
 export const defaultLook = () => ({
   v: 3, preset: "classic", accent: "forest", custom: "", bg: "soft", blur: 6, dim: 45,
@@ -109,7 +112,7 @@ export const defaultLook = () => ({
   home: HOME_IDS.map(id => [id, true]),
   avatar: "letter", emoji: "🌿",
   figure: "auto", muscles: true, speed: 1, body: "mint", still: false, fx: true,
-  skin: "medium", figstyle: "3d", sex: "auto"
+  skin: "medium", figstyle: "3d", sex: "auto", mine: null
 });
 
 // ----- Проверка сохранённых значений -----
@@ -167,7 +170,16 @@ export function sanitizeLook(raw) {
   // до версии 2 «Детальная» была видом по умолчанию — теперь по умолчанию объёмная фигура
   if (!(Number(raw.v) >= 2) && raw.figstyle === "detail") d.figstyle = "3d";
   d.sex = oneOf(raw.sex, SEXES.map(x => x.value), d.sex);
+  d.mine = sanitizeMine(raw.mine);
   return d;
+}
+// Сохранённое своё сочетание проверяется теми же правилами; вложенного «моего стиля» в нём нет
+function sanitizeMine(raw) {
+  // Неполная запись — не сочетание, а мусор: её не показываем
+  if (!isObj(raw) || !["accent", "bg", "font", "head", "radius", "density"].every(k => k in raw)) return null;
+  const src = { v: 3 };
+  for (const k of STYLE_KEYS) if (k in raw) src[k] = raw[k];
+  return pickStyle(sanitizeLook(src));
 }
 
 export function loadLook() {
@@ -365,7 +377,7 @@ export function lookCode(look) {
   const def = defaultLook();
   const src = { ...look, avatar: look.avatar === "photo" ? "letter" : look.avatar, bg: look.bg === "photo" ? "soft" : look.bg };
   const diff = {};
-  for (const k of Object.keys(def)) if (k !== "v" && k !== "preset" && JSON.stringify(src[k]) !== JSON.stringify(def[k])) diff[k] = src[k];
+  for (const k of Object.keys(def)) if (k !== "v" && k !== "preset" && k !== "mine" && JSON.stringify(src[k]) !== JSON.stringify(def[k])) diff[k] = src[k];
   const json = JSON.stringify(diff);
   const bytes = new TextEncoder().encode(json);
   let bin = "";
@@ -384,6 +396,23 @@ export function parseLookCode(code) {
     return null;
   }
 }
+
+// Цвета мини-превью стиля для светлой или тёмной темы: акцент, надпись на нём, текст и карточка
+export function previewColors(st, dark) {
+  const forest = st.accent === "forest";
+  const c = forest ? null : accentSet(seedOf(st));
+  return {
+    accent: forest ? (dark ? "#4ade80" : "#15803d") : (dark ? c.accentDk : c.accent),
+    ink: forest ? (dark ? "#052e14" : "#ffffff") : (dark ? c.inkDk : c.ink),
+    soft: forest ? (dark ? "rgba(74, 222, 128, .16)" : "rgba(21, 128, 61, .14)") : (dark ? c.softDk : c.soft),
+    text: dark ? "#e8f1eb" : "#0e1a13",
+    line: dark ? "rgba(232, 241, 235, .30)" : "rgba(14, 26, 19, .20)",
+    card: st.glass ? (dark ? "rgba(30, 41, 36, .62)" : "rgba(255, 255, 255, .64)") : (dark ? "#151d19" : "#ffffff"),
+    edge: st.glass ? (dark ? "rgba(255, 255, 255, .12)" : "rgba(255, 255, 255, .9)") : (dark ? "rgba(255, 255, 255, .09)" : "rgba(16, 42, 28, .12)")
+  };
+}
+export const bodyStack = st => (FONTS.find(f => f.id === st.font) || FONTS[0]).stack;
+export const headStack = st => (st.head === "same" ? bodyStack(st) : (HEAD_FONTS.find(f => f.id === st.head) || HEAD_FONTS[0]).stack);
 
 // Превью фона для плиток выбора: тот же градиент, что и на экране
 export function bgPreview(id, dark) {

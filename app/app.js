@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.11.1";
+const VERSION = "2.12.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -664,7 +664,7 @@ function viewToday() {
     // одно главное действие: тренировка идёт первой, остальные сообщения — под ней
     ...(shown.length ? [shown[0], infoNotice(), ...shown.slice(1)] : [infoNotice(), h("section", { class: "card glass" },
       h("p", { class: "muted", text: "Все блоки главного экрана скрыты." }),
-      h("a", { class: "btn ghost", href: "#more/look", text: "Настроить главный экран" }))])
+      h("a", { class: "btn ghost", href: "#more/look", text: "Настроить главный экран", onClick: () => { lookTab = "screens"; } }))])
   ];
 }
 // Избранные готовые тренировки — на главном экране одним касанием
@@ -1021,9 +1021,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Ровнее вёрстка: слова в переключателях не рвутся, кнопки и плашки держат одну строку, дни недели — ровным рядом",
-  "Новое знакомство: три слайда с крупной фигурой, цели — карточками, в конце сводка плана",
-  "Проще навигация: настройки плана — под кнопкой «Настроить», инструменты — в «Профиле»"
+  "Новая «Персонализация»: готовые стили видны мини-экранами, тема, углы, плотность и фон выбираются картинками",
+  "«Мой стиль»: своё сочетание запоминается — можно примерить готовые стили и вернуться",
+  "Ровнее вёрстка: слова в переключателях не рвутся, кнопки и плашки держат одну строку"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -3201,6 +3201,7 @@ function matchPreset(lk) {
 function changeLook(patch, { rerender = true } = {}) {
   look = L.sanitizeLook({ ...look, ...patch });
   look.preset = matchPreset(look);
+  if (look.preset === "custom") look.mine = L.pickStyle(look);
   L.saveLook(look);
   applyLookNow();
   if (rerender) refresh();
@@ -3254,30 +3255,97 @@ function subLook() {
 }
 
 // ----- Стиль: готовые наборы, цвет, тема, фон, форма -----
+// Мини-экран приложения в заданном стиле: фон, заголовок, карточка с кольцом и кнопкой, нижняя панель
+function stylePreview(st) {
+  const dark = isDark();
+  const c = L.previewColors(st, dark);
+  const title = h("span", { class: "pv-title", text: "Аа" });
+  const text = h("span", { class: "pv-text", text: "Йога" });
+  const ring = h("span", { class: "pv-ring" });
+  const line = h("i", { class: "pv-line" });
+  const dot = h("i");
+  const btn = h("span", { class: "pv-btn" }, dot);
+  const card = h("span", { class: "pv-card" }, ring, h("span", { class: "pv-lines" }, text, line), btn);
+  const bar = h("span", { class: "pv-bar" }, h("i"), h("i"), h("i"), h("i"));
+  const frame = h("span", { class: `pv pv-r-${st.radius} pv-g-${st.density}${st.bold ? " pv-bold" : ""}`, "aria-hidden": "true" }, title, card, bar);
+  if (st.bg === "photo" && mediaUrls.bg) {
+    const veil = dark ? "rgba(10, 17, 14, .55)" : "rgba(241, 247, 243, .45)";
+    frame.style.background = `linear-gradient(${veil}, ${veil}), url("${mediaUrls.bg}") center / cover`;
+  } else frame.style.background = L.bgPreview(st.bg === "photo" ? "soft" : st.bg, dark);
+  frame.style.color = c.text;
+  title.style.fontFamily = L.headStack(st);
+  text.style.fontFamily = L.bodyStack(st);
+  for (const el of [card, bar]) { el.style.background = c.card; el.style.borderColor = c.edge; }
+  ring.style.background = `conic-gradient(${c.accent} 0 70%, ${c.soft} 70% 100%)`;
+  line.style.background = c.line;
+  btn.style.background = c.accent;
+  dot.style.background = c.ink;
+  bar.querySelectorAll("i").forEach((d, i) => { d.style.background = i ? c.line : c.accent; });
+  return frame;
+}
+function styleCard({ name, desc, st, pressed, onPick }) {
+  return h("button", { class: "style-card", type: "button", "aria-pressed": pressed ? "true" : "false", onClick: onPick },
+    stylePreview(st), h("b", { text: name }), h("span", { class: "muted small", text: desc }));
+}
+// Выбор картинками: тема, углы, плотность и фон
+function tileChoice({ label, value, options, onChange, className = "" }) {
+  return h("div", { class: `tile-pick${className ? ` ${className}` : ""}`, role: "group", "aria-label": label },
+    options.map(o => h("button", { class: "tile-opt", type: "button", "aria-pressed": o.value === value ? "true" : "false", onClick: () => onChange(o.value) },
+      o.art, h("span", { class: "tile-name", text: o.label }))));
+}
+// Тема: светлый и тёмный вид текущего фона, у «Авто» — обе половины
+function themeArt(mode) {
+  const layer = dark => {
+    const c = L.previewColors(look, dark);
+    const card = h("i", { class: "ta-card" });
+    const pill = h("i", { class: "ta-pill" });
+    const el = h("span", { class: "ta" }, card, pill);
+    el.style.background = L.bgPreview(look.bg === "photo" ? "soft" : look.bg, dark);
+    card.style.background = c.card;
+    card.style.borderColor = c.edge;
+    pill.style.background = c.accent;
+    return el;
+  };
+  return h("span", { class: `tile-art theme-art t-${mode}`, "aria-hidden": "true" }, mode !== "dark" ? layer(false) : null, mode !== "light" ? layer(true) : null);
+}
+const cornerArt = r => h("span", { class: `tile-art corner-art c-${r}`, "aria-hidden": "true" }, h("i"));
+const densityArt = d => h("span", { class: `tile-art density-art g-${d}`, "aria-hidden": "true" }, h("i"), h("i"), h("i"));
+const accentName = st => (st.accent === "custom" ? "Свой цвет" : (L.PALETTES.find(p => p.id === st.accent) || L.PALETTES[0]).name);
+// Прокрутка ленты стилей переживает перерисовку, а выбранный стиль всегда в поле зрения
+let lookRailX = 0;
+
 function lookStyle() {
   const dark = isDark();
-  const presets = L.PRESETS.map(p => {
-    const accent = L.accentSet((L.PALETTES.find(x => x.id === p.set.accent) || L.PALETTES[0]).seed);
-    const font = (L.FONTS.find(f => f.id === p.set.font) || L.FONTS[0]).stack;
-    const btn = h("button", { class: "preset", type: "button", "aria-pressed": look.preset === p.id ? "true" : "false" },
-      h("span", { class: "preset-dots", "aria-hidden": "true" }, h("i"), h("i")),
-      h("span", { class: "sample", "aria-hidden": "true", text: "Аа" }),
-      h("b", { text: p.name }), h("span", { class: "small", text: p.desc }));
-    btn.style.background = L.bgPreview(p.set.bg, dark);
-    const dots = btn.querySelectorAll(".preset-dots i");
-    dots[0].style.background = p.set.accent === "forest" ? (dark ? "#4ade80" : "#15803d") : (dark ? accent.accentDk : accent.accent);
-    dots[1].style.background = dark ? "#e8f1eb" : "#0e1a13";
-    btn.querySelector(".sample").style.fontFamily = font;
-    btn.addEventListener("click", () => {
-      const before = look;
-      look = L.sanitizeLook({ ...look, ...PRESET_BASE, ...p.set });
-      look.preset = p.id;
-      L.saveLook(look);
-      applyLookNow();
-      refresh();
-      undoToast(`Стиль «${p.name}»`, before);
-    });
-    return btn;
+  const applyStyle = (st, id, message) => {
+    const before = look;
+    look = L.sanitizeLook({ ...look, ...PRESET_BASE, ...st });
+    look.preset = id || matchPreset(look);
+    L.saveLook(look);
+    applyLookNow();
+    feel("tap");
+    refresh();
+    undoToast(message, before);
+  };
+  const mine = look.mine || (look.preset === "custom" ? L.pickStyle(look) : null);
+  const cards = [
+    mine ? styleCard({
+      name: "Мой стиль", desc: `${accentName(mine)}, фон «${(L.BACKGROUNDS.find(b => b.id === mine.bg) || L.BACKGROUNDS[0]).name}»`,
+      st: mine, pressed: look.preset === "custom", onPick: () => { if (look.preset !== "custom") applyStyle(mine, null, "Мой стиль"); }
+    }) : null,
+    ...L.PRESETS.map(p => styleCard({
+      name: p.name, desc: p.desc, st: { ...look, ...PRESET_BASE, ...p.set }, pressed: look.preset === p.id,
+      onPick: () => { if (look.preset !== p.id) applyStyle(p.set, p.id, `Стиль «${p.name}»`); }
+    }))
+  ];
+  const rail = h("div", { class: "style-rail", role: "group", "aria-label": "Готовые стили" }, cards);
+  rail.addEventListener("scroll", () => { lookRailX = rail.scrollLeft; }, { passive: true });
+  postRender.push(() => {
+    rail.scrollLeft = lookRailX;
+    const sel = rail.querySelector('[aria-pressed="true"]');
+    if (sel && (sel.offsetLeft < rail.scrollLeft || sel.offsetLeft + sel.offsetWidth > rail.scrollLeft + rail.clientWidth)) {
+      rail.scrollLeft = sel.offsetLeft - (rail.clientWidth - sel.offsetWidth) / 2;
+      lookRailX = rail.scrollLeft;
+    }
   });
 
   // Цвет акцента: готовые и свой; оттенки подбираются с проверкой контраста
@@ -3292,21 +3360,21 @@ function lookStyle() {
   colorInput.addEventListener("change", () => changeLook({ accent: "custom", custom: colorInput.value }));
   const custom = h("label", { class: "swatch swatch-custom", title: "Свой цвет", "data-on": look.accent === "custom" ? "1" : "0" }, colorInput);
 
-  // Фон
-  const bgTiles = L.BACKGROUNDS.filter(b => b.id !== "photo").map(b => {
-    const t = h("button", { class: "bg-tile", type: "button", "aria-pressed": look.bg === b.id ? "true" : "false", onClick: () => changeLook({ bg: b.id }) }, h("b", { class: "tile-label", text: b.name }));
-    t.style.background = L.bgPreview(b.id, dark);
-    return t;
+  // Фон: шесть готовых и своё фото отдельной строкой
+  const bgPick = tileChoice({
+    label: "Фон", value: look.bg, className: "bg-pick", onChange: v => changeLook({ bg: v }),
+    options: L.BACKGROUNDS.filter(b => b.id !== "photo").map(b => {
+      const art = h("span", { class: "tile-art bg-art", "aria-hidden": "true" });
+      art.style.background = L.bgPreview(b.id, dark);
+      return { value: b.id, label: b.name, art };
+    })
   });
+  const thumb = h("span", { class: "photo-thumb", "aria-hidden": "true" }, mediaUrls.bg ? null : icon("image", 20));
+  if (mediaUrls.bg) thumb.style.backgroundImage = `url("${mediaUrls.bg}")`;
   const photoTile = h("button", {
-    class: "bg-tile", type: "button", "aria-pressed": look.bg === "photo" ? "true" : "false",
+    class: "photo-tile", type: "button", "aria-pressed": look.bg === "photo" ? "true" : "false",
     onClick: () => (media.bg ? changeLook({ bg: "photo" }) : pickImage("bg", () => changeLook({ bg: "photo" })))
-  }, h("b", { class: "tile-label", text: media.bg ? "Своё фото" : "+ Своё фото" }));
-  if (mediaUrls.bg) {
-    photoTile.style.backgroundImage = `url("${mediaUrls.bg}")`;
-    photoTile.style.backgroundSize = "cover";
-    photoTile.style.backgroundPosition = "center";
-  }
+  }, thumb, h("span", { class: "row-text" }, h("b", { text: "Своё фото" }), h("span", { class: "muted small", text: media.bg ? "Хранится только здесь, без геометки" : "Выбрать картинку на телефоне" })));
   const range = (label, value, min, max, step, unit, onLive) => {
     const out = h("output", { text: `${value}${unit}` });
     const input = h("input", { class: "range neutral", type: "range", min, max, step, value, "aria-label": label });
@@ -3321,83 +3389,106 @@ function lookStyle() {
   ] : [];
 
   return [
-    lookCard("Готовые стили", h("p", { class: "muted small", text: "Всё оформление одним касанием." }), h("div", { class: "preset-grid" }, presets)),
+    h("section", { class: "card glass" },
+      h("h2", { text: "Готовые стили" }),
+      h("p", { class: "muted small", text: "Цвет, фон, шрифты и форма одним касанием." }),
+      rail),
     lookCard("Цвет акцента",
       h("p", { class: "muted small", text: "Кнопки, ссылки, кольца и подсветка мышц." }),
       h("div", { class: "swatches", role: "group", "aria-label": "Цвет акцента" }, swatches, custom),
-      lookHint(look.accent === "custom" ? "Свой цвет: яркость подстроена для читаемости." : `Сейчас: ${(L.PALETTES.find(p => p.id === look.accent) || L.PALETTES[0]).name}.`)),
+      lookHint(look.accent === "custom" ? "Свой цвет: яркость подстроена для читаемости." : `Сейчас: ${accentName(look)}.`)),
     lookCard("Тема",
-      choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Авто" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); applyLookNow(); refresh(); } }),
+      tileChoice({
+        label: "Тема", value: store.getTheme(),
+        options: [{ value: "auto", label: "Авто" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }].map(o => ({ ...o, art: themeArt(o.value) })),
+        onChange: v => { store.setTheme(v); applyTheme(v); applyLookNow(); refresh(); }
+      }),
       lookHint("«Авто» — как в настройках телефона."),
       h("div", { class: "list" }, toggle({ label: "Стеклянные панели", desc: "Полупрозрачные карточки. Без них легче читать.", checked: look.glass, onChange: v => { changeLook({ glass: v }); state.settings.lessGlass = !v; persist(); } }))),
     lookCard("Фон",
-      h("div", { class: "bg-tiles" }, bgTiles, photoTile),
+      bgPick,
+      photoTile,
       ...photoControls,
       media.bg ? h("div", { class: "btn-row" },
         h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("bg", () => changeLook({ bg: "photo" })) }, icon("image", 16), "Другое фото"),
-        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("bg", () => changeLook({ bg: look.bg === "photo" ? "soft" : look.bg })) }, icon("trash", 16), "Убрать фото")) : null,
-      lookHint("Фото хранится только здесь, без геометки.")),
+        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("bg", () => changeLook({ bg: look.bg === "photo" ? "soft" : look.bg })) }, icon("trash", 16), "Убрать фото")) : null),
     lookCard("Форма",
-      h("div", { class: "q" }, h("b", { text: "Углы" }), choice({ className: "seg", label: "Углы", value: look.radius, options: L.RADII, onChange: v => changeLook({ radius: v }) })),
-      h("div", { class: "q" }, h("b", { text: "Плотность" }), choice({ className: "seg", label: "Плотность", value: look.density, options: L.DENSITY, onChange: v => changeLook({ density: v }) }))),
-    lookShareCard(),
-    lookCard("Сбросить",
-      h("p", { class: "muted small", text: "Данные, фото и избранное останутся." }),
-      h("button", {
-        class: "btn ghost", type: "button", text: "Вернуть как было",
-        onClick: async () => {
-          const ok = await confirmSheet({ title: "Сбросить оформление?", message: "Цвет, фон, шрифты и расположение станут как при первом запуске.", ok: "Сбросить" });
-          if (!ok) return;
-          const before = look;
-          // Аватар — часть профиля, а не оформления: его сброс не трогает
-          look = { ...L.defaultLook(), avatar: before.avatar, emoji: before.emoji };
-          L.saveLook(look);
-          applyLookNow();
-          refresh();
-          undoToast("Оформление сброшено", before);
-        }
-      }))
+      h("div", { class: "q" }, h("b", { text: "Углы" }),
+        tileChoice({ label: "Углы", value: look.radius, options: L.RADII.map(o => ({ ...o, art: cornerArt(o.value) })), onChange: v => changeLook({ radius: v }) })),
+      h("div", { class: "q" }, h("b", { text: "Плотность" }),
+        tileChoice({ label: "Плотность", value: look.density, options: L.DENSITY.map(o => ({ ...o, art: densityArt(o.value) })), onChange: v => changeLook({ density: v }) }))),
+    h("section", { class: "card glass list-group" }, h("div", { class: "list" },
+      h("button", { class: "row row-btn lg-row", type: "button", onClick: openStyleCode },
+        h("span", { class: "fi" }, icon("share", 18)),
+        h("span", { class: "row-text" }, h("b", { text: "Поделиться стилем" }), h("span", { class: "muted small", text: "Код для друга или другого телефона" })),
+        icon("chevron", 16)),
+      h("button", { class: "row row-btn lg-row", type: "button", onClick: resetLook },
+        h("span", { class: "fi" }, icon("refresh", 18)),
+        h("span", { class: "row-text" }, h("b", { text: "Сбросить оформление" }), h("span", { class: "muted small", text: "Данные, фото и избранное останутся" })))))
   ];
 }
 
+async function resetLook() {
+  const ok = await confirmSheet({ title: "Сбросить оформление?", message: "Цвет, фон, шрифты и расположение станут как при первом запуске. Своё сочетание останется в «Моём стиле».", ok: "Сбросить" });
+  if (!ok) return;
+  const before = look;
+  // Аватар — часть профиля, а не оформления: его сброс не трогает
+  look = { ...L.defaultLook(), avatar: before.avatar, emoji: before.emoji, mine: before.mine || (before.preset === "custom" ? L.pickStyle(before) : null) };
+  L.saveLook(look);
+  applyLookNow();
+  refresh();
+  undoToast("Оформление сброшено", before);
+}
+
 // Код стиля: передать оформление другу или перенести на другой телефон
-function lookShareCard() {
+function openStyleCode() {
   const code = L.lookCode(look);
-  const input = h("input", { class: "input", type: "text", placeholder: "Вставьте код стиля LP1-…", "aria-label": "Код стиля", maxlength: 4000, autocomplete: "off", spellcheck: "false" });
-  return lookCard("Поделиться стилем",
-    h("p", { class: "muted small", text: "Только оформление — без фото, имени и здоровья." }),
-    h("details", { class: "more" }, h("summary", { text: "Показать код" }), h("p", { class: "code-box", text: code })),
-    h("div", { class: "btn-row" },
-      h("button", {
-        class: "btn small ghost", type: "button",
-        onClick: async () => {
-          try { await navigator.clipboard.writeText(code); toast("Код стиля скопирован"); } catch (e) { toast("Выделите код и скопируйте вручную"); }
-        }
-      }, icon("share", 16), "Скопировать код")),
-    h("label", { class: "field" }, h("span", { text: "Применить чужой стиль" }), input),
-    h("div", { class: "btn-row" }, h("button", {
-      class: "btn small primary", type: "button", text: "Применить",
+  const input = h("input", { class: "input", type: "text", placeholder: "LP1-…", "aria-label": "Код стиля", maxlength: 4000, autocomplete: "off", spellcheck: "false" });
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(code); toast("Код стиля скопирован"); } catch (e) { toast("Выделите код и скопируйте вручную"); }
+  };
+  const send = async () => {
+    try { await navigator.share({ title: "Мой стиль в Листопульсе", text: code }); } catch (e) { /* отменили — ничего не делаем */ }
+  };
+  const close = sheet({
+    title: "Код стиля",
+    body: [
+      h("p", { class: "muted small", text: "Только оформление: без фото, имени и здоровья." }),
+      h("p", { class: "code-box", text: code }),
+      h("div", { class: "btn-row" },
+        h("button", { class: "btn small ghost", type: "button", onClick: copy }, icon("doc", 16), "Скопировать"),
+        typeof navigator.share === "function" ? h("button", { class: "btn small ghost", type: "button", onClick: send }, icon("share", 16), "Отправить") : null),
+      h("label", { class: "field code-field" }, h("span", { text: "Применить чужой стиль" }), input)
+    ],
+    actions: [h("button", {
+      class: "btn primary", type: "button", text: "Применить",
       onClick: () => {
         const parsed = L.parseLookCode(input.value);
         if (!parsed) { toast("Код не подошёл — проверьте, что он скопирован целиком"); return; }
         const before = look;
         // Своя аватарка остаётся своей
-        look = { ...parsed, avatar: before.avatar, emoji: before.emoji, preset: matchPreset(parsed) };
+        look = { ...parsed, avatar: before.avatar, emoji: before.emoji, preset: matchPreset(parsed), mine: before.mine };
+        if (look.preset === "custom") look.mine = L.pickStyle(look);
         L.saveLook(look);
         applyLookNow();
+        close();
         refresh();
         undoToast("Стиль применён", before);
       }
-    })));
+    })]
+  });
 }
 
 // ----- Текст: шрифт, заголовки, размер, жирность -----
 function lookText() {
+  // Название шрифта написано им самим — видно сразу, какой он
   const fontRows = L.FONTS.map(f => {
     const sample = h("span", { class: "sample", "aria-hidden": "true", text: "Аа" });
+    const name = h("b", { text: f.name });
     sample.style.fontFamily = f.stack;
+    name.style.fontFamily = f.stack;
     return h("button", { class: "row row-btn font-row", type: "button", "aria-pressed": look.font === f.id ? "true" : "false", onClick: () => changeLook({ font: f.id }) },
-      sample, h("span", { class: "row-text" }, h("b", { text: f.name }), h("span", { class: "muted small", text: FONT_DESC[f.id] })));
+      sample, h("span", { class: "row-text" }, name, h("span", { class: "muted small", text: FONT_DESC[f.id] })));
   });
   const heads = choice({
     label: "Шрифт заголовков", value: look.head,
@@ -3410,11 +3501,16 @@ function lookText() {
   size.addEventListener("input", () => { out.textContent = `${size.value} %`; changeLook({ scale: Number(size.value) }, { rerender: false }); });
   size.addEventListener("change", () => changeLook({ scale: Number(size.value) }));
   return [
+    // Образец сверху: заголовок, текст и цифры сразу показывают шрифты, размер и жирность
+    h("section", { class: "card glass text-sample" },
+      h("p", { class: "eyebrow", text: "Образец" }),
+      h("h2", { text: "Присед с гантелей" }),
+      h("p", { class: "ts-body", text: "Спина ровная, колени смотрят туда же, куда носки. Вдох вниз, выдох вверх." }),
+      h("div", { class: "stats" }, stat(3, "подхода"), stat(12, "повторов"), stat(16, "кг"))),
     lookCard("Шрифт", h("div", { class: "list" }, fontRows), lookHint("Работают без интернета.")),
     lookCard("Заголовки", heads),
     lookCard("Размер текста",
-      h("div", { class: "range-row" }, size, out),
-      h("p", { class: "size-sample", text: "Так будет выглядеть текст: «Сделайте 10 приседаний, спина ровная»." }),
+      h("div", { class: "range-row size-row" }, h("span", { class: "a-small", "aria-hidden": "true", text: "А" }), size, h("span", { class: "a-big", "aria-hidden": "true", text: "А" }), out),
       lookHint("Растёт только текст.")),
     h("section", { class: "card glass" }, h("div", { class: "list" },
       toggle({ label: "Жирный текст", desc: "Плотнее начертание — легче читать на солнце", checked: look.bold, onChange: v => changeLook({ bold: v }) }),
@@ -3461,11 +3557,18 @@ function lookScreens() {
   });
   const favs = state.favs.map(id => QUICK.find(q => q.id === id)).filter(Boolean);
   return [
+    lookCard("Аватар",
+      h("div", { class: "today-head" }, avatarEl({ big: true }), h("p", { class: "muted small", text: "Виден в профиле и на главном экране." })),
+      avatarKinds,
+      look.avatar === "emoji" ? h("div", { class: "emoji-grid", role: "group", "aria-label": "Эмодзи" },
+        L.EMOJI.map(em => h("button", { class: "emoji-btn", type: "button", text: em, "aria-pressed": look.emoji === em ? "true" : "false", onClick: () => changeLook({ emoji: em }) }))) : null,
+      look.avatar === "photo" && media.avatar ? h("div", { class: "btn-row" },
+        h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("avatar", () => changeLook({ avatar: "photo" })) }, icon("image", 16), "Другое фото"),
+        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("avatar", () => changeLook({ avatar: "letter" })) }, icon("trash", 16), "Убрать фото")) : null),
     lookCard("Главный экран",
       h("p", { class: "muted small", text: "Порядок и видимость блоков. Предупреждения о боли — всегда сверху." }),
-      h("div", {}, homeRows)),
-    lookCard("Мой девиз",
-      h("label", { class: "field" }, h("span", { text: "Фраза на главном экране" }), motto),
+      h("div", {}, homeRows),
+      h("label", { class: "field motto-field" }, h("span", { text: "Мой девиз" }), motto),
       lookHint("Пусто — блок не показывается.")),
     lookCard("Избранное",
       favs.length
@@ -3479,15 +3582,7 @@ function lookScreens() {
       h("div", {}, tabRows),
       h("div", { class: "list" }, toggle({ label: "Подписи под значками", desc: "Без подписей значки крупнее", checked: look.labels, onChange: v => changeLook({ labels: v }) })),
       h("div", { class: "q", style: { marginTop: "12px" } }, h("b", { text: "Экран при запуске" }),
-        choice({ label: "Экран при запуске", value: look.start, options: L.TAB_IDS.map(id => ({ value: id, label: L.TAB_NAMES[id] })), onChange: v => changeLook({ start: v }) }))),
-    lookCard("Аватар",
-      h("div", { class: "today-head" }, avatarEl({ big: true }), h("p", { class: "muted small", text: "Виден в профиле и на главном экране." })),
-      avatarKinds,
-      look.avatar === "emoji" ? h("div", { class: "emoji-grid", role: "group", "aria-label": "Эмодзи" },
-        L.EMOJI.map(em => h("button", { class: "emoji-btn", type: "button", text: em, "aria-pressed": look.emoji === em ? "true" : "false", onClick: () => changeLook({ emoji: em }) }))) : null,
-      look.avatar === "photo" && media.avatar ? h("div", { class: "btn-row" },
-        h("button", { class: "btn small ghost", type: "button", onClick: () => pickImage("avatar", () => changeLook({ avatar: "photo" })) }, icon("image", 16), "Другое фото"),
-        h("button", { class: "btn small ghost", type: "button", onClick: () => removeImage("avatar", () => changeLook({ avatar: "letter" })) }, icon("trash", 16), "Убрать фото")) : null)
+        choice({ label: "Экран при запуске", value: look.start, options: L.TAB_IDS.map(id => ({ value: id, label: L.TAB_NAMES[id] })), onChange: v => changeLook({ start: v }) })))
   ];
 }
 
