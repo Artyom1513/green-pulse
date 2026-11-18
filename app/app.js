@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.9.0";
+const VERSION = "2.10.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -504,6 +504,30 @@ function showLock(env) {
 // ===== Маршруты =====
 const ROUTES = { today: viewToday, workout: viewWorkout, body: viewBody, journal: viewJournal, more: viewMore, guide: viewGuide, program: viewProgram, builder: viewBuilder, challenge: viewChallenge, report: viewReport, run: viewRun };
 const TAB_OF = { guide: "body", program: "workout", builder: "workout", challenge: "workout", report: "body", run: "workout" };
+// Цепочка экранов этого сеанса: «Назад» возвращает туда, откуда пришли, а не в раздел «по умолчанию»
+const navTrail = [];
+const ROUTE_NAMES = { today: "Сегодня", workout: "Тренировки", body: "Тело", journal: "Прогресс", more: "Профиль", guide: "Справочник", program: "Программа", challenge: "Челлендж", run: "Бег с нуля", report: "Отчёт для врача", builder: "Конструктор" };
+const SUB_NAMES = {
+  "workout/catalog": "Каталог", "workout/mine": "Мои тренировки", "body/health": "Здоровье",
+  "journal/strength": "Сила", "journal/body": "Тело", "journal/awards": "Награды",
+  "more/look": "Персонализация", "more/library": "Упражнения", "more/records": "Рекорды", "more/weights": "Рабочие веса",
+  "more/calc": "Калькуляторы", "more/gps": "Прогулка с GPS", "more/timer": "Таймер", "more/breath": "Дыхание",
+  "more/calendar": "План и напоминания", "more/profile": "Профиль и цели", "more/settings": "Настройки",
+  "more/data": "Данные и защита", "more/install": "Установка", "more/about": "О приложении"
+};
+function routeName(key) {
+  if (own(SUB_NAMES, key)) return SUB_NAMES[key];
+  const [name, sub] = key.split("/");
+  if (name === "workout" && own(CATALOG_PAGES, sub)) return CATALOG_PAGES[sub][0];
+  if (name === "guide" && sub) return "Статья";
+  return ROUTE_NAMES[name] || "Назад";
+}
+function backLink(href, label, extra = "") {
+  const cls = `back-link${extra ? ` ${extra}` : ""}`;
+  const prev = navTrail.length > 1 ? navTrail[navTrail.length - 2] : "";
+  if (!prev) return h("a", { class: cls, href }, icon("back", 18), label);
+  return h("a", { class: cls, href: `#${prev}`, onClick: e => { e.preventDefault(); history.back(); } }, icon("back", 18), routeName(prev));
+}
 // Адрес приложения для приглашений и «Поделиться» (работает и на своём домене)
 const appUrl = () => new URL("./", window.location.href).href;
 const TABS = [["today", "Сегодня", "today"], ["workout", "Тренировки", "workout"], ["body", "Тело", "body"], ["journal", "Прогресс", "journal"], ["more", "Профиль", "user"]];
@@ -521,6 +545,12 @@ function render() {
   const keep = key === lastRoute;
   const moved = !keep && lastRoute !== "";
   lastRoute = key;
+  if (!keep) {
+    const here = key.replace(/\/$/, "");
+    if (navTrail.length > 1 && navTrail[navTrail.length - 2] === here) navTrail.pop();
+    else if (navTrail[navTrail.length - 1] !== here) navTrail.push(here);
+    if (navTrail.length > 40) navTrail.splice(0, navTrail.length - 40);
+  }
   const main = h("main", { class: "view", id: "main" }, ROUTES[name](sub));
   // Новый экран мягко появляется; при перерисовке того же экрана — без анимации
   if (moved && motionOK()) main.classList.add("view-in");
@@ -992,9 +1022,10 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Живее: экраны появляются плавно, кольца недели заполняются, кнопки отзываются на нажатие",
-  "Праздник после тренировки: значок с галочкой, конфетти и прогресс недели",
-  "Лёгкая вибрация на «Готово», «Больно» и сохранение — на Android и на iPhone с iOS 18"
+  "Проще навигация: настройки плана — под кнопкой «Настроить», над тренировкой одна строка",
+  "Таймер, дыхание, прогулка с GPS, рекорды, калькуляторы и отчёт врачу — в «Профиле», раздел «Инструменты»",
+  "«Назад» возвращает туда, откуда вы пришли",
+  "Живее: плавные экраны, кольца недели, праздник после тренировки и лёгкая вибрация"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1069,7 +1100,6 @@ const CATALOG = [
   ["challenges", "trophy", "Челленджи", () => "30 дней: планка, осанка, равновесие и др."],
   ["stretch", "leaf", "Йога и растяжка", () => "Гибкость, спина, перед сном"],
   ["weights", "workout", "С весами", () => "Гантели, гиря, штанга"],
-  ["tools", "timer", "Таймеры и рекорды", () => "Интервалы, дыхание, статика"],
   ["library", "book", "Все упражнения", () => `${EXERCISES.length} со схемами движений`]
 ];
 const CATALOG_PAGES = {
@@ -1084,7 +1114,7 @@ const CATALOG_PAGES = {
 function viewWorkout(sub) {
   if (own(CATALOG_PAGES, sub)) {
     const [title, fn] = CATALOG_PAGES[sub];
-    return [h("a", { class: "back-link", href: "#workout/catalog" }, icon("back", 18), "Каталог"), h("h1", { class: "page-title", text: title }), ...fn()];
+    return [backLink("#workout/catalog", "Каталог"), h("h1", { class: "page-title", text: title }), ...fn()];
   }
   const tab = sub === "catalog" || sub === "mine" ? sub : "";
   const head = [h("h1", { class: "page-title", text: "Тренировки" }), workoutTabs(tab)];
@@ -1177,21 +1207,40 @@ function toolsSection() {
     item("#builder", "puzzle", "Конструктор тренировки", "Своя тренировка из любых упражнений"))];
 }
 
+// Шторка настроек плана: те же переключатели, что раньше стояли над тренировкой; план пересобирается сразу
+function planSettingsSheet() {
+  const p = state.profile, d = E.dayKey();
+  const plan = currentPlan();
+  const close = sheet({
+    title: "Настройки плана",
+    body: [
+      h("div", { class: "q" }, h("b", { text: "Длительность" }),
+        choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { p.minutes = v; persist(); refresh(); } })),
+      h("div", { class: "q" }, h("b", { text: "Цель" }),
+        choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); refresh(); } })),
+      plan.blocked ? null : h("div", { class: "q" }, h("b", { text: "Нагрузка сегодня" }),
+        choice({ className: "seg", label: "Нагрузка сегодня", value: plan.mode, options: Object.entries(E.MODES).map(([id, m]) => ({ value: id, label: m.short })), onChange: v => { state.modeOverride = { d, mode: v }; persist(); refresh(); } }))
+    ],
+    actions: [h("button", { class: "btn primary", type: "button", text: "Готово", onClick: () => close() })]
+  });
+}
 function planView() {
   const plan = currentPlan();
   const p = state.profile;
   const d = E.dayKey();
   const goal = GOALS.find(g => g.id === p.goal);
   const hasWeights = p.equipment.some(e => WEIGHT_EQUIP.includes(e));
+  const weightsNote = goal && goal.weights && !hasWeights ? h("p", { class: "note-box small", text: "Для этой цели пригодятся гантели или гиря — отметьте их в профиле." }) : null;
+  const modeWord = plan.blocked ? "" : (MODE_PHRASE[plan.mode] || E.MODES[plan.mode].name.toLowerCase());
   const out = [
-    h("section", { class: "card glass" },
-      h("div", { class: "q" }, h("b", { text: "Длительность" }),
-        choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { p.minutes = v; persist(); refresh(); } })),
-      h("div", { class: "q" }, h("b", { text: "Цель" }),
-        choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); refresh(); } })),
-      goal && goal.weights && !hasWeights ? h("p", { class: "note-box small", text: "Для этой цели пригодятся гантели или гиря — отметьте их в профиле." }) : null,
-      plan.blocked ? null : h("div", { class: "q" }, h("b", { text: "Интенсивность сегодня" }),
-        choice({ className: "seg", label: "Интенсивность", value: plan.mode, options: Object.entries(E.MODES).map(([id, m]) => ({ value: id, label: m.short })), onChange: v => { state.modeOverride = { d, mode: v }; persist(); refresh(); } })))
+    // Настройки плана свёрнуты в одну строку; длительность, цель и нагрузка — в шторке «Настроить»
+    h("section", { class: "card glass plan-settings" },
+      h("div", { class: "card-head" },
+        h("div", { class: "row-text" },
+          h("p", { class: "eyebrow", text: "Настройки плана" }),
+          h("b", { text: [`${p.minutes} мин`, goal ? goal.short : "", modeWord].filter(Boolean).join(" · ") })),
+        h("button", { class: "btn small ghost", type: "button", onClick: planSettingsSheet }, icon("sliders", 16), "Настроить")),
+      weightsNote)
   ];
 
   if (plan.adaptations.length || plan.notes.length) {
@@ -1470,7 +1519,7 @@ function viewBuilder(sub) {
   };
   fill();
   return [
-    h("a", { class: "back-link", href: "#workout/mine" }, icon("back", 18), "Мои тренировки"),
+    backLink("#workout/mine", "Мои тренировки"),
     h("h1", { class: "page-title", text: existing ? "Изменить тренировку" : "Своя тренировка" }),
     h("section", { class: "card glass" }, h("label", { class: "field" }, h("span", { text: "Название" }), name)),
     h("section", { class: "card glass" },
@@ -2844,15 +2893,13 @@ function calcCard() {
 const SUB = { look: subLook, library: subLibrary, records: subRecords, weights: subWeights, calc: subCalc, gps: subGps, timer: subTimer, breath: subBreath, calendar: subCalendar, profile: subProfile, settings: subSettings, data: subData, install: subInstall, about: subAbout };
 // Куда ведёт «Назад» и какая вкладка подсвечена у страниц, которые живут по старым адресам
 const MORE_BACK = {
-  library: ["#workout/catalog", "Каталог", "workout"], records: ["#workout/tools", "Таймеры и рекорды", "workout"],
-  timer: ["#workout/tools", "Таймеры и рекорды", "workout"], breath: ["#workout/tools", "Таймеры и рекорды", "workout"],
-  gps: ["#workout/cardio", "Бег и прогулки", "workout"], weights: ["#journal/strength", "Прогресс", "journal"], calc: ["#journal/body", "Прогресс", "journal"]
+  library: ["#workout/catalog", "Каталог", "workout"], weights: ["#journal/strength", "Прогресс", "journal"]
 };
 const tabOf = (name, sub) => (name === "more" && own(MORE_BACK, sub) ? MORE_BACK[sub][2] : TAB_OF[name] || name);
 function viewMore(sub) {
   if (sub && own(SUB, sub)) {
     const [href, label] = MORE_BACK[sub] || ["#more", "Профиль"];
-    return [h("a", { class: "back-link", href }, icon("back", 18), label), ...SUB[sub]()];
+    return [backLink(href, label), ...SUB[sub]()];
   }
   const p = state.profile;
   const goal = GOALS.find(g => g.id === p.goal);
@@ -2872,10 +2919,13 @@ function viewMore(sub) {
     ...group("Тренировки", [
       row("#more/calendar", "calendar", "План и напоминания", p.planTime ? planText(p) : "Время, место и календарь")
     ]),
-    ...group("Здоровье", [
-      row("#body/health", "heart", "Боль и особенности здоровья"),
-      row("#report", "print", "Отчёт для врача"),
-      row("#more/calc", "calc", "Калькуляторы", "ИМТ, калории, пульс, 1ПМ")
+    ...group("Инструменты", [
+      row("#more/timer", "timer", "Интервальный таймер"),
+      row("#more/gps", "pin", "Прогулка с GPS"),
+      row("#more/breath", "wind", "Дыхание"),
+      row("#more/records", "trophy", "Рекорды на время"),
+      row("#more/calc", "calc", "Калькуляторы", "ИМТ, калории, пульс, 1ПМ"),
+      row("#report", "print", "Отчёт для врача")
     ]),
     ...group("Приложение", [
       row("#more/look", "palette", "Персонализация"),
@@ -3991,7 +4041,7 @@ function viewReport() {
   const from = E.shiftDay(today, -(reportDays - 1));
   const data = reportData(from, today);
   return [
-    h("a", { class: "back-link no-print", href: "#more" }, icon("back", 18), "Ещё"),
+    backLink("#body/health", "Здоровье", "no-print"),
     h("h1", { class: "page-title", text: "Отчёт для врача" }),
     h("p", { class: "lead no-print", text: "Зоны, боль и нагрузка — для приёма у врача." }),
     h("div", { class: "no-print report-tools" },
@@ -4128,7 +4178,7 @@ function guideArticle(a) {
   const prog = a.program ? PROGRAMS.find(p => p.id === a.program) : null;
   postRender.push(() => markGuideRead(a.id));
   return [
-    h("a", { class: "back-link", href: "#guide" }, icon("back", 18), "Справочник"),
+    backLink("#guide", "Справочник"),
     h("p", { class: "eyebrow", text: area ? area.name : "Справочник" }),
     h("h1", { class: "page-title", text: a.title }),
     h("p", { class: "lead", text: a.short }),
@@ -4220,7 +4270,7 @@ function startRun(n, repeat = false) {
   startPlayer(session, steps);
 }
 function viewRun() {
-  const back = h("a", { class: "back-link", href: "#workout/programs" }, icon("back", 18), "Программы");
+  const back = backLink("#workout/cardio", "Бег и прогулки");
   const rs = E.runState(state);
   const done = new Set(rs.started ? state.run.done : []);
   const s = rs.session;
@@ -4306,7 +4356,7 @@ function challengeCard(c) {
 }
 function viewChallenge(id) {
   const c = CHALLENGES.find(x => x.id === id);
-  const back = h("a", { class: "back-link", href: "#workout/programs" }, icon("back", 18), "Программы");
+  const back = backLink("#workout/challenges", "Челленджи");
   if (!c) return [back, h("h1", { class: "page-title", text: "Челлендж не найден" }), h("p", {}, h("a", { href: "#workout/programs", text: "Все программы и челленджи" }))];
   const cs = E.challengeState(state, id);
   const done = new Set(cs.started ? state.challenges[id].done : []);
@@ -4400,7 +4450,7 @@ function viewChallenge(id) {
 
 function viewProgram(id) {
   const prog = PROGRAMS.find(p => p.id === id);
-  const back = h("a", { class: "back-link", href: "#workout/programs" }, icon("back", 18), "Программы");
+  const back = backLink("#workout/programs", "Программы");
   if (!prog) return [back, h("h1", { class: "page-title", text: "Программа не найдена" }), h("p", {}, h("a", { href: "#workout", text: "Вернуться к тренировкам" }))];
   const pr = E.programProgress(state, id);
   const done = new Set(pr.started ? state.programs[id].done : []);
