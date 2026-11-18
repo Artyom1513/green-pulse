@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.10.0";
+const VERSION = "2.11.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -535,7 +535,7 @@ const TABS = [["today", "Сегодня", "today"], ["workout", "Трениро�
 function render() {
   if (!state) return;
   postRender.length = 0;
-  if (!state.profile.onboarded) return renderOnboarding();
+  if (!state.profile.onboarded || onbFinal) return renderOnboarding();
   let hash = "";
   try { hash = decodeURIComponent(window.location.hash.replace(/^#\/?/, "")); } catch (e) { hash = ""; }
   const [section, sub] = hash.split("/");
@@ -633,8 +633,6 @@ function profileAgeField() {
     onDone: () => refresh()
   });
 }
-const feature = (ic, title, textValue) => h("div", { class: "feature" }, h("span", { class: "fi" }, icon(ic, 20)),
-  h("span", {}, h("b", { text: title }), h("br"), h("span", { class: "muted small", text: textValue })));
 const equipName = id => (EQUIPMENT.find(e => e.id === id) || { name: id }).name;
 
 // ===== Сегодня =====
@@ -1022,10 +1020,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Проще навигация: настройки плана — под кнопкой «Настроить», над тренировкой одна строка",
-  "Таймер, дыхание, прогулка с GPS, рекорды, калькуляторы и отчёт врачу — в «Профиле», раздел «Инструменты»",
-  "«Назад» возвращает туда, откуда вы пришли",
-  "Живее: плавные экраны, кольца недели, праздник после тренировки и лёгкая вибрация"
+  "Новое знакомство: три слайда с крупной фигурой, цели — карточками, в конце сводка плана",
+  "Проще навигация: настройки плана — под кнопкой «Настроить», инструменты — в «Профиле»",
+  "«Назад» возвращает туда, откуда вы пришли"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -3185,7 +3182,7 @@ function subProfile() {
       h("p", { class: "muted small", text: `${p.screenedAt ? `Заполнена ${fmtDate(p.screenedAt, { day: "numeric", month: "long", year: "numeric" })}. ` : ""}Обновляйте раз в год и при изменениях здоровья.` }),
       h("button", {
         class: "btn ghost", type: "button", text: "Пройти знакомство заново",
-        onClick: () => { p.onboarded = false; onb = null; onbStep = 0; persist(); render(); }
+        onClick: () => { p.onboarded = false; onb = null; onbStep = 0; onbSlide = 0; onbFinal = null; persist(); render(); }
       }))
   ];
 }
@@ -4654,6 +4651,16 @@ function subRecords() {
 // ===== Знакомство =====
 let onbStep = 0;
 let onb = null;
+let onbSlide = 0;     // слайд вступления; -1 — вступление пройдено
+let onbFinal = null;  // сводка «План готов» после последнего вопроса
+// Вступление: три слайда с крупной фигурой на цветном фоне, как обложки каталога
+const ONB_SLIDES = [
+  { theme: "strength", ex: "squat", title: "Тренер, который слушает тело", text: "Домашние тренировки с учётом травм, боли и самочувствия." },
+  { theme: "joints", ex: "bridge", title: "Болит — уберём лишнее", text: "Отметьте зону на теле, и опасные упражнения уйдут из плана." },
+  { theme: "calm", ex: "childPose", title: "Устали — будет легче", text: "Отметьте самочувствие, и тренировка подстроится. Без регистрации: данные только у вас." }
+];
+const GOAL_ICON = { health: "🌿", strength: "🏋️", muscle: "💪", endurance: "🏃", weight: "🔥", back: "🧘", joints: "🦵", flexibility: "🤸" };
+const onbBrand = () => h("span", { class: "brand" }, h("img", { src: "icon.svg", alt: "", width: 26, height: 26 }), h("span", {}, "Листо", h("b", { text: "пульс" })));
 
 function renderOnboarding() {
   if (!onb) {
@@ -4664,6 +4671,8 @@ function renderOnboarding() {
       conditions: p.conditions.filter(c => c !== "caution")
     };
   }
+  if (onbFinal) return renderOnbFinal();
+  if (onbSlide >= 0 && onbSlide < ONB_SLIDES.length) return renderOnbSlide();
   const steps = [onbWelcome, onbSafety, onbGoal, onbSetup, onbBody];
   onbStep = Math.min(onbStep, steps.length - 1);
   postRender.length = 0;
@@ -4679,10 +4688,11 @@ function renderOnboarding() {
     renderOnboarding();
     window.scrollTo(0, 0);
   });
-  const back = onbStep > 0 ? h("button", { class: "btn ghost", type: "button", text: "Назад", onClick: () => { onbStep -= 1; renderOnboarding(); window.scrollTo(0, 0); } }) : null;
-  app.replaceChildren(h("div", { class: "onb" },
+  // «Назад» с первого вопроса возвращает к последнему слайду вступления
+  const back = h("button", { class: "btn ghost", type: "button", text: "Назад", onClick: () => { if (onbStep > 0) onbStep -= 1; else onbSlide = ONB_SLIDES.length - 1; renderOnboarding(); window.scrollTo(0, 0); } });
+  app.replaceChildren(h("main", { class: "onb" },
     h("div", { class: "onb-top" },
-      h("span", { class: "brand" }, h("img", { src: "icon.svg", alt: "", width: 26, height: 26 }), h("span", {}, "Листо", h("b", { text: "пульс" }))),
+      onbBrand(),
       h("div", { class: "dots", role: "img", "aria-label": `Шаг ${onbStep + 1} из ${steps.length}` }, steps.map((_, i) => h("i", { class: i === onbStep ? "on" : "" })))),
     h("div", { class: "onb-body" }, body, err),
     h("div", { class: "onb-actions glass-clear" }, back, next)));
@@ -4697,13 +4707,8 @@ function onbWelcome() {
   ack.addEventListener("change", () => { onb.ack = ack.checked; });
   return {
     body: [
-      h("img", { class: "hero-logo", src: "icon.svg", alt: "" }),
-      h("h1", { class: "page-title", text: "Тренер, который слушает тело" }),
-      h("p", { class: "lead", text: "Домашние тренировки с учётом травм, боли и самочувствия." }),
-      h("section", { class: "card glass" },
-        feature("body", "Карта тела", "Отметьте, что болит, — опасное уйдёт из плана."),
-        feature("heart", "Самочувствие каждый день", "Плохо спали или устали — тренировка станет легче."),
-        feature("shield", "Данные только у вас", "Без регистрации и рекламы, данные — только у вас.")),
+      h("h1", { class: "page-title", text: "Давайте знакомиться" }),
+      h("p", { class: "lead", text: "Возраст нужен, чтобы план был безопасным." }),
       h("section", { class: "card glass" },
         h("label", { class: "field" }, h("span", { text: "Как к вам обращаться? (необязательно)" }), name),
         ageField({ value: onb.age, label: "Ваш возраст, полных лет", hintEmpty: "Для возраста от 12 лет; до 14 — вместе с родителями.", onSave: (v, raw) => { onb.age = v; onb.ageRaw = raw; } })),
@@ -4754,7 +4759,7 @@ function onbGoal() {
       h("h1", { class: "page-title", text: "Ваша цель" }),
       h("p", { class: "lead", text: "Цель можно сменить в любой момент." }),
       h("section", { class: "card glass" },
-        h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ label: "Цель", value: onb.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { onb.goal = v; } })),
+        h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ className: "chips goal-cards", label: "Цель", value: onb.goal, options: GOALS.map(g => ({ value: g.id, label: g.name, icon: h("span", { class: "goal-ico", "aria-hidden": "true", text: GOAL_ICON[g.id] || "•" }) })), onChange: v => { onb.goal = v; } })),
         h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "seg", label: "Уровень", value: onb.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { onb.level = v; } })))
     ]
   };
@@ -4807,13 +4812,71 @@ function finishOnboarding() {
   p.days = onb.days.slice().sort();
   p.conditions = [...new Set([...onb.conditions, ...derived])];
   p.screenedAt = E.dayKey();
+  const r = E.restrictions(state);
+  const goal = GOALS.find(g => g.id === p.goal);
+  onbFinal = {
+    name: p.name,
+    goal: goal ? goal.name : "",
+    days: `${p.days.length} ${E.plural(p.days.length, "раз", "раза", "раз")} в неделю: ${p.days.map(d => WEEKDAYS[d - 1].toLowerCase()).join(", ")}`,
+    minutes: `${p.minutes} ${E.plural(p.minutes, "минута", "минуты", "минут")}`,
+    care: r.reasons.length ? r.reasons.slice(0, 3).join(", ").toLowerCase() + (r.reasons.length > 3 ? ` и ещё ${r.reasons.length - 3}` : "") : "ничего не беспокоит"
+  };
   onb = null;
   onbStep = 0;
   planCache.key = "";
   persist();
-  if (window.location.hash !== "#today") window.location.hash = "#today";
-  render();
-  toast("Готово! Тренировка на сегодня уже собрана");
+  renderOnboarding();
+  feel("success");
+}
+
+// Слайд вступления: крупная фигура на цветном фоне, заголовок, одна строка и точки; листается свайпом
+function renderOnbSlide() {
+  const sl = ONB_SLIDES[onbSlide];
+  const last = onbSlide === ONB_SLIDES.length - 1;
+  const go = d => { onbSlide += d; renderOnboarding(); window.scrollTo(0, 0); };
+  const skip = () => { onbSlide = -1; renderOnboarding(); window.scrollTo(0, 0); };
+  const wrap = h("main", { class: "onb onb-intro" },
+    h("div", { class: "onb-top" }, onbBrand(), last ? null : h("button", { class: "link-btn", type: "button", text: "Пропустить", onClick: skip })),
+    h("div", { class: "onb-body" },
+      h("div", { class: `onb-art cover-${sl.theme}`, "aria-hidden": "true" }, demoBox(sl.ex, { cover: true })),
+      h("h1", { class: "onb-title", text: sl.title }),
+      h("p", { class: "lead onb-text", text: sl.text }),
+      h("div", { class: "dots onb-dots", role: "img", "aria-label": `Слайд ${onbSlide + 1} из ${ONB_SLIDES.length}` }, ONB_SLIDES.map((_, i) => h("i", { class: i === onbSlide ? "on" : "" })))),
+    h("div", { class: "onb-actions glass-clear" },
+      onbSlide > 0 ? h("button", { class: "btn ghost", type: "button", text: "Назад", onClick: () => go(-1) }) : null,
+      h("button", { class: "btn primary", type: "button", text: last ? "Начать" : "Далее", onClick: () => (last ? skip() : go(1)) })));
+  let x0 = null;
+  wrap.addEventListener("touchstart", e => { x0 = e.touches[0].clientX; }, { passive: true });
+  wrap.addEventListener("touchend", e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (dx < -60 && !last) go(1);
+    else if (dx > 60 && onbSlide > 0) go(-1);
+  });
+  app.replaceChildren(wrap);
+  runPostRender();
+}
+
+// Итог знакомства: значок с галочкой и короткая сводка плана; дальше — в приложение
+function renderOnbFinal() {
+  const f = onbFinal;
+  const go = () => {
+    onbFinal = null;
+    onbSlide = 0;
+    if (window.location.hash !== "#today") window.location.hash = "#today";
+    render();
+  };
+  const rows = [["flag", "Цель", f.goal], ["calendar", "Расписание", f.days], ["timer", "Длительность", f.minutes], ["shield", "Учтено", f.care]];
+  app.replaceChildren(h("main", { class: "onb onb-final" },
+    h("div", { class: "onb-top" }, onbBrand()),
+    h("div", { class: "onb-body" },
+      doneBadge(),
+      h("h1", { class: "onb-title", text: f.name ? `Всё готово, ${f.name}!` : "Всё готово!" }),
+      h("p", { class: "lead onb-text", text: "План собран и подстроен под вас." }),
+      h("section", { class: "card glass onb-summary" }, h("div", { class: "list" }, rows.map(([ic, t, v]) =>
+        h("div", { class: "row" }, h("span", { class: "fi" }, icon(ic, 18)), h("span", { class: "row-text" }, h("span", { class: "muted small", text: t }), h("b", { text: v }))))))),
+    h("div", { class: "onb-actions glass-clear" }, h("button", { class: "btn primary", type: "button", text: "К тренировкам", onClick: go }))));
 }
 
 // ===== Плеер тренировки =====

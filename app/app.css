@@ -663,6 +663,24 @@ input.switch:checked::after { transform: translateX(20px); }
 .onb-body { flex: 1; }
 .onb-actions { position: sticky; bottom: calc(env(safe-area-inset-bottom) + 10px); display: flex; gap: 10px; margin-top: 16px; padding: 8px; border-radius: 28px; }
 .onb-actions .btn { flex: 1; }
+/* Вступление: крупная фигура на цветном фоне (цвета — от тем обложек каталога), заголовок и точки */
+.onb-intro .onb-body, .onb-final .onb-body { display: flex; flex-direction: column; text-align: center; }
+.onb-art { position: relative; display: grid; place-items: center; height: min(46vh, 420px); min-height: 240px; margin: 2px 0 18px; overflow: hidden; border-radius: 30px; background: linear-gradient(150deg, var(--c1) 0%, var(--c2) 100%); box-shadow: 0 18px 40px -20px var(--c1); isolation: isolate; }
+.onb-art::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(70% 60% at 85% 8%, rgba(255, 255, 255, .38), transparent 62%), radial-gradient(60% 50% at 10% 100%, rgba(0, 0, 0, .18), transparent 70%); pointer-events: none; }
+.onb-art .demo { width: 100%; max-width: none; margin: 0; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.onb-art .demo-cover .demo3d-canvas, .onb-art .demo-cover .demo-svg { aspect-ratio: 1 / 1; max-height: min(46vh, 420px); margin: 0 auto; }
+.onb-title { margin: 6px 0 8px; font-size: clamp(1.6rem, 7.4vw, 2.15rem); line-height: 1.12; letter-spacing: -.02em; }
+.onb-text { max-width: 32ch; margin: 0 auto; }
+.onb-dots { display: flex; justify-content: center; margin: 18px 0 4px; }
+.onb-top .link-btn { min-height: 44px; padding: 0 4px; }
+/* Цели — крупные карточки со значком */
+.goal-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.goal-cards .chip { flex-direction: column; justify-content: center; gap: 6px; min-height: 96px; padding: 12px 8px; border-radius: 20px; text-align: center; font-weight: 650; line-height: 1.2; }
+.goal-ico { font-size: 1.9rem; line-height: 1; }
+/* Итог знакомства */
+.onb-final .done-badge { margin-top: 18px; }
+.onb-summary { margin-top: 16px; text-align: left; }
+.onb-summary .row-text b { overflow-wrap: anywhere; }
 .hero-logo { width: 64px; height: 64px; margin-bottom: 14px; }
 .lock-screen { display: grid; place-items: center; min-height: 100vh; min-height: 100dvh; padding: 24px 16px; isolation: isolate; }
 .lock-card { width: min(420px, 100%); padding: 28px 22px; border-radius: 32px; text-align: center; }
