@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.11.0";
+const VERSION = "2.11.1";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -915,7 +915,7 @@ function weekCard() {
       ? h("p", { class: "small plan-line" }, h("span", { class: "muted", text: "Мой план: " }), planText(p), " ", h("button", { class: "link-btn", type: "button", text: "Изменить", onClick: planSheet }))
       : h("p", { class: "small plan-line" }, "Решите, когда и где заниматься. ",
         h("button", { class: "link-btn", type: "button", text: "Составить план", onClick: planSheet })),
-    h("div", { class: "btn-row" }, h("button", { class: "btn small ghost", type: "button", text: "+ Прогулка или другая активность", onClick: addActivitySheet })));
+    h("div", { class: "btn-row" }, h("button", { class: "btn small ghost", type: "button", text: "+ Добавить активность", onClick: addActivitySheet })));
 }
 
 // План «когда, где и после чего»: заранее принятое решение помогает не пропускать тренировки
@@ -929,7 +929,7 @@ function planSheet() {
     title: "Мой план тренировок",
     body: [
       h("p", { class: "muted small", text: "Когда, где и после чего вы будете заниматься. С планом проще не пропускать." }),
-      h("div", { class: "q" }, h("b", { text: "Дни" }), choice({ multiple: true, label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; } })),
+      h("div", { class: "q" }, h("b", { text: "Дни" }), choice({ multiple: true, className: "chips days", label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; } })),
       h("label", { class: "field" }, h("span", { text: "Время" }), time),
       h("div", { class: "q" }, h("b", { text: "Где" }), choice({ label: "Место", value: draft.place, options: Object.entries(PLACE_WORD).map(([id, word]) => ({ value: id, label: word[0].toUpperCase() + word.slice(1) })), onChange: v => { draft.place = v; } })),
       h("div", { class: "q" }, h("b", { text: "После чего (привычка-якорь)" }),
@@ -974,8 +974,9 @@ function followupCard() {
   return h("section", { class: "card glass followup" },
     h("div", { class: "followup-head" },
       h("span", { class: "fi" }, icon("heart", 18)),
-      h("h2", { text: `Как ${names} после ${when}?` }),
-      h("a", { class: "small", href: "#guide/pain-exercise", "aria-label": "Какая боль после тренировки допустима", text: "Подробнее" })),
+      h("div", { class: "followup-title" },
+        h("h2", { text: `Как ${names} после ${when}?` }),
+        h("a", { class: "small", href: "#guide/pain-exercise", "aria-label": "Какая боль после тренировки допустима", text: "Подробнее" }))),
     h("div", { class: "btn-row answer-row" },
       h("button", { class: "btn small ghost", type: "button", text: "Не болит", onClick: () => answer("better") }),
       h("button", { class: "btn small ghost", type: "button", text: "Как было", onClick: () => answer("same") }),
@@ -1020,9 +1021,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
+  "Ровнее вёрстка: слова в переключателях не рвутся, кнопки и плашки держат одну строку, дни недели — ровным рядом",
   "Новое знакомство: три слайда с крупной фигурой, цели — карточками, в конце сводка плана",
-  "Проще навигация: настройки плана — под кнопкой «Настроить», инструменты — в «Профиле»",
-  "«Назад» возвращает туда, откуда вы пришли"
+  "Проще навигация: настройки плана — под кнопкой «Настроить», инструменты — в «Профиле»"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;
@@ -1212,7 +1213,7 @@ function planSettingsSheet() {
     title: "Настройки плана",
     body: [
       h("div", { class: "q" }, h("b", { text: "Длительность" }),
-        choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { p.minutes = v; persist(); refresh(); } })),
+        choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m}\u00a0мин` })), onChange: v => { p.minutes = v; persist(); refresh(); } })),
       h("div", { class: "q" }, h("b", { text: "Цель" }),
         choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); refresh(); } })),
       plan.blocked ? null : h("div", { class: "q" }, h("b", { text: "Нагрузка сегодня" }),
@@ -1233,10 +1234,9 @@ function planView() {
     // Настройки плана свёрнуты в одну строку; длительность, цель и нагрузка — в шторке «Настроить»
     h("section", { class: "card glass plan-settings" },
       h("div", { class: "card-head" },
-        h("div", { class: "row-text" },
-          h("p", { class: "eyebrow", text: "Настройки плана" }),
-          h("b", { text: [`${p.minutes} мин`, goal ? goal.short : "", modeWord].filter(Boolean).join(" · ") })),
+        h("p", { class: "eyebrow", text: "Параметры" }),
         h("button", { class: "btn small ghost", type: "button", onClick: planSettingsSheet }, icon("sliders", 16), "Настроить")),
+      h("b", { class: "plan-summary", text: [`${p.minutes}\u00a0мин`, goal ? goal.short : "", modeWord].filter(Boolean).join(" · ") }),
       weightsNote)
   ];
 
@@ -1681,17 +1681,17 @@ function bodyStage({ layers = true } = {}) {
   }
   fig.setMode(figureMode);
   const hint = h("p", { class: "stage-hint", "aria-live": "polite", text: stageHint() });
-  const painLegend = h("div", { class: "legend" },
+  const painLegend = h("div", { class: "legend l4" },
     [1, 2, 3].map(v => h("span", { class: `pill sev-${v}`, text: SEVERITY[v].name })),
     h("span", { class: "pill sel-pill", text: "выделение" }));
   const loadLegend = h("div", { class: "legend" },
-    h("span", { class: "pill load-0", text: "восстановились" }),
-    h("span", { class: "pill load-1", text: "восстанавливаются" }),
+    h("span", { class: "pill load-0", text: "отдохнули" }),
+    h("span", { class: "pill load-1", text: "отдыхают" }),
     h("span", { class: "pill load-2", text: "нагружены" }));
   const muscleLegend = h("div", { class: "legend" },
     h("span", { class: "pill mus-pill", text: "мышцы" }),
     h("span", { class: "pill tendon-pill", text: "сухожилия и кости" }),
-    h("span", { class: "pill muted-pill", text: `${MUSCLES.filter(m => !m.bone).length} мышц` }));
+    h("span", { class: "pill muted-pill", text: `${MUSCLES.filter(m => !m.bone).length} ${E.plural(MUSCLES.filter(m => !m.bone).length, "мышца", "мышцы", "мышц")}` }));
   const showLayer = () => {
     painLegend.hidden = bodyLayer !== "pain";
     loadLegend.hidden = bodyLayer !== "load";
@@ -2825,12 +2825,12 @@ function progressOverview() {
   return [
     h("section", { class: "card glass" }, h("div", { class: "stats" },
       stat(state.sessions.length, E.plural(state.sessions.length, "занятие", "занятия", "занятий")),
-      stat(total, E.plural(total, "минута всего", "минуты всего", "минут всего")),
+      stat(total, E.plural(total, "минута", "минуты", "минут")),
       stat(E.weekStreak(state), E.plural(E.weekStreak(state), "неделя по плану", "недели по плану", "недель по плану")))),
     h("section", { class: "card glass" },
       h("div", { class: "card-head" },
         h("h2", { text: "Последние 7 дней" }),
-        h("button", { class: "btn small ghost", type: "button", onClick: shareWeek }, icon("share", 16), "Поделиться")),
+        h("button", { class: "icon-btn", type: "button", "aria-label": "Поделиться", title: "Поделиться", onClick: shareWeek }, icon("share", 18))),
       h("p", { class: "muted small", text: `${who.done} из ${who.mins} мин · силовых дней: ${who.strengthDays} из ${who.strength}${who.balance ? ` · равновесие: ${who.balanceDays} из ${who.balance}` : ""}` }),
       h("div", { class: "bars", role: "img", "aria-label": days.map(x => `${fmtDate(x.d, { weekday: "short" })}: ${x.mins} мин`).join(", ") },
         days.map(x => h("div", { class: `bar${x.mins ? "" : " zero"}` },
@@ -3131,7 +3131,7 @@ function subCalendar() {
     h("p", { class: "lead", text: "Календарь телефона напомнит за 10 минут до тренировки." }),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Дни тренировок" }),
-        choice({ multiple: true, label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; state.profile.days = v.length ? v.slice().sort() : state.profile.days; persist(); } })),
+        choice({ multiple: true, className: "chips days", label: "Дни тренировок", value: draft.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { draft.days = v; state.profile.days = v.length ? v.slice().sort() : state.profile.days; persist(); } })),
       h("label", { class: "field" }, h("span", { text: "Время" }), time),
       err,
       h("button", {
@@ -3143,7 +3143,7 @@ function subCalendar() {
           download("listopuls-trenirovki.ics", E.makeICS(draft.days.slice().sort(), time.value, state.profile.minutes), "text/calendar");
           toast("Файл сохранён — откройте его");
         }
-      }, icon("download", 18), "Скачать файл для календаря")),
+      }, icon("download", 18), "Добавить в календарь")),
     h("details", { class: "card glass details-card" },
       h("summary", { text: "Как добавить в календарь" }),
       h("ul", { class: "bullets" },
@@ -3164,10 +3164,10 @@ function subProfile() {
       h("label", { class: "field" }, h("span", { text: "Имя (необязательно)" }), name),
       profileAgeField(),
       h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ label: "Цель", value: p.goal, options: GOALS.map(g => ({ value: g.id, label: g.name })), onChange: v => { p.goal = v; persist(); } })),
-      h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "seg", label: "Уровень", value: p.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { p.level = v; persist(); } })),
+      h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "chips stack", label: "Уровень", value: p.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { p.level = v; persist(); } })),
       h("div", { class: "q" }, h("b", { text: "Инвентарь" }), choice({ multiple: true, label: "Инвентарь", value: p.equipment, options: EQUIPMENT.map(e => ({ value: e.id, label: e.name })), onChange: v => { p.equipment = v; persist(); } })),
-      h("div", { class: "q" }, h("b", { text: "Длительность тренировки" }), choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { p.minutes = v; persist(); } })),
-      h("div", { class: "q" }, h("b", { text: "Дни тренировок" }), choice({ multiple: true, label: "Дни", value: p.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { if (v.length) { p.days = v.slice().sort(); persist(); } } }))),
+      h("div", { class: "q" }, h("b", { text: "Длительность тренировки" }), choice({ className: "seg", label: "Длительность", value: p.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m}\u00a0мин` })), onChange: v => { p.minutes = v; persist(); } })),
+      h("div", { class: "q" }, h("b", { text: "Дни тренировок" }), choice({ multiple: true, className: "chips days", label: "Дни", value: p.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { if (v.length) { p.days = v.slice().sort(); persist(); } } }))),
     h("section", { class: "card glass" },
       h("h2", { text: "Для калькуляторов" }),
       h("p", { class: "muted small", text: "Необязательно — для ИМТ, калорий и пульса." }),
@@ -3534,7 +3534,7 @@ function subSettings() {
         h("span", { class: "row-text" }, h("b", { text: "Персонализация" }), h("span", { class: "muted small", text: "Цвет, фон, шрифт, расположение, аватар" })), icon("chevron", 16)))),
     h("section", { class: "card glass" },
       h("div", { class: "q" }, h("b", { text: "Тема" }),
-        choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Как в системе" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); } }))),
+        choice({ className: "seg", label: "Тема", value: store.getTheme(), options: [{ value: "auto", label: "Авто" }, { value: "light", label: "Светлая" }, { value: "dark", label: "Тёмная" }], onChange: v => { store.setTheme(v); applyTheme(v); } }))),
     h("section", { class: "card glass" }, h("div", { class: "list" },
       toggle({ label: "Звуковые сигналы", desc: "Смена упражнений и отсчёт 3-2-1", checked: st.sound, onChange: v => { st.sound = v; persist(); } }),
       toggle({ label: "Голосовые подсказки", desc: "Название упражнения и отдых — вслух", checked: st.voice, onChange: v => { st.voice = v; persist(); if (v) speak("Голосовые подсказки включены"); } }),
@@ -4760,7 +4760,7 @@ function onbGoal() {
       h("p", { class: "lead", text: "Цель можно сменить в любой момент." }),
       h("section", { class: "card glass" },
         h("div", { class: "q" }, h("b", { text: "Цель" }), choice({ className: "chips goal-cards", label: "Цель", value: onb.goal, options: GOALS.map(g => ({ value: g.id, label: g.name, icon: h("span", { class: "goal-ico", "aria-hidden": "true", text: GOAL_ICON[g.id] || "•" }) })), onChange: v => { onb.goal = v; } })),
-        h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "seg", label: "Уровень", value: onb.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { onb.level = v; } })))
+        h("div", { class: "q" }, h("b", { text: "Уровень" }), choice({ className: "chips stack", label: "Уровень", value: onb.level, options: LEVELS.map(l => ({ value: l.v, label: l.name })), onChange: v => { onb.level = v; } })))
     ]
   };
 }
@@ -4775,9 +4775,9 @@ function onbSetup() {
           choice({ multiple: true, label: "Инвентарь", value: onb.equipment, options: EQUIPMENT.map(e => ({ value: e.id, label: e.name })), onChange: v => { onb.equipment = v; } }),
           h("p", { class: "muted small", style: { marginTop: "8px" }, text: "Коврик или полотенце пригодятся для упражнений на полу." })),
         h("div", { class: "q" }, h("b", { text: "Сколько времени на тренировку?" }),
-          choice({ className: "seg", label: "Длительность", value: onb.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m} мин` })), onChange: v => { onb.minutes = v; } })),
+          choice({ className: "seg", label: "Длительность", value: onb.minutes, options: [10, 20, 30, 45].map(m => ({ value: m, label: `${m}\u00a0мин` })), onChange: v => { onb.minutes = v; } })),
         h("div", { class: "q" }, h("b", { text: "В какие дни удобно?" }),
-          choice({ multiple: true, label: "Дни", value: onb.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { onb.days = v; } })))
+          choice({ multiple: true, className: "chips days", label: "Дни", value: onb.days, options: WEEKDAYS.map((w, i) => ({ value: i + 1, label: w })), onChange: v => { onb.days = v; } })))
     ],
     check: () => (onb.days.length ? null : "Выберите хотя бы один день")
   };
