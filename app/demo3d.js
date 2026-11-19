@@ -612,11 +612,14 @@ const bellAt = (x, c) => Math.exp(-(((x - c) / 0.32) ** 2));
 // Растяжка трицепса: ладонь за головой тянется к лопатке, локоть смотрит вверх; другая рука
 // поверх головы мягко тянет локоть
 HOOKS.tricepsStretch = P => {
-  const U = P.up, Fw = P.fwd, avoid = bodyAvoid(P);
+  const U = P.up, Fw = P.fwd;
+  // голова с причёской (у женской фигуры она объёмнее) — рука обходит её с запасом
+  const head = madd(P.head, P.hdir, 0.085);
+  const avoid = [[head, 0.17], [lerp3(P.neck, P.head, 0.5), 0.09], ...bodyAvoid(P).slice(2)];
   const back = madd(madd(lerp3(P.neck, P.chest, 0.35), Fw, -0.13), outward(P, 1), 0.02);
-  reachHand(P, 0, back, add(mul(U, -1), mul(Fw, -0.3)), add(U, mul(Fw, 0.15)), avoid, 0.15);
+  reachHand(P, 0, back, add(mul(U, -1), mul(Fw, -0.3)), add(add(U, mul(Fw, 0.15)), mul(outward(P, 0), 0.25)), avoid, 0.15);
   const el = P.elbow[0];
-  reachHand(P, 1, madd(madd(el, U, 0.03), Fw, 0.03), add(outward(P, 0), mul(U, 0.2)), add(add(Fw, mul(U, 0.2)), outward(P, 1)), avoid.slice(0, 2));
+  reachHand(P, 1, madd(madd(el, U, 0.05), Fw, 0.04), add(outward(P, 0), mul(U, 0.2)), add(add(Fw, mul(U, 0.35)), outward(P, 1)), avoid.slice(0, 2));
 };
 // Растяжка груди с руками за спиной: пальцы в замке за спиной, руки отведены назад
 HOOKS.handsBehind = (P, f) => {
