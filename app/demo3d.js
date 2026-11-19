@@ -518,15 +518,17 @@ HOOKS.halo = (P, f) => {
   const ph = (f.phase || 0) * Math.PI * 2;
   const cf = Math.cos(ph), sf = Math.sin(ph);
   const front = Math.max(0, cf) ** 2, back = Math.max(0, -cf) ** 2, side = sf * sf;
-  const R = 0.24 * front + 0.2 * side + 0.19 * back;
+  const R = 0.24 * front + 0.23 * side + 0.19 * back;
   const radial = norm(add(mul(Fw, cf), mul(Lt, sf)));
-  const grip = add(madd(head, radial, R), mul(U, -0.2 * front - 0.08 * side - 0.12 * back));
+  const grip = add(madd(head, radial, R), mul(U, -0.2 * front + 0.05 * side - 0.12 * back));
   // линия между кистями: спереди и сзади — поперёк тела, у уха — вдоль (одна рука впереди)
   const v = norm(add(mul(Lt, Math.abs(cf)), mul(Fw, -sf)));
   const hand = [madd(grip, v, -0.055), madd(grip, v, 0.055)];
   const hdir = norm(add(mul(U, 0.85), mul(radial, 0.15)));
   const neck = lerp3(P.neck, P.head, 0.5);
-  const avoid = [[head, 0.15], [neck, 0.1], [P.chest, 0.1]];
+  // локоть — строго по предпочтительному направлению (без перебора с препятствиями): так он идёт
+  // по кругу плавно и не перескакивает; направление само обводит руку вокруг головы
+  const avoid = [];
   for (const i of [0, 1]) {
     const s = i ? 1 : -1;
     const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
@@ -541,6 +543,28 @@ HOOKS.halo = (P, f) => {
   P.curl = [0.8, 0.8];
   // гиря дном вверх: шар над кистями, ручка внизу
   P.kb = { c: madd(grip, U, 0.12), y: mul(U, -1), x: v };
+};
+// «Нитка» на четвереньках: рука сначала тянется к потолку (грудь раскрыта), потом опускается к полу
+// перед плечом и скользит под корпусом в другую сторону, за опорную руку; плечо и голова опускаются.
+// В профиль это движение вбок не видно, поэтому путь кисти задан здесь, плавной кривой
+HOOKS.thread = (P, f) => {
+  const k = typeof f.k === "number" ? f.k : 0;
+  const o = P.spine, ax = P.up;
+  const turn = (-35 * (1 - k) + 25 * k) * D;
+  for (const key of ["chest", "neck", "head", "top"]) P[key] = add(o, rot(sub(P[key], o), ax, turn));
+  for (const key of ["clav", "shoulder", "elbow", "wrist", "knuckle"]) P[key] = P[key].map(q => add(o, rot(sub(q, o), ax, turn)));
+  for (const key of ["latC", "latH", "hdir"]) P[key] = rot(P[key], ax, turn);
+  const S = P.shoulder[0], L = P.shoulder[1], fw = norm([ax[0], 0, ax[2]]);
+  const T0 = add(S, [-0.06, 0.6, 0]);
+  const T1 = add([S[0] - 0.04, 0.07, S[2]], mul(fw, 0.12));
+  const T2 = add([L[0] + 0.14, 0.05, L[2]], mul(fw, -0.1));
+  const list = [T0, T0, T1, T2, T2];
+  const x = Math.min(1.999, k * 2), i = Math.floor(x), t = x - i;
+  const cr = (a, b, c, d) => add(add(mul(b, 1), mul(sub(c, a), 0.5 * t)), add(mul(add(add(mul(a, 2), mul(b, -5)), add(mul(c, 4), mul(d, -1))), 0.5 * t * t), mul(add(add(mul(a, -1), mul(b, 3)), add(mul(c, -3), d)), 0.5 * t * t * t)));
+  const palm = cr(list[i], list[i + 1], list[i + 2], list[i + 3]);
+  const dir = norm(lerp3([0, 1, 0], [1, -0.15, 0], smooth(0.2, 0.75, k)));
+  reachHand(P, 0, palm, dir, add(add(mul(fw, -0.5), [-0.6, 0, 0]), [0, 0.3, 0]), [], 0.2);
+  P.hdir = norm(lerp3(P.hdir, [0.6, -0.4, 0.2], 0.4 * k));
 };
 // ----- Касания: кисть приходит в нужную точку (на стопу, на локоть, в замок за спиной) -----
 // palm — где должна быть середина ладони, dir — куда смотрят пальцы, prefer — куда естественно
@@ -760,6 +784,18 @@ const BY_ID = {
     P.benchAt = [base[0], 0.44, base[2] + back[2] * 0.05];
   }
 };
+// Стойка шире плеч, носки чуть врозь: гиря или гантель проходит между ногами (махи, тяга гири)
+function wideStance(P, deg = 9, toe = 14) {
+  const ax = norm([P.fwd[0], 0, P.fwd[2]]);
+  for (const i of [0, 1]) {
+    const sg = i ? 1 : -1;
+    turnChain(P, LEG, i, P.hip[i], ax, sg * deg * D);
+    turnChain(P, ["toe"], i, P.ankle[i], Y, -sg * toe * D);
+  }
+}
+BY_ID.kbDeadlift = P => wideStance(P, 9, 14);
+BY_ID.kbSwing = P => wideStance(P, 8, 14);
+BY_ID.dbSwing = P => wideStance(P, 8, 14);
 function supportHand(P) {
   const i = 1, sh = P.shoulder[i];
   const palm = [sh[0] + 0.02, Math.max(0.42, sh[1] - 0.6), sh[2] + 0.08];
@@ -781,21 +817,6 @@ const hipLoad = P => {
   const c = madd(madd(P.pelvis, P.fwd, 0.15), P.up, -0.02);
   P.hipLoad = { c, x: P.lat };
   for (const i of [0, 1]) reachHand(P, i, madd(c, outward(P, i), 0.13), mul(P.up, 1), add(outward(P, i), mul(P.up, -0.5)), [], 0.55);
-};
-// «Нитка в иголку»: грудной отдел поворачивается вслед за рукой — рука вверх раскрывает грудь,
-// рука под корпусом закрывает; опорная ладонь остаётся на месте
-HOOKS.thread = (P, f) => {
-  const s0 = f.Pz ? f.Pz.arms[0].s : 150;
-  const tau = -clamp((s0 - 20) / 130, -1, 1) * 38 * D;
-  const w1 = P.wrist[1], k1 = P.knuckle[1];
-  const o = P.chest, axis = norm(sub(P.neck, P.pelvis));
-  for (const k of ["neck", "head", "top"]) P[k] = add(o, rot(sub(P[k], o), axis, tau));
-  for (const k of ["clav", "shoulder", "elbow", "wrist", "knuckle"]) P[k] = P[k].map(q => add(o, rot(sub(q, o), axis, tau)));
-  for (const k of ["latC", "latH", "hdir"]) P[k] = rot(P[k], axis, tau);
-  // опорная ладонь остаётся на месте (на пол её ставит общий расчёт опор); рука, которая «продевается»
-  // под корпус, скользит по полу тыльной стороной — ладонью её не ставим
-  P.wrist[1] = w1; P.knuckle[1] = k1;
-  P.pin = [true, false];
 };
 const FRONTAL = new Set(["sideLying", "sidePlank", "sidePlankKnee"]);
 
@@ -854,7 +875,16 @@ function poseBones(C, P, opt = {}, breath = 0) {
     const root = toPose(C.skel.j.pony), restTip = toPose(C.skel.j.ponyTip);
     const rest = norm(sub(restTip, root));
     const lag = P.lag ? mul(P.lag, -1) : [0, 0, 0];
-    const dir = norm(add(add(mul(rest, 0.45), mul([0, -1, 0], 0.55)), lag));
+    let dir = norm(add(add(mul(rest, 0.45), mul([0, -1, 0], 0.55)), lag));
+    // лёжа хвост не уходит в пол, а ложится на него — за головой
+    const minY = (0.03 - root[1]) / pb.L;
+    if (dir[1] < minY) {
+      let h = [dir[0], 0, dir[2]];
+      if (len(h) < 0.2) h = [hf.y[0], 0, hf.y[2]];
+      if (len(h) < 1e-4) h = [rest[0], 0, rest[2]];
+      const y = clamp(minY, -1, 1), r = Math.sqrt(Math.max(0, 1 - y * y));
+      dir = add(mul(norm(h), r), [0, y, 0]);
+    }
     put("pony", root, madd(root, dir, pb.L), hf.x);
   }
   for (let i = 0; i < 2; i++) {
@@ -931,7 +961,7 @@ function poseBones(C, P, opt = {}, breath = 0) {
 
 // Точки на поверхности тела (в исходной позе) для касания пола: подошвы, ладони, колени,
 // локти, ягодицы, спина, грудь, затылок
-function contactProbes(j) {
+function contactProbes(j, C) {
   const pr = [];
   const P = (bone, p, hand = -1) => pr.push({ bone: BI[bone], p, hand });
   for (let i = 0; i < 2; i++) {
@@ -947,7 +977,12 @@ function contactProbes(j) {
     P("fore" + S, [j.elbow[i][0], j.elbow[i][1] - 0.01, j.elbow[i][2] - 0.035]);
     P("upper" + S, [j.elbow[i][0] - s * 0.01, j.elbow[i][1] + 0.06, j.elbow[i][2] - 0.04]);
     P("thigh" + S, [j.hip[i][0], 0.86, -0.1]);
+    // коленная чашечка: на коленях тело опирается на неё, а не на голень под ней
+    P("thigh" + S, [j.knee[i][0], j.knee[i][1] + 0.012, j.knee[i][2] + 0.063]);
+    // седалищный бугор: сидя на полу
+    P("pelvis", [s * 0.06, 0.83, -0.075]);
   }
+  P("pelvis", [0, 0.815, -0.055]);
   P("pelvis", [0, 0.9, -0.11]);
   P("pelvis", [0, 0.92, 0.1]);
   P("chest", [0, 1.3, -0.105]);
@@ -956,6 +991,25 @@ function contactProbes(j) {
   P("head", [0, 1.68, -0.1]);
   P("head", [0, 1.66, 0.1]);
   P("head", [0, 1.775, -0.01]);
+  // Крайние точки головы (с причёской), таза, груди по самой модели — у женской фигуры причёска и
+  // таз объёмнее, и неподвижные точки выше оказались бы внутри них: лёжа тело проваливалось бы
+  if (C) {
+    const pos = C.geo.pos;
+    for (const [bone, dirs] of [["head", [[0, 0, -1], [0, 0, 1], [0, 1, 0], [1, 0, 0], [-1, 0, 0]]], ["pelvis", [[0, 0, -1], [0, 0, 1], [0, -1, 0], [1, 0, 0], [-1, 0, 0]]], ["chest", [[0, 0, -1], [0, 0, 1], [1, 0, 0], [-1, 0, 0]]], ["spine", [[0, 0, -1], [0, 0, 1]]]]) {
+      const b = BI[bone];
+      for (const d of dirs) {
+        let best = null, bv = -Infinity;
+        for (let v = 0; v < C.n; v++) {
+          let dom = false;
+          for (let k = 0; k < 4; k++) if (C.bi[v * 4 + k] === b && C.bw[v * 4 + k] >= 0.8) dom = true;
+          if (!dom) continue;
+          const q = [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]], val = dot(q, d);
+          if (val > bv) { bv = val; best = q; }
+        }
+        if (best) P(bone, best);
+      }
+    }
+  }
   return pr;
 }
 
@@ -1414,43 +1468,52 @@ function shiftY(P, dy) {
   }
 }
 function lowerBody(P, J, drop) {
-  if (drop < 0.004) return;
   // таз лежит на полу («кобра»): корпус не опускаем — чуть разгибаются локти
-  if (J.hip[1] - 0.1 < 0.035) return;
+  const free = smooth(0.035, 0.07, J.hip[1] - 0.1);
+  drop *= free;
+  if (drop <= 0) return;
   const S = lerp3(P.shoulder[0], P.shoulder[1], 0.5);
-  const kneeDown = [0, 1].filter(i => J.legs[i].knee[1] - 0.06 < 0.03);
+  // опора — колени на полу или носки; доля каждой опоры меняется плавно, пока она отрывается от
+  // пола: иначе точка поворота перескакивает и корпус дёргается («скалолаз», бёрпи)
+  const wk = [0, 1].map(i => smooth(0.05, 0.02, J.legs[i].knee[1] - 0.06));
   const footY = i => Math.min(J.legs[i].toe[1], J.legs[i].heel[1]) - 0.03;
   const clear = Math.min(footY(0), footY(1));
+  const wf = [0, 1].map(i => smooth(clear + 0.03, clear + 0.004, footY(i)));
+  const avg = (pts, w) => { const s = w[0] + w[1]; return s > 1e-6 ? add(mul(pts[0], w[0] / s), mul(pts[1], w[1] / s)) : lerp3(pts[0], pts[1], 0.5); };
+  const kneeW = Math.min(1, wk[0] + wk[1]);
+  const pivot = lerp3(avg(P.toe, wf), avg(P.knee, wk), kneeW);
   const axis = norm([P.lat[0], 0, P.lat[2]]);
-  let pivot;
-  if (kneeDown.length) pivot = kneeDown.length === 2 ? lerp3(P.knee[0], P.knee[1], 0.5) : P.knee[kneeDown[0]];
-  else {
-    const feet = [0, 1].filter(i => footY(i) < clear + 0.03);
-    pivot = feet.length === 2 ? lerp3(P.toe[0], P.toe[1], 0.5) : P.toe[feet[0]];
-  }
   const v = sub(S, pivot), rh = len(perp([v[0], 0, v[2]], axis));
   // стопы в воздухе (прыжок ногами назад) — опускается всё тело; иначе корпус поворачивается вокруг опоры
-  const air = kneeDown.length ? 0 : smooth(0.03, 0.1, clear);
-  if (rh > 0.25 && air < 1) {
-    let ang = (drop * (1 - air)) / rh;
+  const air = smooth(0.03, 0.1, clear) * (1 - kneeW);
+  // поворот вокруг опоры плавно сходит на нет, когда плечи над стопами (бёрпи: прыжок ногами к рукам)
+  const wr = smooth(0.17, 0.3, rh) * (1 - air);
+  if (wr > 0) {
+    let ang = (drop * wr) / Math.max(rh, 0.17);
     if (add(pivot, rot(v, axis, ang))[1] > S[1]) ang = -ang;
-    const saved = kneeDown.map(i => [P.ankle[i], P.toe[i]]);
+    const saved = [0, 1].map(i => [P.ankle[i], P.toe[i]]);
     rollBody(P, axis, pivot, ang);
-    kneeDown.forEach((i, k) => { P.ankle[i] = saved[k][0]; P.toe[i] = saved[k][1]; });
+    // голени на полу остаются на месте (доля — насколько колено на полу)
+    for (const i of [0, 1]) if (wk[i] > 0) { P.ankle[i] = lerp3(P.ankle[i], saved[i][0], wk[i]); P.toe[i] = lerp3(P.toe[i], saved[i][1], wk[i]); }
   }
   if (air > 0.01) shiftY(P, -drop * air);
 }
-function plantHands(P, J, on, opt) {
+// lift — кисть держит ручку гантели, стоящей на полу («ренегат»): запястье выше, пальцы обхватывают
+function plantHands(P, J, on, opt, lift = 0) {
   const fdir = fwdFlat(P.up);
   const W0 = [0, 1].map(i => P.wrist[i]);
   const elbowDown = i => J.arms[i].elbow[1] - 0.045 < 0.03;
+  // опускание корпуса — среднее по кистям на полу с их долями: кисть, которая отрывается, плавно
+  // перестаёт влиять, и корпус не дёргается
   let drop = 0, n = 0;
-  for (const i of [0, 1]) if (on[i] && !elbowDown(i)) { drop += Math.max(0, P.wrist[i][1] - WRIST_H); n++; }
-  if (n) lowerBody(P, J, drop / n);
+  for (const i of [0, 1]) if (on[i] && !elbowDown(i)) { const w = typeof on[i] === "number" ? on[i] : 1; drop += w * Math.max(0, P.wrist[i][1] - WRIST_H - lift); n += w; }
+  // плечи и голова уже на полу (мост, лёжа): ниже опускать нельзя — кисть дотянется сама
+  const room = Math.max(0, Math.min(Math.min(P.shoulder[0][1], P.shoulder[1][1]) - 0.1, P.head[1] - 0.11));
+  if (n > 1e-6) lowerBody(P, J, Math.min(drop / n, room));
   for (const i of [0, 1]) {
     if (!on[i]) continue;
     const l1 = len(sub(P.elbow[i], P.shoulder[i])), l2 = len(sub(P.wrist[i], P.elbow[i]));
-    const W = [W0[i][0], WRIST_H, W0[i][2]];
+    const W = [W0[i][0], WRIST_H + lift, W0[i][2]];
     if (elbowDown(i)) P.wrist[i] = W; // предплечье лежит на полу (планка на локтях): локоть на месте
     else {
       const r = elbowFor(P.shoulder[i], W, l1, l2, add(add(mul(fdir, -0.7), mul(outward(P, i), 0.45)), [0, 0.6, 0]), []);
@@ -1459,9 +1522,10 @@ function plantHands(P, J, on, opt) {
     // пальцы смотрят вперёд по корпусу, а у предплечья, лежащего на полу, — по предплечью
     const fa = sub(P.wrist[i], P.elbow[i]), fh = [fa[0], 0, fa[2]];
     const hd = norm(lerp3(fdir, norm(fh), smooth(0.3, 0.7, len(fh) / (len(fa) || 1))));
-    P.knuckle[i] = add(madd(P.wrist[i], hd, 0.089), [0, -0.012, 0]);
+    // ладонь лежит плашмя, пальцы прямые (а не согнуты в пол); на гантели — обхватывают ручку
+    P.knuckle[i] = add(madd(P.wrist[i], hd, 0.089), [0, lift ? -0.03 : -0.006, 0]);
     opt.palm[i] = { n: [0, -1, 0], w: 1 };
-    opt.curl[i] = 0.04;
+    opt.curl[i] = lift ? 0.9 : -0.04;
   }
 }
 // Ладони на стене, сиденье стула или столе (кисти, которые рисунок держит на опоре): кисть лежит
@@ -1491,6 +1555,263 @@ function surfaceHands(M, P, held, opt) {
   }
 }
 
+// ----- Столкновения -----
+// Объёмы тела берутся с самой модели: капсулы рук и ног, эллипсоид головы (вместе с волосами),
+// эллиптические цилиндры таза, поясницы и груди. Считаются один раз на модель, в кадре переводятся
+// матрицами костей. По ним снаряды и кисти не заходят внутрь тела, а стопы, ладони и снаряды — под пол
+const pctl = (arr, q) => { if (!arr.length) return 0; const a = Float32Array.from(arr).sort(); return a[Math.min(a.length - 1, Math.floor(q * a.length))]; };
+function bodyVolumes(C) {
+  if (C.vols) return C.vols;
+  const F = C.skel.frames, pos = C.geo.pos;
+  const byBone = BONES.map(() => []);
+  for (let v = 0; v < C.n; v++) for (let k = 0; k < 4; k++) if (C.bw[v * 4 + k] >= 0.8) byBone[C.bi[v * 4 + k]].push(v);
+  const P0 = v => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
+  const loc = (f, p) => { const d = sub(p, f.o); return [dot(d, f.x), dot(d, f.y), dot(d, f.z)]; };
+  const W = (f, q) => add(add(add(f.o, mul(f.x, q[0])), mul(f.y, q[1])), mul(f.z, q[2]));
+  const list = [];
+  const cap = (name, from, group) => {
+    const f = F[name], L = f.L;
+    const pts = [].concat(...from.map(b => byBone[BI[b]])).map(v => loc(f, P0(v)));
+    const r = (t0, t1) => pctl(pts.filter(q => q[1] >= t0 * L && q[1] <= t1 * L).map(q => Math.hypot(q[0], q[2])), 0.6);
+    list.push({ kind: "cap", bone: BI[name], name, group, a: f.o, b: W(f, [0, L, 0]), r0: r(0.08, 0.35), r1: r(0.65, 0.92) });
+  };
+  for (let i = 0; i < 2; i++) {
+    const S = SIDE[i];
+    cap("upper" + S, ["upper" + S], "arm" + i); cap("fore" + S, ["fore" + S, "fore2" + S], "arm" + i);
+    cap("thigh" + S, ["thigh" + S], "leg" + i); cap("shin" + S, ["shin" + S], "leg" + i);
+  }
+  cap("neck", ["neck"], "neck");
+  {
+    const f = F.head, pts = byBone[BI.head].map(v => loc(f, P0(v)));
+    const mn = [0, 1, 2].map(k => pctl(pts.map(q => q[k]), 0.02)), mx = [0, 1, 2].map(k => pctl(pts.map(q => q[k]), 0.98));
+    list.push({ kind: "ell", bone: BI.head, name: "head", group: "head", c: W(f, [0, 1, 2].map(k => (mn[k] + mx[k]) / 2)), r: [0, 1, 2].map(k => ((mx[k] - mn[k]) / 2) * 0.92) });
+  }
+  for (const name of ["pelvis", "spine", "chest"]) {
+    const f = F[name], pts = byBone[BI[name]].map(v => loc(f, P0(v)));
+    const mid = k => (pctl(pts.map(q => q[k]), 0.05) + pctl(pts.map(q => q[k]), 0.95)) / 2;
+    const cu = mid(0), cv = mid(2);
+    const ys = pts.map(q => q[1]);
+    list.push({ kind: "ecyl", bone: BI[name], name, group: "torso", ru: pctl(pts.map(q => Math.abs(q[0] - cu)), 0.85), rv: pctl(pts.map(q => Math.abs(q[2] - cv)), 0.85), a: W(f, [cu, pctl(ys, 0.05), cv]), b: W(f, [cu, pctl(ys, 0.95), cv]) });
+  }
+  // вершины стоп и кистей (каждая третья) — чтобы ни носок, ни пальцы не уходили под пол
+  const verts = names => [].concat(...names.map(b => byBone[BI[b]].filter((v, k) => k % 3 === 0).map(v => ({ bone: BI[b], p: P0(v) }))));
+  C.vols = {
+    list,
+    foot: [0, 1].map(i => verts(["foot" + SIDE[i], "toe" + SIDE[i]])),
+    hand: [0, 1].map(i => verts(["hand" + SIDE[i], "fingA" + SIDE[i], "fingB" + SIDE[i], "thumb" + SIDE[i]])),
+    arm: [0, 1].map(i => verts(["upper" + SIDE[i], "fore" + SIDE[i], "fore2" + SIDE[i]]))
+  };
+  return C.vols;
+}
+function volumesAt(C, mats, frames) {
+  return bodyVolumes(C).list.map(v => {
+    const m = mats.subarray(v.bone * 16, v.bone * 16 + 16);
+    if (v.kind === "cap") return { ...v, A: m4.apply(m, v.a), B: m4.apply(m, v.b) };
+    const f = frames[v.name];
+    if (v.kind === "ell") return { ...v, O: m4.apply(m, v.c), x: f.x, y: f.y, z: f.z };
+    return { ...v, A: m4.apply(m, v.a), B: m4.apply(m, v.b), x: f.x, z: f.z };
+  });
+}
+// Глубина точки внутри объёма (больше нуля — внутри) и направление наружу
+function volDepth(V, q) {
+  if (V.kind === "cap") {
+    const ab = sub(V.B, V.A), t = clamp(dot(sub(q, V.A), ab) / Math.max(dot(ab, ab), 1e-9), 0, 1);
+    const c = madd(V.A, ab, t), d = sub(q, c), L = len(d);
+    return { d: V.r0 + (V.r1 - V.r0) * t - L, n: L > 1e-6 ? mul(d, 1 / L) : norm(perp(Y, norm(ab))) };
+  }
+  if (V.kind === "ell") {
+    const d = sub(q, V.O), l = [dot(d, V.x) / V.r[0], dot(d, V.y) / V.r[1], dot(d, V.z) / V.r[2]];
+    const rho = Math.hypot(l[0], l[1], l[2]);
+    return { d: (1 - rho) * Math.min(V.r[0], V.r[1], V.r[2]), n: norm(add(add(mul(V.x, l[0] / V.r[0]), mul(V.y, l[1] / V.r[1])), mul(V.z, l[2] / V.r[2]))) };
+  }
+  const ab = sub(V.B, V.A), L = len(ab), y = mul(ab, 1 / (L || 1)), d = sub(q, V.A), t = dot(d, y);
+  const u = dot(d, V.x), w = dot(d, V.z), rho = Math.hypot(u / V.ru, w / V.rv);
+  const over = t < 0 ? -t : t > L ? t - L : 0;
+  return { d: (1 - rho) * Math.min(V.ru, V.rv) - over, n: norm(add(mul(V.x, u / (V.ru * V.ru)), mul(V.z, w / (V.rv * V.rv)))) };
+}
+// Точки снарядов в руках (гриф между кистями, головки гантелей, шар гири) и чьи это кисти
+function carriedPoints(M, P, frames) {
+  const out = [];
+  let props;
+  try { props = propList(M, P, { pal: { accent: [0, 0, 0] }, statics: [], anchor: null }, frames); } catch (e) { return out; }
+  const palms = [0, 1].map(i => gripCenter(P, frames, i));
+  const both = TWO_HANDS.has(M.id) || gripOf(M) === "together";
+  for (const pr of props) {
+    const m = pr.model, at = q => m4.apply(m, q), pts = [];
+    const ring = (y, r, k) => { for (let a = 0; a < k; a++) { const t = (a / k) * Math.PI * 2; pts.push(at([r * Math.cos(t), y, r * Math.sin(t)])); } };
+    if (pr.shape === "bar") for (let y = -0.5; y <= 0.501; y += 0.04) pts.push(at([0, y, 0]));
+    else if (pr.shape === "plate") { pts.push(at([0, 0, 0])); ring(0, 0.21, 16); }
+    else if (pr.shape === "dbHead") { pts.push(at([0, 0, 0])); ring(0.024, 0.046, 8); ring(-0.024, 0.046, 8); }
+    else if (pr.shape === "kbBody") { pts.push(at([0, 0, 0]), at([0, -0.085, 0])); for (const yy of [-0.05, 0, 0.05]) ring(yy, Math.sqrt(0.075 * 0.075 - yy * yy), 8); }
+    else continue;
+    const c = at([0, 0, 0]);
+    const hands = pr.shape === "bar" || pr.shape === "plate" || both ? [0, 1] : [len(sub(c, palms[0])) <= len(sub(c, palms[1])) ? 0 : 1];
+    out.push({ pts, hands, shape: pr.shape, r: pr.shape === "bar" ? 0.014 : 0 });
+  }
+  return out;
+}
+// Кисть сдвигается на dv, плечо на месте, локоть — в той же плоскости (если рука прямая и не
+// дотягивается, кисть встаёт на её длине в сторону цели)
+function moveHand(P, i, dv) {
+  const S = P.shoulder[i], l1 = len(sub(P.elbow[i], S)), l2 = len(sub(P.wrist[i], P.elbow[i]));
+  const hv = sub(P.knuckle[i], P.wrist[i]);
+  // почти прямая рука сгибается так, как сгибается у человека: локоть назад и чуть в сторону
+  const prefer = add(sub(P.elbow[i], lerp3(S, P.wrist[i], 0.5)), mul(add(mul(P.fwd, -1), mul(outward(P, i), 0.35)), 0.02));
+  const r = elbowFor(S, add(P.wrist[i], dv), l1, l2, prefer, []);
+  P.elbow[i] = r.elbow; P.wrist[i] = r.wrist; P.knuckle[i] = add(r.wrist, hv);
+}
+// Насколько точку q нужно сдвинуть вдоль u, чтобы она вышла из выпуклого объёма V
+function exitAlong(V, q, u) {
+  if (volDepth(V, q).d <= 0) return 0;
+  let lo = 0, hi = 0.06;
+  while (volDepth(V, madd(q, u, hi)).d > 0 && hi < 0.6) hi *= 2;
+  for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (volDepth(V, madd(q, u, m)).d > 0) lo = m; else hi = m; }
+  return hi;
+}
+// Снаряд не заходит в тело: он выходит наружу по линии «от оси корпуса к снаряду» — ровно на
+// нужное расстояние, поэтому движение остаётся плавным. Кисти, держащие снаряд, сдвигаются вместе
+// с ним (гриф — обе одинаково); прямая рука при этом чуть поворачивается в плече
+function clearHands(M, C, P, opt, breath, fixed) {
+  if (M.where === "back" || M.where === "hip") return false;
+  let pose = poseBones(C, P, opt, breath);
+  const vols = volumesAt(C, pose.mats, pose.frames).filter(v => !v.group.startsWith("arm"));
+  const ax = norm(sub(P.neck, P.pelvis));
+  let moved = false, dirs = null;
+  for (let it = 0; it < 3; it++) {
+    const items = carriedPoints(M, P, pose.frames);
+    // гриф всегда перед телом — выходит вперёд (лёжа на скамье — вверх); гантели и гиря — от оси
+    // корпуса наружу, с небольшим уклоном вперёд, чтобы у самой оси направление не перескакивало
+    if (!dirs) dirs = items.map(c => {
+      if (c.shape === "bar" || c.shape === "plate") return P.fwd;
+      const ctr = mul(c.pts.reduce((a, q) => add(a, q), [0, 0, 0]), 1 / c.pts.length);
+      const r = add(perp(sub(ctr, P.pelvis), ax), mul(P.fwd, 0.06));
+      return len(r) > 1e-3 ? norm(r) : P.fwd;
+    });
+    const push = [0, 0], pdir = [null, null];
+    items.forEach((c, k) => {
+      const u = dirs[k] || P.fwd;
+      let need = 0;
+      for (const q of c.pts) {
+        for (const V of vols) need = Math.max(need, exitAlong(V, c.r ? madd(q, u, -c.r) : q, u));
+        // пол: снаряд стоит на полу, но не проходит сквозь него
+        if (q[1] < 0) need = Math.max(need, u[1] > 0.2 ? -q[1] / u[1] : 0);
+      }
+      if (need > 0.001) for (const i of c.hands) if (fixed[i] < 1 && need * (1 - fixed[i]) > push[i]) { push[i] = need * (1 - fixed[i]); pdir[i] = u; }
+    });
+    // снаряд ниже пола (гантели лёжа, рука за головой): кисть поднимается
+    items.forEach(c => {
+      const low = Math.min(...c.pts.map(q => q[1]));
+      if (low < -0.002) for (const i of c.hands) if (fixed[i] < 1 && !push[i]) { push[i] = -low * (1 - fixed[i]); pdir[i] = Y; }
+    });
+    if (!push[0] && !push[1]) break;
+    for (const i of [0, 1]) if (push[i]) moveHand(P, i, mul(pdir[i], push[i] + 0.004));
+    moved = true;
+    pose = poseBones(C, P, opt, breath);
+  }
+  return moved;
+}
+// Руки не проходят сквозь корпус, голову и ноги: предплечье и кисть выводятся наружу — от оси
+// корпуса к кисти, с лёгким уклоном вперёд, — ровно на нужное расстояние (не больше 12 см).
+// Направление и величина меняются плавно вместе с позой, поэтому движение не дёргается. Касание
+// остаётся касанием: ладонь на поясе, на лбу, на голени лежит на поверхности. Кисти на одном
+// снаряде (гриф, гантель или гиря в двух руках) сдвигаются вместе
+function clearArms(M, C, P, opt, breath, fixed) {
+  const pose = poseBones(C, P, opt, breath);
+  const vols = volumesAt(C, pose.mats, pose.frames).filter(v => !v.group.startsWith("arm"));
+  const joined = M.weight === "bb" || TWO_HANDS.has(M.id) || gripOf(M) === "together";
+  const ax = norm(sub(P.neck, P.pelvis)), RAD = 0.032;
+  const ptsOf = i => {
+    const pts = [];
+    for (let k = 2; k <= 6; k++) pts.push(lerp3(P.elbow[i], P.wrist[i], k / 6));
+    pts.push(lerp3(P.wrist[i], P.knuckle[i], 0.5), P.knuckle[i]);
+    return pts;
+  };
+  const dirOf = i => {
+    const r = add(perp(sub(lerp3(P.wrist[i], P.knuckle[i], 0.5), P.pelvis), ax), mul(P.fwd, 0.06));
+    return len(r) > 1e-3 ? norm(r) : P.fwd;
+  };
+  let moved = false;
+  for (let it = 0; it < 2; it++) {
+    const push = [0, 0], dirs = [dirOf(0), dirOf(1)];
+    if (joined) { const c = norm(add(dirs[0], dirs[1])); dirs[0] = dirs[1] = len(c) > 1e-3 ? c : P.fwd; }
+    for (const i of [0, 1]) {
+      if (fixed[i] >= 1) continue;
+      let need = 0;
+      for (const q of ptsOf(i)) for (const V of vols) need = Math.max(need, exitAlong(V, madd(q, dirs[i], -RAD), dirs[i]));
+      push[i] = Math.min(0.12, need) * (1 - fixed[i]);
+    }
+    if (joined) push[0] = push[1] = Math.max(push[0], push[1]);
+    if (push[0] < 0.001 && push[1] < 0.001) break;
+    for (const i of [0, 1]) if (fixed[i] < 1 && push[i] >= 0.001) moveHand(P, i, mul(dirs[i], push[i]));
+    moved = true;
+  }
+  return moved;
+}
+// Самая низкая вершина стопы или кисти (по кости, без смешивания весов)
+function lowestOf(list, mats) {
+  let low = Infinity;
+  for (const { bone, p } of list) {
+    const m = mats.subarray(bone * 16, bone * 16 + 16);
+    const y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13];
+    if (y < low) low = y;
+  }
+  return low;
+}
+// Стопы и ладони не уходят под пол. Поправка плавная (растёт с глубиной, без порога) и без
+// пересчёта колена и локтя: у почти прямой ноги даже миллиметр по высоте переставил бы колено на
+// сантиметры. Сантиметр-другой стопа или кисть приподнимается сама, кость чуть удлиняется — глазу не видно
+function floorClamp(M, C, P, opt, breath) {
+  const V = bodyVolumes(C);
+  let pose = poseBones(C, P, opt, breath);
+  let changed = false;
+  for (let i = 0; i < 2; i++) {
+    const dy = Math.min(0.04, Math.max(0, -0.005 - lowestOf(V.foot[i], pose.mats)));
+    if (dy <= 0) continue;
+    P.ankle[i] = add(P.ankle[i], [0, dy, 0]); P.toe[i] = add(P.toe[i], [0, dy, 0]);
+    changed = true;
+  }
+  // рука ниже пола (лёжа на боку, «нитка»): кисть поднимается, плечо на месте — рука ложится на пол
+  for (let i = 0; i < 2; i++) {
+    if (M.hang) continue;
+    for (let it = 0; it < 3; it++) {
+      const p2 = poseBones(C, P, opt, breath);
+      const d = Math.max(0, -0.006 - Math.min(lowestOf(V.arm[i], p2.mats), lowestOf(V.hand[i], p2.mats) + 0.012));
+      if (d < 0.003) break;
+      moveHand(P, i, [0, d, 0]);
+      changed = true;
+    }
+  }
+  pose = poseBones(C, P, opt, breath);
+  for (let i = 0; i < 2; i++) {
+    if (M.hang) continue;
+    const dy = Math.min(0.04, Math.max(0, -0.005 - lowestOf(V.hand[i], pose.mats)));
+    if (dy <= 0) continue;
+    P.wrist[i] = add(P.wrist[i], [0, dy, 0]); P.knuckle[i] = add(P.knuckle[i], [0, dy, 0]);
+    changed = true;
+  }
+  return changed;
+}
+
+// Копия позы и смесь двух поз: точки и направления — по общей доле, суставы рук — по доле своей руки
+function clonePose(P) {
+  const Q = {};
+  for (const [k, v] of Object.entries(P)) {
+    if (isPt(v)) Q[k] = [...v];
+    else if (Array.isArray(v) && v.length && isPt(v[0])) Q[k] = v.map(q => [...q]);
+    else if (Array.isArray(v)) Q[k] = [...v];
+    else if (v && typeof v === "object") Q[k] = { ...v };
+    else Q[k] = v;
+  }
+  return Q;
+}
+function blendPose(P, Q, w, wBody) {
+  for (const [k, v] of Object.entries(Q)) {
+    const a = P[k];
+    if (isPt(v) && isPt(a)) P[k] = DIRS.includes(k) ? norm(lerp3(a, v, wBody)) : lerp3(a, v, wBody);
+    else if (Array.isArray(v) && v.length === 2 && isPt(v[0]) && Array.isArray(a)) P[k] = v.map((q, i) => lerp3(a[i], q, ARM.includes(k) ? w[i] : wBody));
+  }
+}
+
 // Поза в кадре: суставы рисунка → 3D, плечевой пояс, хваты, опоры на пол, кости
 function solvePose(M, C, f, demo) {
   const j = C.skel.j, J = f.J;
@@ -1510,20 +1831,22 @@ function solvePose(M, C, f, demo) {
     // носок остаётся на полу, пока стопа у пола (или на краю ступеньки)
     toe: [0, 1].map(i => (M.front ? 0 : smooth(0.11, 0.045, J.legs[i].toe[1] - (M.pat.standY || 0))))
   };
-  // кисти на полу (упор лёжа, планка, «кошка») встанут ладонью — высоту тела они не задают
-  const onFloor = [0, 1].map(i => !M.front && !M.hang && !M.weight && !(P.pin && P.pin[i]) && J.arms[i].hand[1] < 0.075 && J.arms[i].wrist[1] < 0.14);
+  // кисти на полу (упор лёжа, планка, «кошка») встанут ладонью — высоту тела они не задают.
+  // Доля «ладонь на полу» меняется плавно, пока кисть отрывается от пола: без скачка позы
+  const plantW = [0, 1].map(i => (!M.front && !M.hang && (!M.weight || M.id === "renegadeRow") && !(P.pin && P.pin[i]) ? smooth(0.22, 0.115, J.arms[i].wrist[1]) * smooth(0.15, 0.07, J.arms[i].hand[1]) : 0));
+  const onFloor = plantW.map(w => w > 0), wMax = Math.max(plantW[0], plantW[1]);
   const breath = demo && !reduced() ? 0.012 * Math.sin(demo.t * 2 * Math.PI / 3.6) : 0;
   let { mats, frames } = poseBones(C, P, opt, breath);
   // Высота: самая низкая точка тела там же, где у рисунка (стоя — на полу, в прыжке — в воздухе,
   // на ступеньке — на ступеньке, в висе — на перекладине)
-  if (!C.probes) C.probes = contactProbes(j);
+  if (!C.probes) C.probes = contactProbes(j, C);
   let low = Infinity;
   for (const pr of C.probes) {
-    if (pr.hand >= 0 && onFloor[pr.hand]) continue;
-    const y = m4.apply(mats.subarray(pr.bone * 16, pr.bone * 16 + 16), pr.p)[1];
+    // кисть на полу не задаёт высоту тела: её точки «приподняты» на долю «на полу»
+    const y = m4.apply(mats.subarray(pr.bone * 16, pr.bone * 16 + 16), pr.p)[1] + (pr.hand >= 0 ? plantW[pr.hand] * 0.4 : 0);
     if (y < low) low = y;
   }
-  const dy = M.hang ? 0 : lowest2D(J, onFloor) * K - low;
+  const dy = M.hang ? 0 : lowest2D(J, plantW) * K - low;
   if (dy) {
     shiftY(P, dy);
     ({ mats, frames } = poseBones(C, P, opt, breath));
@@ -1531,8 +1854,29 @@ function solvePose(M, C, f, demo) {
   // Стопы, которые у рисунка стоят на полу, касаются пола и у модели: ногу чуть сгибаем или
   // выпрямляем (обратная кинематика), бедро остаётся на месте
   if (!M.hang && fixFeet(C, P, J, mats)) ({ mats, frames } = poseBones(C, P, opt, breath));
-  if (onFloor[0] || onFloor[1]) plantHands(P, J, onFloor, opt);
-  surfaceHands(M, P, heldHands(M, J, f.second), opt);
+  if (onFloor[0] || onFloor[1]) {
+    // ладонь встаёт на пол в копии позы; итог — смесь по доле «на полу» (у каждой руки своя)
+    const Q = clonePose(P), optQ = { ...opt, curl: [...opt.curl], palm: [...opt.palm] };
+    plantHands(Q, J, plantW, optQ, M.id === "renegadeRow" ? 0.05 : 0);
+    blendPose(P, Q, plantW, wMax);
+    for (const i of [0, 1]) {
+      if (!onFloor[i]) continue;
+      opt.curl[i] += (optQ.curl[i] - opt.curl[i]) * plantW[i];
+      if (optQ.palm[i]) opt.palm[i] = { n: optQ.palm[i].n, w: (optQ.palm[i].w || 1) * plantW[i] };
+    }
+    // корпус повернулся вокруг опоры — стопы, которые стоят на полу, снова ставим на пол
+    if (!M.hang) { ({ mats, frames } = poseBones(C, P, opt, breath)); fixFeet(C, P, J, mats); }
+  }
+  const held = heldHands(M, J, f.second);
+  surfaceHands(M, P, held, opt);
+  // снаряды и кисти не проходят сквозь тело, стопы, ладони и снаряды — сквозь пол
+  // доля «кисть закреплена»: на полу — по доле «на полу», на опоре, в висе и в заданной точке — целиком
+  const fixedHands = [0, 1].map(i => (M.hang || held.includes(i) ? 1 : plantW[i]));
+  // кисти, поставленные в нужную точку (держат стопу, гирю у головы), не выталкиваем; снаряд в двух
+  // руках (гантель, гиря) — выталкиваем вместе с руками
+  clearArms(M, C, P, opt, breath, [0, 1].map(i => (P.pin && P.pin[i] && !TWO_HANDS.has(M.id) && M.pid !== "sumo" ? 1 : fixedHands[i])));
+  clearHands(M, C, P, opt, breath, fixedHands);
+  floorClamp(M, C, P, opt, breath);
   ({ mats, frames } = poseBones(C, P, opt, breath));
   return { P, mats, frames, dy };
 }
@@ -1556,12 +1900,25 @@ function fixFeet(C, P, J, mats) {
   let changed = false;
   for (let i = 0; i < 2; i++) {
     const S = SIDE[i], L = J.legs[i];
-    if (Math.min(L.toe[1], L.heel[1]) - 0.03 >= 0.012) continue;
+    // стопа отрывается от пола плавно: поправка убывает до нуля за полтора сантиметра высоты
+    const wUp = smooth(0.06, 0.004, Math.min(L.toe[1], L.heel[1]) - 0.03);
+    if (wUp <= 0) continue;
+    // подошва смотрит вверх или назад (стоя на коленях, лёжа на животе): на полу лежит подъём стопы,
+    // его держит отдельная проверка пола — тянуть «подошву» к полу нельзя, иначе стопа уйдёт в пол
+    const Mf = mats.subarray(BI["foot" + S] * 16, BI["foot" + S] * 16 + 16);
+    const wDown = smooth(-0.3, -0.6, norm(sub(m4.apply(Mf, [0, -1, 0]), m4.apply(Mf, [0, 0, 0])))[1]);
+    if (wDown <= 0) continue;
     const y = Math.min(probeY("foot" + S, [j.heel[i][0], 0.004, j.heel[i][2] + 0.01]), probeY("foot" + S, [j.ball[i][0], 0.002, j.ball[i][2]]), probeY("toe" + S, [j.toe[i][0], 0.006, j.toe[i][2] + 0.012]));
-    if (Math.abs(y) <= 0.006) continue;
+    const yy = y * wUp * wDown;
+    if (Math.abs(yy) <= 0.0005) continue;
     const fv = sub(P.toe[i], P.ankle[i]);
-    const r = ik2(P.hip[i], P.knee[i], P.ankle[i], P.fwd)([P.ankle[i][0], P.ankle[i][1] - y, P.ankle[i][2]]);
-    P.knee[i] = r.mid; P.ankle[i] = r.end; P.toe[i] = add(r.end, fv);
+    const r = ik2(P.hip[i], P.knee[i], P.ankle[i], P.fwd)([P.ankle[i][0], P.ankle[i][1] - yy, P.ankle[i][2]]);
+    // почти прямая нога: миллиметр по высоте переставил бы колено на сантиметры — стопа просто
+    // сдвигается (переход между способами плавный)
+    const l1 = len(sub(P.knee[i], P.hip[i])), l2 = len(sub(P.ankle[i], P.knee[i]));
+    const wIk = smooth(0.985, 0.95, len(sub(P.ankle[i], P.hip[i])) / (l1 + l2));
+    const moved = [P.ankle[i][0], P.ankle[i][1] - clamp(yy, -0.03, 0.03), P.ankle[i][2]];
+    P.knee[i] = lerp3(P.knee[i], r.mid, wIk); P.ankle[i] = lerp3(moved, r.end, wIk); P.toe[i] = add(P.ankle[i], fv);
     changed = true;
   }
   return changed;
@@ -1570,7 +1927,8 @@ function fixFeet(C, P, J, mats) {
 function lowest2D(J, skipHands = []) {
   const pts = [[J.hip, 0.1], [J.sh, 0.1], [J.head, 0.105]];
   for (const L of J.legs) pts.push([L.knee, 0.06], [L.ankle, 0.035], [L.toe, 0.03], [L.heel, 0.03]);
-  J.arms.forEach((A, i) => { pts.push([A.elbow, 0.045]); if (!skipHands[i]) pts.push([A.wrist, 0.035], [A.hand, 0.03]); });
+  // кисть на полу (доля от 0 до 1) «приподнята» — высоту задают другие опоры
+  J.arms.forEach((A, i) => { const up = (+skipHands[i] || 0) * 0.4; pts.push([A.elbow, 0.045], [[A.wrist[0], A.wrist[1] + up], 0.035], [[A.hand[0], A.hand[1] + up], 0.03]); });
   let low = Infinity;
   for (const [q, r] of pts) low = Math.min(low, q[1] - r);
   return Math.max(0, low);
@@ -1638,8 +1996,9 @@ function propList(M, P, demo, frames) {
   } else if (kind === "db" && (where === "hands" || where === "near" || !where)) {
     for (const i of where === "near" ? [0] : [0, 1]) {
       const f = handFrame(i), c = palmC(i);
-      // ручка гантели — поперёк ладони
-      const ax = norm(cross(f.y, f.x));
+      // ручка гантели — поперёк ладони; в упоре на гантелях («ренегат») ладонь смотрит в пол,
+      // и ручка лежит вдоль линии костяшек — гантель стоит на полу обоими блинами
+      const ax = M.id === "renegadeRow" ? norm(f.x) : norm(cross(f.y, f.x));
       const y = ax, x = norm(perp(f.y, y)), z = cross(x, y);
       place("dbHandle", T(c, x, y, z), metal);
       place("dbHead", T(madd(c, y, 0.095), x, y, z), dark);
@@ -1737,9 +2096,10 @@ function staticProps(M, C) {
       box([0, top - 0.04, (z0 + z1) / 2], 0.3, 0.08, z1 - z0, [0.24, 0.26, 0.3]);
       for (const z of [z0 + 0.12, z1 - 0.12]) box([0, (top - 0.08) / 2, z], 0.24, top - 0.08, 0.06, metal);
     } else if (p === "step" || p === "stepEdge") {
-      // ступенька под опорной ногой (в позе B на ней стоят); край — под носками
+      // ступенька под опорной ногой (в позе B на ней стоят); край — под подушечками стоп: передняя
+      // часть стопы на ступеньке, пятки свисают назад
       const top = p === "step" ? Math.max(0.12, B.ankle[0][1] - 0.085) : (M.pat.standY || 0.2) * K;
-      const zc = p === "step" ? B.ankle[0][2] + 0.03 : A.toe[0][2] - 0.13;
+      const zc = p === "step" ? B.ankle[0][2] + 0.03 : A.toe[0][2] + 0.1;
       box([0, top / 2, zc], 0.7, top, p === "step" ? 0.42 : 0.4, [0.5, 0.52, 0.55]);
     } else if (p === "door") {
       // открытая дверь торцом к человеку: держатся за ручки с двух сторон

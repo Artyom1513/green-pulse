@@ -11,7 +11,7 @@ import { MUSCLES, MUSCLE, MUSCLE_GROUPS, muscleSummary, exercisesFor } from "./m
 import * as E from "./engine.js";
 import * as L from "./look.js";
 
-const VERSION = "2.12.0";
+const VERSION = "2.13.0";
 const app = document.getElementById("app");
 const REGION = Object.fromEntries(REGIONS.map(r => [r.id, r]));
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -1021,9 +1021,9 @@ function rescreenCard() {
 
 // Что нового: короткая карточка после обновления, без всплывающих окон
 const WHATS_NEW = [
-  "Новая «Персонализация»: готовые стили видны мини-экранами, тема, углы, плотность и фон выбираются картинками",
-  "«Мой стиль»: своё сочетание запоминается — можно примерить готовые стили и вернуться",
-  "Ровнее вёрстка: слова в переключателях не рвутся, кнопки и плашки держат одну строку"
+  "Схемы упражнений аккуратнее: руки не проходят сквозь голову, гриф и гантели — сквозь ноги, стопы — сквозь пол",
+  "Становая тяга по правилам: блины на полу, гриф над серединой стопы и идёт вдоль ног",
+  "Движения ровнее: без рывков, ритмичные упражнения — без замираний"
 ];
 function whatsNewCard() {
   if (state.settings.seenVersion === VERSION) return null;

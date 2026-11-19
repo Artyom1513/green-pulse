@@ -35,6 +35,39 @@ const LUNGE_LOW = (o = {}) => pose({ t: 3, legs: [leg(80, 85), leg(-10, 96, 2)],
 const HANDS_HIPS = [arm(-15, 100), arm(-15, 100)];
 const BALANCE = (o = {}) => pose({ legs: [leg(0, 0), leg(25, 70, 70)], arms: [arm(30, 10), arm(30, 10)], ...o });
 
+// Становая тяга по траектории грифа: гриф идёт вертикально над серединой стопы. Внизу блины стоят
+// на полу, голени почти вертикальны и касаются грифа, плечи чуть впереди грифа, руки прямые; гриф
+// проходит колени, когда голени уже вертикальны (колени уходят назад), скользит по бёдрам; вверху —
+// прямая стойка, руки чуть впереди, гриф у передней поверхности бёдер. Позы считаются обратной
+// кинематикой: для каждой высоты грифа — колено по углу голени, таз на пересечении окружностей
+// «бедро» и «корпус», плечо над грифом
+function barPath(n = 6) {
+  const deg = r => r / D;
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const ankle = [0, 0.035], reach = LEN.upper + LEN.fore + 0.07; // плечо → середина ладони
+  const out = [];
+  for (let j = 0; j <= n; j++) {
+    const s = j / n;
+    const y = 0.168 + (0.802 - 0.168) * s;
+    const x = 0.072 + (0.095 - 0.072) * sm(0.5, 1, s);
+    const al = (-3 + 11.5 * sm(0.35, 1, s)) * D; // наклон рук вперёд от вертикали
+    const sh = [x - reach * Math.sin(al), y + reach * Math.cos(al)];
+    const th = 6 * (1 - sm(0, 0.45, s)) * D; // наклон голени вперёд
+    const knee = [ankle[0] + LEN.shank * Math.sin(th), ankle[1] + LEN.shank * Math.cos(th)];
+    // таз: пересечение окружностей вокруг колена (бедро) и плеча (корпус), позади
+    const dx = sh[0] - knee[0], dy = sh[1] - knee[1], d = Math.min(Math.hypot(dx, dy), LEN.thigh + LEN.torso - 1e-4);
+    const a = (LEN.thigh ** 2 - LEN.torso ** 2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, LEN.thigh ** 2 - a * a));
+    const ux = dx / d, uy = dy / d;
+    const hip = [knee[0] + ux * a - uy * h, knee[1] + uy * a + ux * h];
+    const hh = deg(Math.atan2(knee[0] - hip[0], hip[1] - knee[1]));
+    const sg = deg(Math.atan2(ankle[0] - knee[0], knee[1] - ankle[1]));
+    const t = deg(Math.atan2(sh[0] - hip[0], sh[1] - hip[1]));
+    out.push(pose({ t, legs: [leg(hh, hh - sg), leg(hh, hh - sg)], arms: [arm(deg(al), 0), arm(deg(al), 0)] }));
+  }
+  return out;
+}
+const DEADLIFT = barPath();
+
 // Узоры движений: a и b — ключевые позы, alt — чередование сторон, p — период в секундах,
 // anchor — что стоит на месте, w — где вес (руки, грудь, таз, спина), props — опоры
 const P = {
@@ -61,8 +94,9 @@ const P = {
   bridgeHold: { a: BRIDGE(), anchor: "shoulder" },
   lunge: { a: pose({ legs: [leg(33.7, 10), leg(-36.7, 14, 45)] }), b: LUNGE_LOW(), p: 2.6, w: "hands", anchor: "toes" },
   splitHold: { a: LUNGE_LOW({ legs: [leg(60, 60), leg(-12, 73, 15)] }) },
-  stepUp: { a: pose({ legs: [leg(60, 70), leg(0, 0)] }), b: pose({ lift: 0.24, legs: [leg(0, 0), leg(35, 70, 60)] }), p: 2.6, props: ["step"], w: "hands" },
-  deadlift: { a: pose({ t: 62, legs: [leg(60, 80), leg(60, 80)], arms: [arm(0, 0), arm(0, 0)] }), b: pose({ arms: [arm(0, 0), arm(0, 0)] }), p: 2.8, w: "hands" },
+  // ведущая стопа стоит на ступеньке весь повтор (опора — она), толчковая — на полу позади
+  stepUp: { a: pose({ legs: [leg(60, 70), leg(0, 0)] }), b: pose({ lift: 0.24, legs: [leg(0, 0), leg(35, 70, 60)] }), p: 2.6, props: ["step"], w: "hands", anchor: "near" },
+  deadlift: { a: DEADLIFT[0], mids: DEADLIFT.slice(1, -1), b: DEADLIFT[DEADLIFT.length - 1], p: 3, w: "hands" },
   swing: { a: pose({ t: 62, legs: [leg(25, 32), leg(25, 32)], arms: [arm(-32, 0), arm(-32, 0)] }), b: pose({ t: -4, arms: [arm(86, 0), arm(86, 0)] }), p: 1.6, w: "hands" },
   calfRaise: { a: STAND, b: pose({ legs: [leg(0, 0, 50), leg(0, 0, 50)] }), p: 2, w: "hands", anchor: "toes" },
   calfHold: { a: pose({ legs: [leg(0, 0, 60), leg(0, 0, 60)] }), anchor: "toes" },
@@ -100,7 +134,7 @@ const P = {
   row: { a: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)] }), b: HINGE({ t: 65, legs: [leg(20, 28), leg(20, 28)], arms: [arm(-75, 75), arm(-75, 75)] }), p: 2.2, w: "hands" },
   reverseFly: { a: HINGE({ t: 72 }), b: HINGE({ t: 72, arms: [arm(-72, 6), arm(-72, 6)] }), p: 2.4, w: "hands" },
   hang: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), hang: 2.24, props: ["bar"] },
-  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(-12, 186), arm(-12, 186)] }), p: 2.8, hang: 2.24, anchor: "hands", props: ["bar"] },
+  pullUp: { a: pose({ t: -2, legs: [leg(4, 20), leg(4, 20)], arms: [arm(178, 0), arm(178, 0)] }), b: pose({ t: -6, legs: [leg(14, 40), leg(14, 40)], arms: [arm(38, 161), arm(38, 161)] }), p: 2.8, hang: 2.24, anchor: "hands", props: ["bar"] },
   shrug: { a: pose({ arms: [arm(2, 0), arm(2, 0)] }), b: pose({ sh: 0.05, arms: [arm(2, 0), arm(2, 0)] }), p: 1.8, w: "hands" },
   renegade: { a: PLANK_HIGH, b: pose({ t: 71, legs: [leg(-71, 0, -5), leg(-71, 0, -5)], arms: [arm(-72, 82), arm(3, 0)] }), alt: true, p: 2.2, w: "hands" },
   doorRow: { a: pose({ t: -28, legs: [leg(28, 0), leg(28, 0)], arms: [arm(80, 0), arm(80, 0)] }), b: pose({ t: -12, legs: [leg(12, 0), leg(12, 0)], arms: [arm(-13.6, 114.9, -16.3), arm(-13.6, 114.9, -16.3)] }), p: 2.4, props: ["door"] },
@@ -194,7 +228,7 @@ const P = {
   legSide: { a: fpose({ arms: [farm(10, 6), farm(70, 10)] }), b: fpose({ legs: [fleg(4), fleg(36)], arms: [farm(10, 6), farm(70, 10)] }), p: 2.2, anchor: "near" },
   stepSide: { a: fpose({ legs: [fleg(4, 12), fleg(4, 12)] }), b: fpose({ legs: [fleg(18, 16), fleg(5, 16)], arms: [farm(30, 20), farm(14, 10)] }), m: fpose({ legs: [fleg(12, 16, 0.12), fleg(5, 16)], arms: [farm(22, 15), farm(10, 10)] }), alt: true, p: 1.4 },
   weightShift: { a: fpose({ tp: 11, legs: [fleg(5), fleg(17)], arms: [farm(22, 12), farm(22, 12)] }), b: fpose({ tp: -11, legs: [fleg(17), fleg(5)], arms: [farm(22, 12), farm(22, 12)] }), p: 3 },
-  sideBendWarm: { a: fpose({ arms: [farm(6, 4), farm(6, 4)] }), b: fpose({ t: 18, arms: [farm(150, 40), farm(2, 2)] }), alt: true, p: 2.6 },
+  sideBendWarm: { a: fpose({ arms: [farm(6, 4), farm(6, 4)] }), b: fpose({ t: 18, arms: [farm(150, 40), farm(2, 2)] }), alt: true, p: 3.4 },
   shuffle: { a: fpose({ legs: [fleg(14, 26), fleg(14, 26)], arms: [farm(18, -130), farm(18, -130)] }), b: fpose({ air: 0.03, legs: [fleg(24, 28), fleg(6, 18)], arms: [farm(18, -130), farm(18, -130)] }), alt: true, p: 0.9 },
   bandLateral: { a: fpose({ arms: [farm(12, 5), farm(12, 5)] }), b: fpose({ arms: [farm(86, 5), farm(86, 5)] }), p: 2.2, props: ["bandFeet"] },
   sideBend: { a: fpose({ arms: [farm(170, 10), farm(170, 10)] }), b: fpose({ t: 18, arms: [farm(158, 10), farm(180, 0)] }), p: 3.2 },
@@ -234,9 +268,9 @@ const P = {
   gripHold: { a: pose({ arms: [arm(55, 35), arm(55, 35)] }) },
   neckIsoF: { a: fpose({ arms: [farm(10, 6), farm(57, 129, 143)] }) },
   // Скрёстный шаг: шаг в сторону, вторая нога заходит сзади накрест, снова шаг и приставить
-  crossStep: { seq: [fpose({ legs: [fleg(4), fleg(4)], arms: [farm(14, 6), farm(14, 6)] }), fpose({ legs: [fleg(4), fleg(14, 14, 0.1)], arms: [farm(28, 10), farm(28, 10)] }), fpose({ legs: [fleg(6), fleg(20)], arms: [farm(24, 10), farm(24, 10)] }), fpose({ legs: [{ h: -12, k: 8, lift: 0.05, lz: -1 }, fleg(12)], arms: [farm(30, 10), farm(30, 10)] }), fpose({ legs: [fleg(6), fleg(20)], arms: [farm(24, 10), farm(24, 10)] }), fpose({ legs: [fleg(4), fleg(14, 14, 0.1)], arms: [farm(20, 8), farm(20, 8)] })], alt: true, p: 3.6 },
+  crossStep: { seq: [fpose({ legs: [fleg(4), fleg(4)], arms: [farm(14, 6), farm(14, 6)] }), fpose({ legs: [fleg(4), fleg(14, 14, 0.1)], arms: [farm(28, 10), farm(28, 10)] }), fpose({ legs: [fleg(6), fleg(20)], arms: [farm(24, 10), farm(24, 10)] }), fpose({ legs: [{ h: -12, k: 8, lift: 0.05, lz: -1.7 }, fleg(12)], arms: [farm(30, 10), farm(30, 10)] }), fpose({ legs: [fleg(6), fleg(20)], arms: [farm(24, 10), farm(24, 10)] }), fpose({ legs: [fleg(4), fleg(14, 14, 0.1)], arms: [farm(20, 8), farm(20, 8)] })], alt: true, p: 3.6 },
   // «Конькобежец» без прыжка: шаг в сторону на согнутую ногу, другая уходит назад накрест
-  skaterX: { seq: [fpose({ legs: [fleg(5), fleg(5)], arms: [farm(14, 6), farm(14, 6)] }), fpose({ t: 3, legs: [fleg(5), fleg(12, 16, 0.1)], arms: [farm(22, 8), farm(14, 8)] }), fpose({ t: 5, legs: [fleg(6), fleg(18, 22)], arms: [farm(30, 10), farm(14, 8)] }), fpose({ t: 8, legs: [{ h: -16, k: 20, lift: 0.08, lz: -1 }, fleg(16, 26)], arms: [farm(42, 12), farm(8, 6)] }), fpose({ t: 5, legs: [fleg(6), fleg(18, 22)], arms: [farm(30, 10), farm(14, 8)] }), fpose({ t: 3, legs: [fleg(5), fleg(12, 16, 0.1)], arms: [farm(22, 8), farm(14, 8)] })], alt: true, p: 3 },
+  skaterX: { seq: [fpose({ legs: [fleg(5), fleg(5)], arms: [farm(14, 6), farm(14, 6)] }), fpose({ t: 3, legs: [fleg(5), fleg(12, 16, 0.1)], arms: [farm(22, 8), farm(14, 8)] }), fpose({ t: 5, legs: [fleg(6), fleg(18, 22)], arms: [farm(30, 10), farm(14, 8)] }), fpose({ t: 8, legs: [{ h: -16, k: 20, lift: 0.08, lz: -1.7 }, fleg(16, 26)], arms: [farm(42, 12), farm(8, 6)] }), fpose({ t: 5, legs: [fleg(6), fleg(18, 22)], arms: [farm(30, 10), farm(14, 8)] }), fpose({ t: 3, legs: [fleg(5), fleg(12, 16, 0.1)], arms: [farm(22, 8), farm(14, 8)] })], alt: true, p: 3 },
 };
 
 // Какой узор у какого упражнения
@@ -1116,7 +1150,10 @@ function frameAt(pat, time) {
   const B = second ? mirrorOf(pat)(pat.b) : pat.b;
   // доли цикла: пауза в A, путь A → B, пауза в B, путь B → A
   const tp = tempoOf(pat);
-  const go = tp > 0 ? 0.42 : tp < 0 ? 0.3 : 0.35, back = tp > 0 ? 0.3 : tp < 0 ? 0.42 : 0.35;
+  // быстрые ритмичные упражнения со сменой сторон (марш, колени вверх, захлёст голени) идут
+  // непрерывно, как в жизни: без замирания в крайних точках, поэтому и без рывков между ними
+  const flow = pat.flow !== undefined ? pat.flow : pat.alt && (pat.p || 2.6) <= 1.6;
+  const go = flow ? 0.5 : tp > 0 ? 0.42 : tp < 0 ? 0.3 : 0.35, back = flow ? 0.5 : tp > 0 ? 0.3 : tp < 0 ? 0.42 : 0.35;
   const h1 = (1 - go - back) / 2;
   let k;
   if (u < h1) k = 0;
@@ -1138,11 +1175,14 @@ function seqAt(pat, time) {
   const Pz = blend4(P[(i - 1 + n) % n], P[i], P[(i + 1) % n], P[(i + 2) % n], f);
   return { Pz, k: { i, f, n }, second, phase: u };
 }
-// Поза в долю k: если у узора есть промежуточная поза m, путь идёт A → m → B
+// Поза в долю k: если у узора есть промежуточные позы (m или список mids), путь идёт через них
+// плавной кривой (сплайн Катмулла — Рома): без остановки на промежуточной позе
 function poseAt(pat, B, k, second) {
-  if (!pat.m) return mix(pat.a, B, k);
-  const M = second ? mirrorOf(pat)(pat.m) : pat.m;
-  return k < 0.5 ? mix(pat.a, M, ease(k * 2)) : mix(M, B, ease((k - 0.5) * 2));
+  const mids = pat.mids || (pat.m ? [pat.m] : null);
+  if (!mids) return mix(pat.a, B, k);
+  const list = [pat.a, ...(second ? mids.map(mirrorOf(pat)) : mids), B];
+  const n = list.length - 1, x = Math.min(n - 1e-9, Math.max(0, k * n)), i = Math.floor(x);
+  return blend4(list[Math.max(0, i - 1)], list[i], list[i + 1], list[Math.min(n, i + 2)], x - i);
 }
 // Для упражнений с чередованием ног опора — стоящая нога: так она не скользит, пока другая
 // шагает. Опорную ногу узнаём по тому, чья лодыжка меньше смещается от позы A к позе B
@@ -1169,7 +1209,7 @@ const normDeg = a => ((((a + 180) % 360) + 360) % 360) - 180;
 function footLocks(pat, placeAt, second) {
   if (!pat.b && !pat.seq) return [];
   const mirror = mirrorOf(pat);
-  const keys = pat.seq ? pat.seq.map(Pz => (second ? mirror(Pz) : Pz)) : [pat.a, pat.m, pat.b].filter(Boolean).map(Pz => (second && Pz !== pat.a ? mirror(Pz) : Pz));
+  const keys = pat.seq ? pat.seq.map(Pz => (second ? mirror(Pz) : Pz)) : [pat.a, pat.m, ...(pat.mids || []), pat.b].filter(Boolean).map(Pz => (second && Pz !== pat.a ? mirror(Pz) : Pz));
   const Js = keys.map(Pz => placeAt(Pz, second));
   const same = ps => ps.every(q => Math.abs(q[0] - ps[0][0]) < 0.025 && Math.abs(q[1] - ps[0][1]) < 0.025);
   const low = ps => ps.every(q => q[1] - FOOT_R < 0.3);
@@ -1267,11 +1307,22 @@ function handAboveFloor(J, i, A) {
     const wrist = add(arm.elbow, down(A.s + e), LEN.fore);
     return { ...arm, wrist, hand: add(wrist, down(A.s + e + (A.w || 0)), LEN.hand) };
   };
-  for (let d = 3; d <= 150; d += 3) {
-    for (const sg of [1, -1]) {
+  // локоть сгибается в одну и ту же сторону (естественный сгиб), пока кисть не выйдет над полом;
+  // в обратную — только если так не получается. Перебор «то туда, то сюда» давал рывки
+  for (const sg of [1, -1]) {
+    let lo = 0, hi = 0;
+    for (let d = 3; d <= 150; d += 3) {
       const c = build(A.e + sg * d);
-      if (c.hand[1] - FOOT_R > -0.003 && c.wrist[1] - 0.035 > -0.003) return c;
+      if (c.hand[1] - FOOT_R > -0.003 && c.wrist[1] - 0.035 > -0.003) { hi = d; break; }
+      lo = d;
     }
+    if (!hi) continue;
+    // точнее: наименьший сгиб, при котором кисть над полом
+    for (let k = 0; k < 10; k++) {
+      const m = (lo + hi) / 2, c = build(A.e + sg * m);
+      if (c.hand[1] - FOOT_R > -0.003 && c.wrist[1] - 0.035 > -0.003) hi = m; else lo = m;
+    }
+    return build(A.e + sg * hi);
   }
   return arm;
 }
