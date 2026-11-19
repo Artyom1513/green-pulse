@@ -80,7 +80,7 @@ export const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
 // Тон кожи фигур в схемах движений и цвет волос к нему
 export const SKINS = [
   { id: "light", name: "Светлый", c: "#f2d1b3", hair: "#6b4a2f" },
-  { id: "medium", name: "Средний", c: "#e2b08a", hair: "#3b2a20" },
+  { id: "medium", name: "Средний", c: "#deb398", hair: "#3b2a20" },
   { id: "tan", name: "Смуглый", c: "#c58b5f", hair: "#2a1d16" },
   { id: "brown", name: "Тёмный", c: "#8f5c3a", hair: "#1c1410" },
   { id: "deep", name: "Очень тёмный", c: "#5e3c27", hair: "#14100d" }

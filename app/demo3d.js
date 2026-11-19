@@ -1022,8 +1022,10 @@ function contactProbes(j, C) {
 const VS = `
 attribute vec3 aPos; attribute vec3 aNor; attribute vec4 aBone; attribute vec4 aWt; attribute vec3 aMat; attribute vec3 aSd; attribute float aFace; attribute float aWork;
 uniform mat4 uVP; uniform mat4 uView; uniform vec4 uB[${NB * 3}]; uniform vec3 uPal[8]; uniform vec3 uWorkCol; uniform float uWorkAmt;
-varying vec3 vN; varying vec3 vC0; varying vec3 vC1; varying vec3 vC2; varying vec4 vD; varying vec3 vF;
+varying vec3 vN; varying vec3 vC0; varying vec3 vC1; varying vec3 vC2; varying vec4 vD; varying vec3 vF; varying vec4 vM;
 void main() {
+  // доля кожи по трём слоям материала и доля волос — для своего освещения кожи и волос
+  vM = vec4(step(aMat.x, 0.5), step(aMat.y, 0.5), step(aMat.z, 0.5), step(abs(aMat.x - 5.0), 0.5));
   int i0 = int(aBone.x + 0.5) * 3; int i1 = int(aBone.y + 0.5) * 3; int i2 = int(aBone.z + 0.5) * 3; int i3 = int(aBone.w + 0.5) * 3;
   vec4 r0 = uB[i0] * aWt.x + uB[i1] * aWt.y + uB[i2] * aWt.z + uB[i3] * aWt.w;
   vec4 r1 = uB[i0 + 1] * aWt.x + uB[i1 + 1] * aWt.y + uB[i2 + 1] * aWt.z + uB[i3 + 1] * aWt.w;
@@ -1044,30 +1046,62 @@ void main() {
 }`;
 const FS = `
 precision mediump float;
-varying vec3 vN; varying vec3 vC0; varying vec3 vC1; varying vec3 vC2; varying vec4 vD; varying vec3 vF;
-uniform vec3 uRim; uniform float uAmb; uniform vec3 uHair; uniform vec3 uIris;
+varying vec3 vN; varying vec3 vC0; varying vec3 vC1; varying vec3 vC2; varying vec4 vD; varying vec3 vF; varying vec4 vM;
+uniform vec3 uRim; uniform float uAmb; uniform vec3 uHair; uniform vec3 uIris; uniform float uBlink; uniform float uFem;
+float g2(float x, float w) { return exp(-(x / w) * (x / w)); }
+// Лицо рисуется по координатам точки на голове (q — от середины лица, метры): глаза миндалевидные,
+// с радужкой, зрачком, бликом и ресницами; брови по форме — мужские прямее, женские с изломом;
+// губы с «луком Купидона», уголки чуть вверх — спокойная полуулыбка; лёгкий румянец
 vec3 face(vec3 skin, vec2 q) {
   float ax = abs(q.x);
-  // глаз: белок, радужка, зрачок; сверху — тёмная линия века и ресниц
-  vec2 e = vec2((ax - 0.031) / 0.0118, (q.y - 0.0172) / 0.0054);
-  float r2 = dot(e, e);
-  float white = 1.0 - smoothstep(0.78, 1.0, r2);
-  vec2 ir = vec2(ax - 0.0306, q.y - 0.0176) / 0.0051;
-  float i2 = dot(ir, ir);
-  float lid = smoothstep(0.7, 0.95, r2) * (1.0 - smoothstep(1.25, 1.7, r2)) * smoothstep(-0.25, 0.2, e.y);
-  // бровь — дуга над глазом; губы — чуть темнее и розовее кожи
-  float bx = (ax - 0.0325) / 0.0215;
-  float by = (q.y - (0.0392 - 0.0042 * bx * bx)) / 0.0027;
-  float brow = (1.0 - smoothstep(0.55, 1.0, abs(by))) * (1.0 - smoothstep(0.8, 1.0, abs(bx)));
-  float lx = q.x / 0.0225;
-  float ly = (q.y + 0.0488) / (0.0072 * max(0.12, 1.0 - 0.82 * lx * lx));
-  float lips = (1.0 - smoothstep(0.6, 1.0, abs(ly))) * (1.0 - smoothstep(0.85, 1.0, abs(lx)));
-  vec3 c = mix(skin, skin * vec3(0.86, 0.6, 0.58), lips * 0.62);
-  c = mix(c, uHair * vF.z * 0.8, brow * 0.82);
-  c = mix(c, skin * 0.42, lid * 0.75);
-  c = mix(c, vec3(0.93, 0.92, 0.9) * vF.z, white);
-  c = mix(c, uIris, white * (1.0 - smoothstep(0.7, 1.0, i2)));
-  c = mix(c, vec3(0.05, 0.04, 0.04), white * (1.0 - smoothstep(0.1, 0.2, i2)));
+  vec3 c = skin;
+  c = mix(c, c * vec3(1.03, 0.88, 0.87), g2(ax - 0.05, 0.017) * g2(q.y + 0.008, 0.014) * (0.1 + 0.14 * uFem));
+  c *= 1.0 - 0.14 * g2(ax - 0.0085, 0.0042) * g2(q.y + 0.0236, 0.0024);
+  c *= 1.0 - 0.07 * g2(ax - 0.03, 0.016) * g2(q.y - 0.012, 0.007);
+  // губы
+  float lx = q.x / (0.0212 + 0.0022 * uFem), lxx = lx * lx;
+  float dy = q.y - (-0.0488 + 0.0017 * lxx * lxx + 0.0004 * lxx);
+  float bow = 1.0 + 0.22 * g2(abs(lx) - 0.2, 0.13) - 0.18 * g2(lx, 0.07);
+  float upH = (0.0036 + 0.0006 * uFem) * pow(max(0.0, 1.0 - lxx), 0.6) * bow;
+  float loH = (0.005 + 0.0019 * uFem) * pow(max(0.0, 1.0 - lxx), 0.75);
+  float upLip = smoothstep(-0.0002, 0.0003, dy) * (1.0 - smoothstep(upH - 0.0005, upH + 0.0004, dy));
+  float loLip = smoothstep(-loH - 0.0005, -loH + 0.0004, dy) * (1.0 - smoothstep(-0.0003, 0.0002, dy));
+  float lip = max(upLip, loLip) * (1.0 - smoothstep(0.9, 1.02, abs(lx)));
+  vec3 lipCol = mix(skin * vec3(0.9, 0.7, 0.68), mix(skin * vec3(0.88, 0.6, 0.62), vec3(0.74, 0.38, 0.42) * vF.z, 0.35), uFem);
+  lipCol += loLip * vec3(0.06) * g2(dy + loH * 0.42, loH * 0.3 + 0.0001) * (1.0 - lxx);
+  c = mix(c, lipCol, lip * 0.92);
+  c = mix(c, skin * vec3(0.45, 0.32, 0.3), g2(dy, 0.00045) * (1.0 - smoothstep(0.85, 1.05, abs(lx))) * 0.85);
+  // брови
+  float bx = clamp((ax - 0.0105) / 0.0445, 0.0, 1.2);
+  float archF = bx < 0.66 ? bx / 0.66 : 1.0 - (bx - 0.66) / 0.34 * 1.1;
+  float arch = mix(sin(min(bx, 1.0) * 2.4) * 0.8, archF, uFem);
+  float bc = 0.0368 - 0.0016 * uFem + (0.0018 + 0.002 * uFem) * arch - 0.0006 * bx;
+  float bth = mix(0.0046 - 0.002 * bx, 0.0036 - 0.0019 * bx, uFem);
+  float brow = (1.0 - smoothstep(0.55, 1.0, abs(q.y - bc) / max(bth, 0.0006))) * smoothstep(-0.02, 0.06, bx) * (1.0 - smoothstep(0.95, 1.08, bx));
+  c = mix(c, uHair * vF.z * 0.7, brow * (0.9 - 0.08 * uFem) * (0.86 + 0.14 * sin(ax * 2600.0 + q.y * 900.0)));
+  // глаз
+  float ex = (ax - 0.0312) / (0.0127 + 0.0011 * uFem), exx = min(ex * ex, 1.0);
+  float cy = q.y - 0.0171 - (0.0006 + 0.0008 * uFem) * ex;
+  float open = 1.0 - 0.96 * uBlink;
+  float up = (0.0057 + 0.0006 * uFem - 0.0009 * ex) * open * pow(1.0 - exx, 0.55);
+  float lo = 0.0039 * pow(1.0 - exx, 0.7);
+  float inside = smoothstep(-lo - 0.0004, -lo + 0.0003, cy) * (1.0 - smoothstep(up - 0.0003, up + 0.0004, cy)) * (1.0 - smoothstep(0.92, 1.0, abs(ex)));
+  vec3 sclera = vec3(0.93, 0.91, 0.89) * vF.z * (0.9 + 0.1 * (1.0 - exx));
+  sclera = mix(sclera, vec3(0.86, 0.6, 0.58) * vF.z, g2(ex + 0.95, 0.12));
+  vec2 ic = vec2(ax - 0.0306, q.y - 0.0174) / (0.0058 + 0.0004 * uFem);
+  float ir = length(ic);
+  vec3 iris = mix(uIris * 1.3, uIris * 0.55, smoothstep(0.35, 1.0, ir)) * (0.9 + 0.1 * sin(atan(ic.y, ic.x) * 14.0));
+  vec3 eye = mix(sclera, iris, 1.0 - smoothstep(0.88, 1.0, ir));
+  eye = mix(eye, vec3(0.03, 0.025, 0.02), 1.0 - smoothstep(0.3, 0.4, ir));
+  eye *= 0.7 + 0.3 * smoothstep(0.0, 0.003, up - cy);
+  eye = mix(eye, vec3(1.0), (1.0 - smoothstep(0.12, 0.2, length(ic - vec2(-0.3, 0.32)))) * 0.9);
+  c = mix(c, eye, inside);
+  float lashW = (0.00045 + 0.00045 * max(ex, 0.0)) * (1.0 + 0.9 * uFem);
+  float lash = g2(cy - up - lashW * 0.4, lashW) * (1.0 - smoothstep(0.98, 1.1 + 0.15 * uFem, abs(ex)));
+  float wing = uFem * g2(ex - 1.08, 0.1) * g2(cy - 0.0012, 0.0009);
+  c = mix(c, uHair * 0.35, clamp(lash * 0.9 + wing * 0.8, 0.0, 1.0));
+  c *= 1.0 - 0.12 * g2(cy - up - 0.0034 * open - 0.0006, 0.0007) * (1.0 - exx);
+  c = mix(c, skin * 0.6, g2(cy + lo + 0.0002, 0.00035) * (1.0 - exx) * 0.35);
   return c;
 }
 void main() {
@@ -1080,14 +1114,25 @@ void main() {
   float hemi = 0.5 + 0.5 * n.y;
   float rim = pow(1.0 - max(dot(n, V), 0.0), 2.6);
   vec3 h = normalize(L1 + V);
-  float spec = pow(max(dot(n, h), 0.0), 30.0) * 0.1;
+  float nh = max(dot(n, h), 0.0);
   vec3 amb = mix(vec3(0.74, 0.76, 0.82), vec3(1.0), hemi);
   float term = w1 * (1.0 - w1) * 4.0;
   // материал точки: границы одежды — по расстояниям до них (ровный край)
   float e = 0.0011;
-  vec3 base = mix(vC0, mix(vC1, vC2, smoothstep(-e, e, vD.y)), smoothstep(-e, e, vD.x));
+  float sx = smoothstep(-e, e, vD.x), sy = smoothstep(-e, e, vD.y);
+  vec3 base = mix(vC0, mix(vC1, vC2, sy), sx);
+  float sk = mix(vM.x, mix(vM.y, vM.z, sy), sx), hr = vM.w;
+  // кожа освещается мягче: свет «огибает» форму, без резкой границы тени на скуле и челюсти
+  w1 = mix(w1, max((dot(n, L1) + 0.5) / 1.5, 0.0), sk);
+  term = w1 * (1.0 - w1) * 4.0;
   if (vD.z > 0.01) base = mix(base, face(base, vF.xy), vD.z);
+  // блик: на коже мягкий и широкий (бархат, а не пластик), на ткани — как было
+  float spec = mix(pow(nh, 30.0) * 0.1, pow(nh, 16.0) * 0.055, sk);
   vec3 col = base * (uAmb * amb + 0.62 * w1 * vec3(1.0, 0.97, 0.93) + 0.2 * w2 * vec3(0.84, 0.9, 1.0)) + base * vec3(0.05, 0.02, 0.0) * term + uRim * rim * 0.28 + spec;
+  // кожа: свет немного «проходит» под кожу — переход в тень тёплый, тени не серые; лёгкий отсвет по краю
+  col += sk * (base * vec3(0.07, 0.025, 0.008) * term + base * vec3(0.03, 0.01, 0.0) * (1.0 - w1) + vec3(1.0, 0.88, 0.82) * rim * 0.04);
+  // волосы: мягкий блик вдоль прядей и чуть светлее по контуру
+  col += hr * (vec3(0.15, 0.12, 0.09) * pow(nh, 12.0) + uHair * 0.1 * rim);
   // у самого пола чуть темнее — фигура «стоит», а не висит
   col *= 0.84 + 0.16 * smoothstep(0.0, 0.1, vD.w);
   gl_FragColor = vec4(col, 1.0);
@@ -2337,7 +2382,11 @@ function draw(d, o = {}) {
     gl.uniform1f(L.uWorkAmt, opts.muscles ? 0.42 + 0.22 * effort : 0);
     gl.uniform3fv(L.uRim, pal.accent);
     gl.uniform3fv(L.uHair, pal.hair);
-    gl.uniform3fv(L.uIris, [0.27, 0.19, 0.14]);
+    // глаза: у мужской фигуры карие, у женской — зеленовато-ореховые; изредка моргает (пока показ идёт)
+    const fem = d.sex === "f";
+    gl.uniform3fv(L.uIris, fem ? [0.27, 0.3, 0.22] : [0.3, 0.2, 0.13]);
+    gl.uniform1f(L.uFem, fem ? 1 : 0);
+    gl.uniform1f(L.uBlink, d.paused || still || reduced() ? 0 : blinkAt(d.t + (d.blinkSeed || (d.blinkSeed = 0.7 + Math.random() * 2.5))));
     gl.uniform1f(L.uAmb, opts.dark ? 0.34 : 0.42);
     const attr = (buf, loc, size) => { if (loc === undefined || loc < 0) return; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 0, 0); };
     attr(G.pos, L.aPos, 3); attr(G.nor, L.aNor, 3); attr(G.bi, L.aBone, 4); attr(G.bw, L.aWt, 4); attr(G.mat, L.aMat, 3); attr(G.sd, L.aSd, 3); attr(G.face, L.aFace, 1); attr(d.workBuf, L.aWork, 1);
@@ -2350,6 +2399,14 @@ function draw(d, o = {}) {
   const ctx = d.ctx || (d.ctx = d.canvas.getContext("2d"));
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(r.canvas, 0, r.canvas.height - h, w, h, 0, 0, w, h);
+}
+// Моргание: раз в несколько секунд, быстро закрыть и чуть медленнее открыть
+function blinkAt(t) {
+  const p = ((t % 4.3) + 4.3) % 4.3;
+  if (p < 0.07) return smooth(0, 0.07, p);
+  if (p < 0.1) return 1;
+  if (p < 0.2) return 1 - smooth(0.1, 0.2, p);
+  return 0;
 }
 // Матрицы костей 4×4 (по столбцам) → три строки на кость для шейдера
 const PACK = new Float32Array(NB * 12);
